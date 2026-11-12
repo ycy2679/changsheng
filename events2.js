@@ -233,3 +233,11 @@ Object.assign(ARC_END_LABEL, {
   redeemed: '你給了回頭的他一條路', slain: '你斬了他', demon: '他魔功大成，說在上面等你',
   vow: '你答應替他守碑', left: '你沒有接下那塊碑',
 });
+
+// 天材地寶現世：給下一個大境界要用的天材地寶。每個大境界都有一次機會（free：不受一世 4 次、隔 40 年的限制）
+EVENTS.push(
+  { id: 'tiancai', free: true, title: '天材地寶現世', cond: s => !!tcNext() && !s.flags['tc_' + stg().major], text: () => `遠處靈光沖天，是${ITEMS[tcNext()].name}出世了。四周已經聚了不少修士，還有一頭守著它的妖獸。`, choices: [
+    { t: '跟妖獸搶', run() { if (battle('守寶妖獸', placeLv() + 2, 1.25)) return `你斬了妖獸，搶在眾人之前收起${addTc()}。`; return '妖獸太凶，你負傷退走，寶物被別人撿了便宜。'; } },
+    { t: () => `出價收購（靈石 ${tcBuyPrice()}）`, cond: s => s.stone >= tcBuyPrice(), run(s) { s.stone -= tcBuyPrice(); return `搶到手的修士開價不低，你還是買下了${addTc()}。`; } },
+    { t: '看看就好', run() { return '寶物最後落到一位大宗門弟子手裡。'; } }] },
+);

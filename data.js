@@ -126,11 +126,11 @@ const TECHS = {
   jubao:   { name: '聚寶錄', grade: 4, type: '尋寶', elem: '無', stone: .8, drop: .8 },
 };
 const NO_SCALE = ['life', 'brk', 'offline', 'risk'];
-const EFF_LABEL = { rate: '修煉', hp: '氣血', atk: '攻擊', def: '防禦', spd: '身法', crit: '暴擊', critDmg: '暴傷', dodge: '閃避', regen: '每回合回血', lifesteal: '吸血', life: '壽元', brk: '突破率', stone: '遊歷靈石', drop: '掉落', evRate: '奇遇', offline: '離線上限', pillEff: '丹藥效果', toxRes: '丹毒抗性', killXiu: '擊殺得修為', techXp: '功法精進', lateRate: '壽元將盡時修煉', lifePct: '壽元', risk: '突破失敗損失加倍' };
+const EFF_LABEL = { rate: '修煉', hp: '氣血', mp: '法力', atk: '攻擊', def: '防禦', spd: '身法', crit: '暴擊', critDmg: '暴傷', dodge: '閃避', regen: '每回合回血', lifesteal: '吸血', life: '壽元', brk: '突破率', stone: '遊歷靈石', drop: '掉落', evRate: '奇遇', offline: '離線上限', pillEff: '丹藥效果', toxRes: '丹毒抗性', killXiu: '擊殺得修為', techXp: '功法精進', lateRate: '壽元將盡時修煉', lifePct: '壽元', risk: '突破失敗損失加倍' };
 const FLAT_EFF = ['spd', 'life', 'offline'];   // 這些顯示成數字，其他顯示成百分比
 
 // ---------- 丹藥 ----------
-// kind：xiu 修為丹（major 對應的大境界）、brk 突破丹、heal 療傷、mp 回氣、life 延壽、body 洗髓、tech 悟道
+// kind：xiu 修為丹（major 對應的大境界）、brk 突破丹、heal 療傷、mp 回氣、life 延壽、body 洗髓、tech 悟道、tc 天材地寶
 const ITEMS = {
   heal:     { name: '療傷丹', kind: 'heal', desc: '立刻治好傷勢。' },
   huiqi:    { name: '回氣丹', kind: 'mp', desc: '戰鬥中法力不夠又傷到一半時自動服用，回復六成法力。每場最多一顆。' },
@@ -154,7 +154,17 @@ const ITEMS = {
   yanshou:  { name: '延壽丹', kind: 'life', desc: '壽元 +15 年，有丹毒。' },
   xisui:    { name: '洗髓丹', kind: 'body', desc: '這一世氣血、攻擊、防禦永久 +3%，有丹毒。' },
   wudao:    { name: '悟道丹', kind: 'tech', desc: '主修功法立刻精進 10 分鐘的進度。' },
+  // 天材地寶（major 是從哪個大境界往上衝時用）：衝大境界時自動使用，沒有它品質最多上品
+  xuanhuang: { name: '玄黃地乳', kind: 'tc', major: 0, desc: '地脈深處凝出的靈乳。突破築基時自動使用，才有機會成就無瑕道基。' },
+  chiyang:   { name: '赤陽丹砂', kind: 'tc', major: 1, desc: '至陽之地千年才結一粒。突破金丹時自動使用，才有機會結成九竅金丹。' },
+  ninghun:   { name: '凝魂玉露', kind: 'tc', major: 2, desc: '能凝住魂魄的露水。突破元嬰時自動使用，才有機會引來萬象來朝。' },
+  shenmu:    { name: '神木之心', kind: 'tc', major: 3, desc: '上古神木枯死後留下的木心。突破化神時自動使用，才有機會凝出不滅法相。' },
+  xukong:    { name: '虛空晶核', kind: 'tc', major: 4, desc: '虛空裂隙裡凝結的晶核。突破煉虛時自動使用，才有機會凝出不滅法相。' },
+  liangyi:   { name: '兩儀泉', kind: 'tc', major: 5, desc: '一半冰冷一半滾燙的泉水。突破合體時自動使用，才有機會凝出不滅法相。' },
+  jiujie:    { name: '九劫金蓮', kind: 'tc', major: 6, desc: '熬過九次天劫才開的蓮花。突破大乘時自動使用，才有機會凝出不滅法相。' },
+  tianxin:   { name: '天心石', kind: 'tc', major: 7, desc: '據說是天道落下的一塊石頭。突破渡劫時自動使用，才有機會凝出不滅法相。' },
 };
+const TC_ITEMS = ['xuanhuang', 'chiyang', 'ninghun', 'shenmu', 'xukong', 'liangyi', 'jiujie', 'tianxin'];
 const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due'];
 const BRK_PILLS = ['zhuji', 'ningyuan', 'huaying', 'tongxuan', 'poxu', 'heyuan', 'dacheng', 'yinjie'];
 const BRK_PILL_PRICE = [600, 6000, 40000, 120000, 400000, 1.2e6, 4e6, 1.2e7];
@@ -173,7 +183,7 @@ const PLACES = [
 
 // ---------- 坊市 ----------
 const SHOP_REFRESH = 600;          // 秒，貨架自動換貨
-const SHOP_SLOTS = 8;
+const SHOP_PER = 4;   // 坊市每一類（功法、術法、法寶、丹藥）擺幾格
 const TECH_PRICE = [0, 200, 2500, 25000, 150000];
 const GRADE_MIN_STAGE = [0, 0, 4, 10, 15];         // 坊市開始賣這個品階的境界
 const GRADE_WEIGHT = [0, 50, 30, 12, 3];

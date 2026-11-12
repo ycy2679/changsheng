@@ -33,8 +33,9 @@ const EVENTS = [
   { id: 'ambush', repeat: true, min: 3, title: '劫修攔路', text: '三個蒙面修士堵住山道：「留下靈石，饒你一命。」', choices: [
     { t: '動手', run() { if (battle('劫修', placeLv() + 1, 1)) return `你反搶了他們的儲物袋，得靈石 ${addStone(stoneUnit() * 4)}。`; return '寡不敵眾，你負傷突圍。'; } },
     { t: '交出三成靈石', run(s) { const n = Math.floor(s.stone * .3); s.stone -= n; return `失去靈石 ${n}。`; } }] },
-  { id: 'auction', min: 5, title: '坊市拍賣', text: () => `坊市今夜開拍，壓軸是一卷功法，起拍價 ${auctionPrice()} 靈石。`, choices: [
-    { t: '競拍', cond: s => s.stone >= auctionPrice(), run(s) { s.stone -= auctionPrice(); const id = randomUnowned('tech', [2, 3]); if (!id) return '……拍到的是你早就會的功法。'; learnTech(id); return `你拍下了《${TECHS[id].name}》。`; } },
+  // 壓軸有三成五機率改成天材地寶（第一次看到時決定，一世只有一場）
+  { id: 'auction', min: 5, title: '坊市拍賣', text: s => { if (s.flags.lot === undefined) s.flags.lot = tcNext() && pct(.35) ? tcNext() : ''; return `坊市今夜開拍，壓軸是${s.flags.lot ? ITEMS[s.flags.lot].name : '一卷功法'}，起拍價 ${auctionPrice()} 靈石。`; }, choices: [
+    { t: '競拍', cond: s => s.stone >= auctionPrice(), run(s) { s.stone -= auctionPrice(); if (s.flags.lot) { addItem(s.flags.lot); return `你拍下了${ITEMS[s.flags.lot].name}。`; } const id = randomUnowned('tech', [2, 3]); if (!id) return '……拍到的是你早就會的功法。'; learnTech(id); return `你拍下了《${TECHS[id].name}》。`; } },
     { t: '只是看看', run() { return '壓軸被一位戴斗笠的女修拍走了。'; } }] },
   { id: 'duel', repeat: true, min: 2, title: '宗門弟子', text: '一名大宗門的年輕弟子攔下你，說要拿散修練手。', choices: [
     { t: '應戰', run(s) { if (battle('宗門弟子', s.stage + 1, 1.05)) { for (const id of s.equip) s.skills[id] += 5; return '他捂著胸口認輸。這一戰讓你的術法熟練了不少。'; } return '你輸了。他扔下一句「散修不過如此」便走了。'; } },

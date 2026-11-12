@@ -141,7 +141,8 @@ function skillDesc(k) {
   return p.join(' · ');
 }
 
-// ---------- 法寶：武器、護甲、飾品各一格，效果和功法共用同一套欄位，祭煉每級 +15% ----------
+// ---------- 法寶：武器、護甲各一格，飾品 1～3 格（悟道樹「萬寶隨身」），效果和功法共用同一套欄位，祭煉每級 +15% ----------
+// ART_SLOTS 是法寶種類；身上的欄位用 gearKeys()，飾品欄依序叫 飾品、飾品2、飾品3
 const ART_SLOTS = ['武器', '護甲', '飾品'];
 const ARTS = {
   qingfeng:  { name: '青鋒劍', slot: '武器', grade: 1, atk: .1 },
@@ -151,6 +152,12 @@ const ARTS = {
   jingleichui: { name: '驚雷錘', slot: '武器', grade: 3, atk: .35, crit: .1 },
   zhanyue:   { name: '斬月刀', slot: '武器', grade: 3, atk: .4, critDmg: .3 },
   taixu:     { name: '太虛劍', slot: '武器', grade: 4, atk: .7, crit: .15, critDmg: .5 },
+  taomu:     { name: '桃木劍', slot: '武器', grade: 1, atk: .08, crit: .03 },
+  gangbian:  { name: '精鋼鞭', slot: '武器', grade: 1, atk: .12 },
+  qingshuang: { name: '青霜劍', slot: '武器', grade: 2, atk: .18, dodge: .03 },
+  chiyan:    { name: '赤焰槍', slot: '武器', grade: 2, atk: .22, critDmg: .1 },
+  jinghong:  { name: '驚鴻劍', slot: '武器', grade: 3, atk: .35, spd: 4 },
+  panlong:   { name: '盤龍戟', slot: '武器', grade: 4, atk: .6, crit: .1, lifesteal: .05 },
   shoupi:    { name: '獸皮軟甲', slot: '護甲', grade: 1, def: .1, hp: .05 },
   suoyi:     { name: '青竹蓑衣', slot: '護甲', grade: 1, def: .05, dodge: .03 },
   xuantie:   { name: '玄鐵重甲', slot: '護甲', grade: 2, def: .25, hp: .1, spd: -2 },
@@ -158,14 +165,26 @@ const ARTS = {
   guijia:    { name: '龜甲護心鏡', slot: '護甲', grade: 3, def: .35, hp: .2 },
   nichang:   { name: '霓裳羽衣', slot: '護甲', grade: 3, dodge: .1, spd: 5 },
   jiulong:   { name: '九龍神甲', slot: '護甲', grade: 4, def: .6, hp: .5, regen: .02 },
-  pingan:    { name: '平安符', slot: '飾品', grade: 1, hp: .05, life: 5 },
+  daopao:    { name: '布衣道袍', slot: '護甲', grade: 1, def: .06, hp: .04 },
+  tengjia:   { name: '藤甲', slot: '護甲', grade: 1, def: .12, spd: -1 },
+  linwen:    { name: '鱗紋甲', slot: '護甲', grade: 2, def: .2, hp: .12 },
+  liuyunshan: { name: '流雲衫', slot: '護甲', grade: 2, def: .12, dodge: .05 },
+  xuanwu:    { name: '玄武重鎧', slot: '護甲', grade: 3, def: .45, hp: .25, spd: -3 },
+  xingchen:  { name: '星辰戰衣', slot: '護甲', grade: 4, def: .45, hp: .3, dodge: .08 },
+  pingan:    { name: '平安符', slot: '飾品', grade: 1, life: 10 },
   juling:    { name: '聚靈玉佩', slot: '飾品', grade: 1, rate: .08 },
-  zhaocai:   { name: '招財葫蘆', slot: '飾品', grade: 2, stone: .3 },
+  zhaocai:   { name: '招財葫蘆', slot: '飾品', grade: 2, stone: .3, drop: .15 },
   yanghunyu: { name: '養魂玉', slot: '飾品', grade: 2, techXp: .25, toxRes: .1 },
   bixie:     { name: '辟邪鈴', slot: '飾品', grade: 2, brk: .03, evRate: .1 },
-  qiankun:   { name: '乾坤袋', slot: '飾品', grade: 3, drop: .5, offline: 2 },
-  pantao:    { name: '蟠桃核', slot: '飾品', grade: 3, life: 60 },
-  xingpan:   { name: '周天星盤', slot: '飾品', grade: 4, rate: .4, brk: .06 },
+  qiankun:   { name: '乾坤袋', slot: '飾品', grade: 3, drop: .5, offline: 2, stone: .2 },
+  pantao:    { name: '蟠桃核', slot: '飾品', grade: 3, life: 60, hp: .1, regen: .01 },
+  xingpan:   { name: '周天星盤', slot: '飾品', grade: 4, rate: .4, brk: .06, techXp: .3, mp: .2 },
+  lingxi:    { name: '靈犀香囊', slot: '飾品', grade: 1, mp: .2 },
+  tongxin:   { name: '同心結', slot: '飾品', grade: 2, hp: .08, regen: .01 },
+  qingxin:   { name: '清心玉', slot: '飾品', grade: 2, toxRes: .2, pillEff: .15 },
+  xuanjing:  { name: '玄晶耳墜', slot: '飾品', grade: 3, crit: .08, critDmg: .2, atk: .1 },
+  jieyin:    { name: '接引燈', slot: '飾品', grade: 3, brk: .04, mp: .3, rate: .1 },
+  hunyuanzhu: { name: '混元珠', slot: '飾品', grade: 4, atk: .2, hp: .2, mp: .3, def: .2 },
 };
 const ART_PRICE = [0, 250, 3000, 30000, 180000];
 const ART_MAX_REFINE = 9;
