@@ -130,9 +130,10 @@ const EFF_LABEL = { rate: '修煉', hp: '氣血', atk: '攻擊', def: '防禦', 
 const FLAT_EFF = ['spd', 'life', 'offline'];   // 這些顯示成數字，其他顯示成百分比
 
 // ---------- 丹藥 ----------
-// kind：xiu 修為丹（major 對應的大境界）、brk 突破丹、heal 療傷、life 延壽、body 洗髓、tech 悟道
+// kind：xiu 修為丹（major 對應的大境界）、brk 突破丹、heal 療傷、mp 回氣、life 延壽、body 洗髓、tech 悟道
 const ITEMS = {
   heal:     { name: '療傷丹', kind: 'heal', desc: '立刻治好傷勢。' },
+  huiqi:    { name: '回氣丹', kind: 'mp', desc: '戰鬥中法力不夠又傷到一半時自動服用，回復六成法力。每場最多一顆。' },
   juqi:     { name: '聚氣丹', kind: 'xiu', major: 0, desc: '練氣期的修為丹。' },
   peiyuan:  { name: '培元丹', kind: 'xiu', major: 1, desc: '築基期的修為丹。' },
   jinsui:   { name: '金髓丹', kind: 'xiu', major: 2, desc: '金丹期的修為丹。' },

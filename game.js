@@ -261,11 +261,12 @@ const stoneUnit = (lv = placeLv()) => Math.round(4 * Math.pow(lv, 1.4));
 const auctionPrice = () => Math.round(400 * Math.pow(1.3, Math.max(0, L().stage - 5)));
 const pillDisc = () => 1 - .1 * tl('zhekou');   // 丹房熟客
 const healPrice = () => Math.round(20 * (1 + L().stage) * pillDisc());
+const mpPillPrice = () => Math.round(15 * (1 + L().stage) * pillDisc());
 const cavePrice = () => 80 * Math.pow(2, L().cave);
 const xiuPillPrice = () => Math.round(25 * Math.pow(1.5, L().stage) * pillDisc());
 const itemPrice = id => {
   const st = L().stage, k = ITEMS[id].kind, f = Math.pow(1 + st, 1.5);
-  return k === 'heal' ? healPrice() : k === 'xiu' ? xiuPillPrice() : Math.round(pillDisc() * (k === 'brk' ? BRK_PILL_PRICE[ITEMS[id].major]
+  return k === 'heal' ? healPrice() : k === 'mp' ? mpPillPrice() : k === 'xiu' ? xiuPillPrice() : Math.round(pillDisc() * (k === 'brk' ? BRK_PILL_PRICE[ITEMS[id].major]
     : { life: 200, body: 500, tech: 150 }[k] * f));
 };
 // 賣給坊市：原價七成。原價用丹藥本身的價位算，不跟著現在的境界漲
@@ -273,7 +274,7 @@ const SELL_RATE = .7;
 const sellItemPrice = id => {
   const it = ITEMS[id], k = it.kind;
   const base = k === 'brk' ? BRK_PILL_PRICE[it.major] : k === 'xiu' ? 25 * Math.pow(1.5, STAGES.findIndex(x => x.major === it.major))
-    : k === 'heal' ? 20 : { life: 200, body: 500, tech: 150 }[k];
+    : k === 'heal' ? 20 : k === 'mp' ? 15 : { life: 200, body: 500, tech: 150 }[k];
   return Math.max(1, Math.round(base * SELL_RATE));
 };
 const sellArtPrice = id => Math.round(ART_PRICE[ARTS[id].grade] * SELL_RATE);
@@ -354,7 +355,7 @@ function rate(s = L(), mode = s.mode) {
 function stats(s = L()) {
   const k = 1 + .5 * s.stage, b = 1 + s.body;
   return {
-    hp: Math.round(100 * k * (1 + eff('hp')) * b), atk: 10 * k * (1 + eff('atk')) * b, def: 5 * k * (1 + eff('def')) * b,
+    hp: Math.round(100 * k * (1 + eff('hp')) * b), mp: Math.round(50 * k * techMul(s.tech, s)), atk: 10 * k * (1 + eff('atk')) * b, def: 5 * k * (1 + eff('def')) * b,
     spd: Math.max(1, Math.round(10 + 2 * s.stage + eff('spd'))), crit: .05 + eff('crit'), critDmg: 1.5 + eff('critDmg'),
     dodge: eff('dodge'), regen: eff('regen'), lifesteal: eff('lifesteal'),
   };
@@ -371,6 +372,9 @@ function skillPow(id, s = L()) {
   const boost = s.phys && PHYSIQUES[s.phys].boost === sk.elem ? 1.3 : 1;
   return sk.pow * (1 + .25 * skillLv(id, s)) * (same ? 1.2 : 1) * (1 + (skillFits(sk.elem, s) ? rootType(s).aff : 0)) * boost;
 }
+// 武技耗法力：看品階和境界（法力上限 50×境界係數×主修層數，每回合回 8%）
+const SKILL_COST = [0, 1, 1.5, 2, 2.6];
+const skillCost = (id, s = L()) => Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade]);
 // 屬性相剋倍率：a 攻、d 守
 // mine：是不是你在出手（看破五行只強化你這一方）
 function elemMul(a, d, mine = true) {
@@ -423,8 +427,8 @@ function refineArt(id) {
 function hit(atk, def) { return Math.max(atk * .15, atk - def * .6) * (.9 + Math.random() * .2); }
 function fight(foe) {
   const s = L(), p = stats(), myElem = TECHS[s.tech].elem, isVoid = s.root.type === 'void';
-  let php = p.hp, ehp = foe.hp, shield = 0, dodgeT = 0, dodgePow = 0, r = 0, charge = 1;
-  let burn = 0, burnT = 0, brkT = 0, brkV = 0, skip = 0, reflT = 0, reflV = 0;
+  let php = p.hp, ehp = foe.hp, mp = p.mp, shield = 0, dodgeT = 0, dodgePow = 0, r = 0, charge = 1;
+  let burn = 0, burnT = 0, brkT = 0, brkV = 0, skip = 0, reflT = 0, reflV = 0, pill = false;
   const cd = {}, used = {};
   const strike = (atk, elem, drain = 0) => {
     let m = elemMul(elem, foe.elem); if (isVoid) m = Math.max(1, m);
@@ -434,10 +438,15 @@ function fight(foe) {
   };
   while (php > 0 && ehp > 0 && r < 30) {
     r++;
-    const id = s.equip.find(k => !(cd[k] > 0));
+    const ready = s.equip.filter(k => !(cd[k] > 0));
+    // 法力不夠放招、又傷到一半：自動服回氣丹（每場一顆）
+    if (!pill && ready.length && ready.every(k => skillCost(k) > mp) && php < p.hp * .5 && count('huiqi')) {
+      s.items.huiqi--; S.meta.pills++; pill = true; mp = Math.min(p.mp, mp + p.mp * .6);
+    }
+    const id = ready.find(k => skillCost(k) <= mp);
     if (id) {
       const sk = SKILLS[id], pw = skillPow(id);
-      cd[id] = sk.cd + 1; s.skills[id] += 1 + .5 * tl('shulian'); used[id] = (used[id] || 0) + 1;
+      mp -= skillCost(id); cd[id] = sk.cd + 1; s.skills[id] += 1 + .5 * tl('shulian'); used[id] = (used[id] || 0) + 1;
       if (sk.kind === 'dmg' || sk.kind === 'multi') {
         // 先上破防再打，打完才結算灼燒和控制
         if (sk.brk) { brkT = 3; brkV = Math.max(brkV, sk.brk); }
@@ -466,14 +475,15 @@ function fight(foe) {
     }
     dodgeT--; reflT--;
     php = Math.min(p.hp, php + p.hp * p.regen);
+    mp = Math.min(p.mp, mp + p.mp * .08);
   }
-  return { win: ehp <= 0, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、') };
+  return { win: ehp <= 0, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), pill };
 }
 // lv：敵人相當於第幾個小境界（1 起算），mult：強度倍率，elem：敵人屬性
 function battle(name, lv, mult = 1, loot = false, elem = '無') {
   const s = L(), i = lv - 1, k = 1 + .5 * i, rr = (.85 + Math.random() * .3) * mult;
   const res = fight({ hp: 115 * k * rr, atk: 11.5 * k * rr, def: 4.5 * k * mult, spd: 10 + 2 * i, elem });
-  const how = `${res.rounds} 回合${res.used ? '，施展' + res.used : ''}`;
+  const how = `${res.rounds} 回合${res.used ? '，施展' + res.used : ''}${res.pill ? '，服了一顆回氣丹' : ''}`;
   if (res.win) {
     s.wins++; S.meta.wins++;
     let msg = `擊敗${name}（${how}）`;
@@ -659,10 +669,11 @@ function toggleEquip(id) {
 function moveEquip(id, d) { const e = L().equip, i = e.indexOf(id), j = i + d; if (j < 0 || j >= e.length) return; [e[i], e[j]] = [e[j], e[i]]; save(); render(); }
 function buy(kind, id) {
   const s = L();
-  const price = kind === 'heal' ? healPrice() : kind === 'xiu' ? xiuPillPrice() : cavePrice();
+  const price = kind === 'heal' ? healPrice() : kind === 'mp' ? mpPillPrice() : kind === 'xiu' ? xiuPillPrice() : cavePrice();
   if (s.stone < price || (kind === 'cave' && s.cave >= 8)) return;
   s.stone -= price;
   if (kind === 'heal') addItem('heal');
+  else if (kind === 'mp') addItem('huiqi');
   else if (kind === 'xiu') addItem(XIU_PILLS[stg().major]);
   else s.cave++;
   save(); render();
@@ -917,7 +928,7 @@ function renderCult() {
     <h3>主修</h3>${techCard(s.tech)}
     <h3>輔修（${s.subs.length}/${maxSubs()}）</h3>${s.subs.map(id => techCard(id, `<button class="mini on" onclick="toggleSub('${id}')">卸下</button>`)).join('') || '<p class="muted small">空著。煉體、身法、劍修、長生、丹道、殺伐、悟性、尋寶類功法都能輔修，精進速度是主修的一半。</p>'}
     <h3>身體</h3>
-    <div class="stats"><span>氣血 ${fmt(st.hp)}</span><span>攻擊 ${fmt(st.atk)}</span><span>防禦 ${fmt(st.def)}</span><span>身法 ${st.spd}</span>
+    <div class="stats"><span>氣血 ${fmt(st.hp)}</span><span>法力 ${fmt(st.mp)}</span><span>攻擊 ${fmt(st.atk)}</span><span>防禦 ${fmt(st.def)}</span><span>身法 ${st.spd}</span>
       <span>暴擊 ${Math.round(st.crit * 100)}%</span><span>暴傷 ${Math.round(st.critDmg * 100)}%</span><span>閃避 ${Math.round(st.dodge * 100)}%</span><span>屬性 ${TECHS[s.tech].elem}</span></div>
     <h3>已學功法（${Object.keys(s.techs).length}）</h3>
     ${others.map(id => techCard(id, btnFor(id))).join('') || '<p class="muted">還沒有別的功法。坊市、遊歷、奇遇都可能得到。</p>'}
@@ -928,11 +939,11 @@ function renderSkill() {
   const row = id => { const k = SKILLS[id], on = s.equip.includes(id), lv = skillLv(id), nx = MASTERY_USES[lv + 1];
     return `<div class="item"><div class="row"><b>${k.name}</b>${gradeTag(k.grade, `${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}</div>
-      <div class="row small"><span>${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd}${k.elem !== '無' && k.elem === te ? ' · <span class="same">與主修同屬性</span>' : ''}${skillFits(k.elem) ? ' · <span class="same">靈根親和</span>' : ''}</span>
+      <div class="row small"><span>${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗法 ${skillCost(id)}${k.elem !== '無' && k.elem === te ? ' · <span class="same">與主修同屬性</span>' : ''}${skillFits(k.elem) ? ' · <span class="same">靈根親和</span>' : ''}</span>
       <span>${on ? `<button class="mini" onclick="moveEquip('${id}',-1)">↑</button><button class="mini" onclick="moveEquip('${id}',1)">↓</button>` : ''}<button class="mini ${on ? 'on' : ''}" onclick="toggleEquip('${id}')">${on ? '卸下' : '裝備'}</button></span></div></div>`; };
-  return `<h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(row).join('') || '<p class="muted">沒有裝備武技，只會普通攻擊。</p>'}
+  return `<p class="small">法力 ${fmt(stats().mp)}，每回合回復 8%。</p><h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(row).join('') || '<p class="muted">沒有裝備武技，只會普通攻擊。</p>'}
     <h3>其他武技</h3>${Object.keys(s.skills).filter(id => !s.equip.includes(id)).map(row).join('') || '<p class="muted">沒有了。</p>'}
-    <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好的武技施放；都在冷卻就普通攻擊。用得越多越熟練，和主修同屬性威力 +20%。</p>`;
+    <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好、法力也夠的武技施放；都放不了就普通攻擊。每場戰鬥從滿法力開始，武技品階越高越耗法力，主修功法層數越高法力越多。用得越多越熟練，和主修同屬性威力 +20%。</p>`;
 }
 function renderArt() {
   const s = L();
@@ -953,6 +964,7 @@ function renderBag() {
   const btn = id => {
     const k = ITEMS[id].kind;
     if (k === 'brk') return `<span class="muted small">${ITEMS[id].major === stg().major && isMajorNext() ? '突破時自動服用' : '突破對應大境界時自動服用'}</span>`;
+    if (k === 'mp') return '<span class="muted small">戰鬥中自動服用</span>';
     const ok = k === 'heal' ? s.injury > 0 : k === 'xiu' ? s.xiu < stg().need : true;
     return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>`;
   };
@@ -975,6 +987,7 @@ function renderShop() {
   };
   return `<h3>櫃台</h3>
     <div class="item row"><span><b>療傷丹</b> <span class="muted small">立刻治好傷勢</span></span>${btn(healPrice(), "buy('heal')")}</div>
+    <div class="item row"><span><b>回氣丹</b> <span class="muted small">戰鬥中法力不夠又受傷時自動服用</span></span>${btn(mpPillPrice(), "buy('mp')")}</div>
     <div class="item row"><span><b>${xp.name}</b> <span class="muted small">${xp.desc}服用後修為增加</span></span>${btn(xiuPillPrice(), "buy('xiu')")}</div>
     <div class="item row"><span><b>洞府 ${s.cave} 級</b> <span class="muted small">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</span></span>${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
@@ -1015,7 +1028,7 @@ const HELP = [
   ['閉關與遊歷', '閉關修為較穩，多出來的修為會變成根基，提高突破成功率，偶爾還會頓悟。遊歷會遇到事件、戰鬥和寶物，但可能受傷。'],
   ['凡人篇', '每一世都從凡人開始：先抽出身，做些凡人的事累積底子，等仙緣上門後選一條路，測出靈根、感氣入體，才算踏入練氣。'],
   ['突破', '修為滿了就能突破。小境界容易，失敗只會散去一些修為。大境界有機率失敗，失敗會經脈受創、折損壽元，還可能跌回上一個小境界，境界越高越兇險。服用對應境界的突破丹可以提高成功率。'],
-  ['功法、武技、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。武技在戰鬥中自動施放，用得越多越熟練。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
+  ['功法、武技、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。武技在戰鬥中自動施放，要耗法力，用得越多越熟練。法力不夠時會自動服回氣丹。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
   ['坐化與輪迴', '壽元用盡就會坐化。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
   ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括自動化、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
 ];
