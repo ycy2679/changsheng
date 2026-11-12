@@ -301,26 +301,50 @@ const ART_PRICE = [0, 250, 3000, 30000, 180000];
 const ART_MAX_REFINE = 9;
 
 // ---------- 體質：開局和靈根一起抽 ----------
-// r 稀有度 1～4；boost 該屬性術法 +30%；allAff 所有屬性都算靈根親和；lifePct 壽元比例
-const PHYS_RANK = ['', '凡品', '靈品', '玄品', '聖品'];
-const PHYS_WEIGHT = [0, 50, 30, 15, 5];
+// r 稀有度 1～5：凡體、靈體、道體、聖體、混沌；path 對應的修行路線（對上時效果 ×1.3，兼修 ×1.15）
+// boost 該屬性術法 +30%（boosts 多個屬性、boostAmt 改倍率）；allAff 所有屬性都算靈根親和；noCounter 不受屬性相剋；lifePct 壽元比例
+// 道體以上測靈根時帶天賦神通（PHYS_SHEN），靈體以下不帶
+const PHYS_RANK = ['', '凡體', '靈體', '道體', '聖體', '混沌'];
+const PHYS_WEIGHT = [0, 50, 30, 12, 4, 1];
 const PHYSIQUES = {
+  // 凡體
   fantai:    { name: '凡胎', r: 1, desc: '平平無奇，什麼加成都沒有。' },
-  tongjin:   { name: '銅筋鐵骨', r: 1, hp: .15, def: .1 },
+  tongjin:   { name: '銅筋鐵骨', r: 1, path: 'ti', hp: .15, def: .1 },
   congming:  { name: '耳聰目明', r: 1, dodge: .05, spd: 2 },
   shouxiang: { name: '長壽之相', r: 1, life: 20 },
-  jiangu:    { name: '劍骨', r: 2, atk: .15, crit: .08 },
-  yaoti:     { name: '藥體', r: 2, pillEff: .3, toxRes: .3 },
-  fuyuan:    { name: '福緣深厚', r: 2, evRate: .3, drop: .3 },
-  lingyan:   { name: '靈眼', r: 2, stone: .3 },
-  leiling:   { name: '雷靈之體', r: 3, boost: '雷', rate: .1 },
-  hanbing:   { name: '寒冰玄體', r: 3, boost: '冰', dodge: .05 },
-  fengling:  { name: '風靈之體', r: 3, boost: '風', spd: 8 },
-  daotai:    { name: '先天道胎', r: 3, techXp: .5, brk: .05 },
-  zhanti:    { name: '不滅戰體', r: 4, hp: .4, regen: .03, killXiu: .003 },
-  tiandu:    { name: '天妒之體', r: 4, rate: .6, lifePct: -.4, desc: '修煉極快，但天妒英才，壽元只剩六成。' },
-  wanxiang:  { name: '萬象歸元體', r: 4, allAff: 1, desc: '所有屬性的術法都算靈根親和。' },
-  changsheng: { name: '長生道體', r: 4, life: 200, lateRate: .5 },
+  jiangu:    { name: '劍骨', r: 1, atk: .15, crit: .08 },
+  yaoti:     { name: '藥體', r: 1, pillEff: .3, toxRes: .3 },
+  fuyuan:    { name: '福緣深厚', r: 1, evRate: .3, drop: .3 },
+  lingyan:   { name: '靈眼', r: 1, stone: .3 },
+  lingqiao:  { name: '靈竅初開', r: 1, path: 'fa', mp: .15, skillUp: .05 },
+  chengming: { name: '心思澄明', r: 1, path: 'hun', techXp: .15, crit: .03 },
+  // 靈體：八種屬性靈體（法修），加上體修、魂修各一
+  gengjinlt: { name: '庚金靈體', r: 2, path: 'fa', boost: '金', atk: .1 },
+  qingmult:  { name: '青木靈體', r: 2, path: 'fa', boost: '木', regen: .02 },
+  xuanshuilt: { name: '玄水靈體', r: 2, path: 'fa', boost: '水', mp: .2 },
+  chiyanlt:  { name: '赤炎靈體', r: 2, path: 'fa', boost: '火', crit: .05 },
+  houtult:   { name: '厚土靈體', r: 2, path: 'fa', boost: '土', hp: .15, def: .1 },
+  leiling:   { name: '雷靈之體', r: 2, path: 'fa', boost: '雷', rate: .1 },
+  hanbing:   { name: '寒冰玄體', r: 2, path: 'fa', boost: '冰', dodge: .05 },
+  fengling:  { name: '風靈之體', r: 2, path: 'fa', boost: '風', spd: 8 },
+  manhuang:  { name: '蠻荒血脈', r: 2, path: 'ti', hp: .3, regen: .015 },
+  shenhun:   { name: '神魂靈體', r: 2, path: 'hun', shenUp: .15, techXp: .2 },
+  // 道體
+  daotai:    { name: '先天道胎', r: 3, path: 'fa', techXp: .5, brk: .05 },
+  jingangdt: { name: '金剛道體', r: 3, path: 'ti', hp: .4, def: .3, normalAtk: .3 },
+  zifu:      { name: '紫府道體', r: 3, path: 'hun', shenUp: .3, crit: .08 },
+  tiandu:    { name: '天妒之體', r: 3, rate: .6, lifePct: -.4, desc: '修煉極快，但天妒英才，壽元只剩六成。' },
+  changsheng: { name: '長生道體', r: 3, life: 200, lateRate: .5 },
+  // 聖體
+  zhanti:    { name: '不滅戰體', r: 4, path: 'ti', hp: .4, regen: .03, killXiu: .003 },
+  wanxiang:  { name: '萬象歸元體', r: 4, path: 'fa', allAff: 1, desc: '所有屬性的術法都算靈根親和。' },
+  wuxingst:  { name: '五行聖體', r: 4, path: 'fa', boosts: ['金', '木', '水', '火', '土'], rate: .2, desc: '金木水火土五系術法都 +30%，修煉 +20%。' },
+  tianhun:   { name: '天魂聖體', r: 4, path: 'hun', shenUp: .5, crit: .1, techXp: .3 },
+  // 混沌
+  hundunti:  { name: '混沌體', r: 5, boost: '無', boostAmt: 1.5, noCounter: 1, rate: .3, desc: '天地未分時的一縷混沌：無屬性術法 +50%、不受屬性相剋、修煉 +30%。' },
+  hongmeng:  { name: '鴻蒙體', r: 5, path: 'fa', allAff: 1, skillUp: .3, mp: .5, desc: '所有屬性的術法都算靈根親和，術法威力 +30%、法力 +50%。' },
+  taigu:     { name: '太古神體', r: 5, path: 'ti', hp: 1, def: .6, normalAtk: .5, regen: .03 },
+  xinghai:   { name: '星海神魂', r: 5, path: 'hun', shenUp: .8, crit: .15, evRate: .3 },
 };
 
 // ---------- 神通 ----------
@@ -353,9 +377,11 @@ const SHENS = {
   lingtai:  SH('靈台清明', '回法', '無', 'field', '開場法力回滿，整場每回合多回 15% 法力，術法威力 +20%', { mpFull: 1, mpRegen: .15, skillUp: .2 }),
   guangyin: SH('光陰剎那', '加速', '無', 'open', '前 4 回合每回合多出手一次', { clone: [1, 4, 1] }),
   tianyan:  SH('天眼通', '洞察', '無', 'field', '看穿破綻，整場暴擊 +30%', { crit: .3 }),
+  wuxinglz: SH('五行輪轉', '領域', '無', 'field', '五行生生不息：整場敵人攻擊 -20%、暴擊 +15%、每回合回血 3%', { foeAtk: .8, crit: .15, regen: .03 }),
+  hundunck: SH('混沌初開', '攻伐', '無', 'open', '開場一擊 ×6，無視防禦，敵人停手 1 回合', { nuke: 6, pierce: 1, stun: 1 }),
 };
-// 天賦神通：稀有體質測根骨時就帶的神通
-const PHYS_SHEN = { leiling: 'leiyu', hanbing: 'xuanbing', fengling: 'fengying', daotai: 'tianyan', zhanti: 'jinshen', tiandu: 'guangyin', wanxiang: 'sanshen', changsheng: 'kurong' };
+// 天賦神通：道體以上的體質測根骨時就帶的神通
+const PHYS_SHEN = { daotai: 'tianyan', jingangdt: 'yinguo', zifu: 'lingtai', tiandu: 'guangyin', changsheng: 'kurong', zhanti: 'jinshen', wanxiang: 'sanshen', wuxingst: 'wuxinglz', tianhun: 'zhenyu', hundunti: 'hundunck', hongmeng: 'powang', taigu: 'chihuang', xinghai: 'taixu' };
 
 // 功法專屬神通：天階功法練到第 9 層圓滿時覺醒，只能從那部功法得到（tech 標記，不進隨機池）
 Object.assign(SHENS, {

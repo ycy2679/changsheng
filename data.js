@@ -3,14 +3,14 @@
 // 大境界：life 壽元（年）、brk 突破到下一個大境界的基礎成功率
 const MAJORS = [
   { name: '練氣', subs: ['一層', '二層', '三層', '四層', '五層', '六層', '七層', '八層', '九層'], life: 100, brk: .5 },
-  { name: '築基', subs: ['初期', '中期', '後期'], life: 220, brk: .38 },
-  { name: '金丹', subs: ['初期', '中期', '後期'], life: 450, brk: .27 },
-  { name: '元嬰', subs: ['初期', '中期', '後期'], life: 900, brk: .18 },
-  { name: '化神', subs: ['初期', '中期', '後期'], life: 1800, brk: .15 },
-  { name: '煉虛', subs: ['初期', '中期', '後期'], life: 3600, brk: .12 },
-  { name: '合體', subs: ['初期', '中期', '後期'], life: 7000, brk: .09 },
-  { name: '大乘', subs: ['初期', '中期', '後期'], life: 15000, brk: .06 },
-  { name: '渡劫', subs: ['初期', '中期', '後期'], life: 30000, brk: 0 },   // 渡劫後期之後是飛升，等成仙時再做
+  { name: '築基', subs: ['初期', '中期', '後期'], life: 200, brk: .38 },
+  { name: '金丹', subs: ['初期', '中期', '後期'], life: 240, brk: .27 },
+  { name: '元嬰', subs: ['初期', '中期', '後期'], life: 360, brk: .18 },
+  { name: '化神', subs: ['初期', '中期', '後期'], life: 530, brk: .15 },
+  { name: '煉虛', subs: ['初期', '中期', '後期'], life: 730, brk: .12 },
+  { name: '合體', subs: ['初期', '中期', '後期'], life: 930, brk: .09 },
+  { name: '大乘', subs: ['初期', '中期', '後期'], life: 1130, brk: .06 },
+  { name: '渡劫', subs: ['初期', '中期', '後期'], life: 1330, brk: 0 },   // 渡劫後期之後是飛升，等成仙時再做
 ];
 
 // 攤平成 33 個小境界，need = 修為上限
@@ -193,7 +193,7 @@ const TECHS = {
   jixing: { name: '吉星高照錄', grade: 4, type: '尋寶', elem: '無', drop: 1.2, stone: .5 },
 };
 const NO_SCALE = ['life', 'brk', 'offline', 'risk'];
-const EFF_LABEL = { rate: '修煉', hp: '氣血', mp: '法力', atk: '攻擊', def: '防禦', spd: '身法', crit: '暴擊', critDmg: '暴傷', dodge: '閃避', regen: '每回合回血', lifesteal: '吸血', life: '壽元', brk: '突破率', stone: '遊歷靈石', drop: '掉落', evRate: '奇遇', offline: '離線上限', pillEff: '丹藥效果', toxRes: '丹毒抗性', killXiu: '擊殺得修為', techXp: '功法精進', lateRate: '壽元將盡時修煉', lifePct: '壽元', risk: '突破失敗損失加倍' };
+const EFF_LABEL = { rate: '修煉', hp: '氣血', mp: '法力', skillUp: '術法威力', shenUp: '神通威力', normalAtk: '普通攻擊', atk: '攻擊', def: '防禦', spd: '身法', crit: '暴擊', critDmg: '暴傷', dodge: '閃避', regen: '每回合回血', lifesteal: '吸血', life: '壽元', brk: '突破率', stone: '遊歷靈石', drop: '掉落', evRate: '奇遇', offline: '離線上限', pillEff: '丹藥效果', toxRes: '丹毒抗性', killXiu: '擊殺得修為', techXp: '功法精進', lateRate: '壽元將盡時修煉', lifePct: '壽元', risk: '突破失敗損失加倍' };
 const FLAT_EFF = ['spd', 'life', 'offline'];   // 這些顯示成數字，其他顯示成百分比
 
 // ---------- 丹藥 ----------
