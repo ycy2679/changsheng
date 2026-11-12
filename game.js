@@ -58,6 +58,8 @@ function load() {
   s.arts = s.arts || {}; s.gear = s.gear || {};
   if (!s.phys && !s.draw) s.draw = makeDraw(S.meta, s.root);   // 舊存檔補抽體質（原本的靈根留在選項裡）
   s.tox = s.tox || 0; s.body = s.body || 0;
+  if (s.draw && !s.draw.rr) { s.draw.rr = { r: s.draw.rerolls, p: s.draw.rerolls }; delete s.draw.rerolls; }
+  for (const slot of ART_SLOTS) if (s.gear[slot] && !artOk(s.gear[slot], s)) s.gear[slot] = null;   // 境界不夠的法寶先卸下
 }
 
 // ---------- 開局抽根骨 ----------
@@ -83,12 +85,14 @@ function drawPhys(meta) {
   return phys;
 }
 function makeDraw(meta, keepRoot) {
-  return { roots: drawRoots(meta, keepRoot), phys: drawPhys(meta), r: -1, p: -1, rerolls: 1 + Math.floor(meta.dao / 15) + (meta.talents.chongchou || 0) };
+  return { roots: drawRoots(meta, keepRoot), phys: drawPhys(meta), r: -1, p: -1, rr: rerollN(meta) };
 }
+// 靈根、體質各自有重抽次數
+function rerollN(meta) { const n = 1 + Math.floor(meta.dao / 15) + (meta.talents.chongchou || 0); return { r: n, p: n }; }
 function pickDraw(kind, i) { L().draw[kind] = i; render(); }
 function rerollDraw(kind) {
-  const d = L().draw; if (d.rerolls <= 0) return;
-  d.rerolls--;
+  const d = L().draw; if (d.rr[kind] <= 0) return;
+  d.rr[kind]--;
   if (kind === 'r') { d.roots = drawRoots(S.meta); d.r = -1; } else { d.phys = drawPhys(S.meta); d.p = -1; }
   render();
 }
@@ -123,6 +127,22 @@ const itemPrice = id => {
   return k === 'heal' ? healPrice() : k === 'xiu' ? xiuPillPrice() : Math.round(pillDisc() * (k === 'brk' ? BRK_PILL_PRICE[ITEMS[id].major]
     : { life: 200, body: 500, tech: 150 }[k] * f));
 };
+// 賣給坊市：買價的三成。用丹藥本身的「原價」算，不跟著現在的境界漲，保證一定比買的便宜
+const SELL_RATE = .3;
+const sellItemPrice = id => {
+  const it = ITEMS[id], k = it.kind;
+  const base = k === 'brk' ? BRK_PILL_PRICE[it.major] : k === 'xiu' ? 25 * Math.pow(1.5, STAGES.findIndex(x => x.major === it.major))
+    : k === 'heal' ? 20 : { life: 200, body: 500, tech: 150 }[k];
+  return Math.max(1, Math.round(base * SELL_RATE));
+};
+const sellArtPrice = id => Math.round(ART_PRICE[ARTS[id].grade] * SELL_RATE);
+function sellItem(id) { const s = L(); if (!count(id)) return; s.items[id]--; s.stone += sellItemPrice(id); save(); render(); }
+function sellArt(id) {
+  const s = L(); if (!(id in s.arts) || s.gear[ARTS[id].slot] === id) return;
+  if (armed !== 'sell:' + id) { armed = 'sell:' + id; render(); return; }
+  armed = ''; delete s.arts[id]; const p = sellArtPrice(id); s.stone += p;
+  log(`把${ARTS[id].name}賣給了坊市，得靈石 ${fmt(p)}。`); save(); render();
+}
 const refreshPrice = () => Math.round(20 * Math.pow(1.4, L().stage));
 const isMajorNext = (s = L()) => s.stage < STAGES.length - 1 && STAGES[s.stage + 1].major !== stg(s).major;
 const count = id => L().items[id] || 0;
@@ -247,8 +267,11 @@ function tryDrop(p) {
   return '';
 }
 // 法寶：得到時如果那一格空著就直接裝上
-function gainArt(id) { const s = L(); if (!(id in s.arts)) { s.arts[id] = 0; const slot = ARTS[id].slot; if (!s.gear[slot]) s.gear[slot] = id; } }
-function equipArt(id) { const s = L(), slot = ARTS[id].slot; s.gear[slot] = s.gear[slot] === id ? null : id; save(); render(); }
+// 法寶境界門檻（依品階）：玄階築基、地階金丹、天階元嬰
+const ART_REALM = [0, 0, 9, 12, 15], ART_REALM_NAME = ['', '', '築基', '金丹', '元嬰'];
+const artOk = (id, s = L()) => s.stage >= ART_REALM[ARTS[id].grade];
+function gainArt(id) { const s = L(); if (!(id in s.arts)) { s.arts[id] = 0; const slot = ARTS[id].slot; if (!s.gear[slot] && artOk(id, s)) s.gear[slot] = id; } }
+function equipArt(id) { const s = L(), slot = ARTS[id].slot; if (s.gear[slot] !== id && !artOk(id)) return; s.gear[slot] = s.gear[slot] === id ? null : id; save(); render(); }
 const refinePrice = id => Math.round(ART_PRICE[ARTS[id].grade] * .4 * Math.pow(1.6, L().arts[id]));
 function refineArt(id) {
   const s = L(), p = refinePrice(id); if (s.stone < p || s.arts[id] >= ART_MAX_REFINE) return;
@@ -371,7 +394,7 @@ function autoActs() {
   if (autoOn('a_xiu') && s.tox < 30 && s.xiu < need && count(xp)) usePill(xp);
   if (autoOn('a_main')) {
     const best = Object.keys(s.techs).filter(id => canMain(id)).sort((a, b) => (TECHS[b].rate || 0) - (TECHS[a].rate || 0))[0];
-    if (best && (TECHS[best].rate || 0) > (TECHS[s.tech].rate || 0)) { switchTech(best); log(`改以《${TECHS[best].name}》為主修。`); }
+    if (best && (TECHS[best].rate || 0) > (TECHS[s.tech].rate || 0)) switchTech(best, true);
   }
   if (autoOn('a_place') && s.mode === 'travel') { const top = PLACES.filter(p => s.stage >= p.min).pop(); if (top.id !== s.place) setPlace(top.id); }
   if (autoOn('a_refine')) for (const slot of ART_SLOTS) { const id = s.gear[slot]; if (id && s.arts[id] < ART_MAX_REFINE && s.stone > refinePrice(id) * 3) refineArt(id); }
@@ -459,7 +482,13 @@ function breakthrough() {
   }
   save(); render();
 }
-function switchTech(id) { const s = L(); if (!canMain(id)) return; s.tech = id; s.subs = s.subs.filter(x => x !== id); save(); render(); }
+// 換主修要散功：目前修為折半（各功法自己的層數保留）。手動換要按兩次確認
+function switchTech(id, force) {
+  const s = L(); if (!canMain(id) || id === s.tech) return;
+  if (!force && armed !== 'tech:' + id) { armed = 'tech:' + id; render(); return; }
+  armed = ''; s.xiu /= 2; s.tech = id; s.subs = s.subs.filter(x => x !== id);
+  log(`散功重修，改以《${TECHS[id].name}》為主修，修為折半。`); save(); render();
+}
 function toggleSub(id) {
   const s = L(), i = s.subs.indexOf(id);
   if (i >= 0) s.subs.splice(i, 1); else if (s.subs.length < maxSubs() && TECHS[id].type !== '吐納') s.subs.push(id);
@@ -629,10 +658,10 @@ function renderDraw() {
   const rootCls = r => ({ heaven: 'g4', mutant: 'g4', void: 'g4', dual: 'g3', triple: 'g2', quad: 'g1', five: 'g1' })[r.type];
   return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel card"><b>測根骨</b>
-      <p class="small">${S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。'}各選一個。還能重抽 ${d.rerolls} 次（道心越高次數越多，好根骨也越常出現）。</p>
-      <div class="row"><h3>靈根</h3><button class="mini" ${d.rerolls ? '' : 'disabled'} onclick="rerollDraw('r')">重抽靈根</button></div>
+      <p class="small">${S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。'}各選一個。靈根、體質各能重抽 ${d.rr.r}／${d.rr.p} 次（道心越高次數越多，好根骨也越常出現）。</p>
+      <div class="row"><h3>靈根</h3><button class="mini" ${d.rr.r ? '' : 'disabled'} onclick="rerollDraw('r')">重抽靈根</button></div>
       <div class="opts">${d.roots.map((r, i) => opt('r', i, d.r === i, fake(r), rootCls(r), rootDesc(r))).join('')}</div>
-      <div class="row"><h3>體質</h3><button class="mini" ${d.rerolls ? '' : 'disabled'} onclick="rerollDraw('p')">重抽體質</button></div>
+      <div class="row"><h3>體質</h3><button class="mini" ${d.rr.p ? '' : 'disabled'} onclick="rerollDraw('p')">重抽體質</button></div>
       <div class="opts">${d.phys.map((id, i) => opt('p', i, d.p === i, `${PHYSIQUES[id].name} <span class="small">${PHYS_RANK[PHYSIQUES[id].r]}</span>`, 'g' + PHYSIQUES[id].r, physDesc(id))).join('')}</div>
       <div class="choices"><button class="primary" ${d.r >= 0 && d.p >= 0 ? '' : 'disabled'} onclick="confirmDraw()">就是這副根骨</button></div>
     </section>`;
@@ -713,7 +742,7 @@ function renderCult() {
   const others = Object.keys(s.techs).filter(id => !equipped().includes(id)).sort((a, b) => TECHS[b].grade - TECHS[a].grade);
   const btnFor = id => {
     const t = TECHS[id];
-    if (t.type === '吐納') return canMain(id) ? `<button class="mini" onclick="switchTech('${id}')">改為主修</button>` : `<span class="muted">需${t.elem}屬性靈根</span>`;
+    if (t.type === '吐納') return canMain(id) ? `<button class="mini ${armed === 'tech:' + id ? 'danger' : ''}" onclick="switchTech('${id}')">${armed === 'tech:' + id ? '確定散功？修為減半' : '改為主修'}</button>` : `<span class="muted">需${t.elem}屬性靈根</span>`;
     return s.subs.length < 2 ? `<button class="mini" onclick="toggleSub('${id}')">輔修</button>` : '<span class="muted">輔修已滿</span>';
   };
   return `<h3>靈根</h3>
@@ -749,11 +778,12 @@ function renderArt() {
     return `<div class="item"><div class="row"><b>${a.name}</b>${gradeTag(a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
       <div class="row small"><span>${effText(a, null, artMul(id))}</span><span>
         <button class="mini" ${full || s.stone < p ? 'disabled' : ''} onclick="refineArt('${id}')">${full ? '已祭煉圓滿' : `祭煉 ${fmt(p)} 靈石`}</button>
-        <button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button></span></div></div>`;
+        ${on || artOk(id) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : `<span class="muted">需${ART_REALM_NAME[a.grade]}</span>`}
+        ${on ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</span></div></div>`;
   };
   const owned = Object.keys(s.arts);
   return ART_SLOTS.map(slot => `<h3>${slot}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => (s.gear[slot] === b) - (s.gear[slot] === a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
-    + '<p class="muted small">每一格只能裝一件。祭煉每重讓效果 +15%，最多 9 重。</p>';
+    + '<p class="muted small">每一格只能裝一件。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重。</p>';
 }
 function renderBag() {
   const s = L(), ids = Object.keys(ITEMS).filter(id => count(id) > 0);
@@ -763,9 +793,10 @@ function renderBag() {
     const ok = k === 'heal' ? s.injury > 0 : k === 'xiu' ? s.xiu < stg().need : true;
     return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>`;
   };
+  const sell = id => `<button class="mini" onclick="sellItem('${id}')">賣 ${fmt(sellItemPrice(id))}</button>`;
   return `<h3>丹毒 ${Math.ceil(s.tox)}%</h3>${bar('tox', s.tox / 100)}
-    <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。</p>
-    <h3>丹藥</h3>${ids.map(id => `<div class="item row"><span><b>${ITEMS[id].name}</b> ×${count(id)} <span class="muted small">${ITEMS[id].desc}</span></span>${btn(id)}</div>`).join('') || '<p class="muted">行囊空空。</p>'}`;
+    <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。用不到的丹藥可以按原價三成賣給坊市。</p>
+    <h3>丹藥</h3>${ids.map(id => `<div class="item row"><span><b>${ITEMS[id].name}</b> ×${count(id)} <span class="muted small">${ITEMS[id].desc}</span></span><span>${btn(id)}${sell(id)}</span></div>`).join('') || '<p class="muted">行囊空空。</p>'}`;
 }
 function renderShop() {
   const s = L(), btn = (price, call, ok = true) => `<button class="mini" ${s.stone >= price && ok ? '' : 'disabled'} onclick="${call}">${fmt(price)} 靈石</button>`;
