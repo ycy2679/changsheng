@@ -37,7 +37,7 @@ const EVENTS = [
     { t: '競拍', cond: s => s.stone >= auctionPrice(), run(s) { s.stone -= auctionPrice(); const id = randomUnowned('tech', [2, 3]); if (!id) return '……拍到的是你早就會的功法。'; learnTech(id); return `你拍下了《${TECHS[id].name}》。`; } },
     { t: '只是看看', run() { return '壓軸被一位戴斗笠的女修拍走了。'; } }] },
   { id: 'duel', repeat: true, min: 2, title: '宗門弟子', text: '一名大宗門的年輕弟子攔下你，說要拿散修練手。', choices: [
-    { t: '應戰', run(s) { if (battle('宗門弟子', s.stage + 1, 1.05)) { for (const id of s.equip) s.skills[id] += 5; return '他捂著胸口認輸。這一戰讓你的武技熟練了不少。'; } return '你輸了。他扔下一句「散修不過如此」便走了。'; } },
+    { t: '應戰', run(s) { if (battle('宗門弟子', s.stage + 1, 1.05)) { for (const id of s.equip) s.skills[id] += 5; return '他捂著胸口認輸。這一戰讓你的術法熟練了不少。'; } return '你輸了。他扔下一句「散修不過如此」便走了。'; } },
     { t: '不接', run() { return '他嗤笑一聲。'; } }] },
   { id: 'elder', once: true, min: 1, title: '溪邊老者', text: '溪邊一個釣魚的老人叫住你，說你的吐納「有三處不對」。', choices: [
     { t: '恭敬請教', run(s) { s.techs[s.tech] += 900; return `老人講了一個下午，你對《${TECHS[s.tech].name}》的領悟大進。回頭再看，溪邊已經沒有人。`; } },

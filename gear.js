@@ -1,7 +1,8 @@
-// 長生閒記：武技、法寶、體質
+// 長生閒記：術法、法寶、體質
 
-// ---------- 武技 ----------
+// ---------- 術法 ----------
 // kind：dmg 攻擊 / multi 連擊（hits 段，每段 pow）/ heal 回血 / shield 護盾 / dodge 身法 / charge 蓄力（下一招威力 ×2）
+//       buff 增益（3 回合攻擊 +15%×威力）/ mana 回法（回復 20%×威力 的法力）
 // 附加：burn 灼燒（每回合攻擊力的比例，3 回合）freeze 冰凍機率 stun 麻痺機率（敵人跳過一回合）
 //       brk 破防（敵人防禦降低，3 回合）drain 吸血 reflect 反震（3 回合內把受到的傷害反彈一部分）
 const K = (name, grade, elem, kind, pow, cd, ex = {}) => ({ name, grade, elem, kind, pow, cd, ...ex });
@@ -105,8 +106,20 @@ const SKILLS = {
   chengfeng: K('乘風遁', 3, '風', 'dodge', 1.8, 4),
   gangfeng: K('九天罡風', 4, '風', 'multi', .85, 6, { hits: 6 }),
   wuying:   K('無影風神', 4, '風', 'dodge', 2.4, 4),
+  // 增益（3 回合攻擊提升）
+  jushi:    K('聚勢訣', 1, '無', 'buff', 1, 5),
+  ruijin:   K('銳金意', 2, '金', 'buff', 1.5, 5),
+  ranxue:   K('燃血術', 2, '火', 'buff', 1.8, 6),
+  leiti:    K('引雷入體', 3, '雷', 'buff', 2.2, 6),
+  tianwei:  K('天威加身', 4, '無', 'buff', 3, 6),
+  // 回法（回復法力，本身不耗法力，法力過半時不施放）
+  huiyuan:  K('吐納回元', 1, '無', 'mana', 1, 5),
+  jingshui: K('靜水凝神', 2, '水', 'mana', 1.5, 5),
+  qingmuqi: K('青木養氣', 2, '木', 'mana', 1.5, 5),
+  bingxin:  K('冰心返照', 3, '冰', 'mana', 2, 5),
+  guiyi:    K('萬氣歸一', 4, '無', 'mana', 2.6, 5),
 };
-const KIND_LABEL = { dmg: '攻擊', multi: '連擊', heal: '回復', shield: '護盾', dodge: '身法', charge: '蓄力' };
+const KIND_LABEL = { dmg: '攻擊', multi: '連擊', heal: '回復', shield: '護盾', dodge: '身法', charge: '蓄力', buff: '增益', mana: '回法' };
 const MASTERY = ['入門', '小成', '大成', '圓滿'];
 const MASTERY_USES = [0, 40, 150, 400];
 const SKILL_PRICE = [0, 120, 1200, 12000, 80000];
@@ -117,6 +130,8 @@ function skillDesc(k) {
   if (k.kind === 'heal') p.push('回血');
   if (k.kind === 'shield') p.push('護盾');
   if (k.kind === 'dodge') p.push('3 回合閃避大增');
+  if (k.kind === 'buff') p.push('3 回合攻擊提升');
+  if (k.kind === 'mana') p.push('回復法力，不耗法力');
   if (k.burn) p.push(`灼燒 ${Math.round(k.burn * 100)}%`);
   if (k.freeze) p.push(`冰凍 ${Math.round(k.freeze * 100)}%`);
   if (k.stun) p.push(`麻痺 ${Math.round(k.stun * 100)}%`);
@@ -156,7 +171,7 @@ const ART_PRICE = [0, 250, 3000, 30000, 180000];
 const ART_MAX_REFINE = 9;
 
 // ---------- 體質：開局和靈根一起抽 ----------
-// r 稀有度 1～4；boost 該屬性武技 +30%；allAff 所有屬性都算靈根親和；lifePct 壽元比例
+// r 稀有度 1～4；boost 該屬性術法 +30%；allAff 所有屬性都算靈根親和；lifePct 壽元比例
 const PHYS_RANK = ['', '凡品', '靈品', '玄品', '聖品'];
 const PHYS_WEIGHT = [0, 50, 30, 15, 5];
 const PHYSIQUES = {
@@ -174,6 +189,40 @@ const PHYSIQUES = {
   daotai:    { name: '先天道胎', r: 3, techXp: .5, brk: .05 },
   zhanti:    { name: '不滅戰體', r: 4, hp: .4, regen: .03, killXiu: .003 },
   tiandu:    { name: '天妒之體', r: 4, rate: .6, lifePct: -.4, desc: '修煉極快，但天妒英才，壽元只剩六成。' },
-  wanxiang:  { name: '萬象歸元體', r: 4, allAff: 1, desc: '所有屬性的武技都算靈根親和。' },
+  wanxiang:  { name: '萬象歸元體', r: 4, allAff: 1, desc: '所有屬性的術法都算靈根親和。' },
   changsheng: { name: '長生道體', r: 4, life: 200, lateRate: .5 },
 };
+
+// ---------- 神通 ----------
+// 每門一場戰鬥只發動一次，不耗法力。trig：open 開場第一回合、field 整場生效、lethal 受到致命傷時
+// elem：本命神通依靈根屬性覺醒（void 是空靈根）；'無' 只會從其他途徑得到
+// 效果欄位：nuke 一擊倍率（pierce 無視防禦）、burn 灼燒、stun 敵人停手回合、brk 破防、
+//   fa 法相（atk/def 倍率、回合）、shield 護盾（氣血比例）、clone 分身（每回合追加攻擊比例、回合、段數）、
+//   foeAtk/foeDef 敵人攻防倍率、regen 每回合回血、dodge 閃避、steal 吸血、reflect 反震、crit 暴擊、mpFull 開場回滿法力、mpRegen 每回合回法、skillUp 術法威力
+//   revive 不死回血比例、flee 遁走
+const SH = (name, type, elem, trig, desc, ex = {}) => ({ name, type, elem, trig, desc, ...ex });
+const SHENS = {
+  duanyue:  SH('斷嶽金芒', '攻伐', '金', 'open', '開場一道金芒，攻擊力 ×8，無視防禦', { nuke: 8, pierce: 1 }),
+  fentian:  SH('焚天赤羽', '攻伐', '火', 'open', '開場一擊 ×6，並灼燒 4 回合', { nuke: 6, burn: .8 }),
+  powang:   SH('破妄一指', '攻伐', '無', 'open', '開場一擊 ×5，敵人破防 50%', { nuke: 5, brk: .5 }),
+  shanyue:  SH('山嶽法相', '法相', '土', 'open', '化出山嶽法相，5 回合攻擊、防禦 ×1.6', { fa: [1.6, 1.6, 5] }),
+  jinshen:  SH('丈六金身', '法相', '無', 'open', '金身護體，得到氣血一半的護盾，5 回合防禦 ×2', { shield: .5, fa: [1, 2, 5] }),
+  zeguo:    SH('澤國千里', '領域', '水', 'field', '整場敵人攻擊 -25%，你每回合回血 3%', { foeAtk: .75, regen: .03 }),
+  guixu:    SH('歸墟', '領域', 'void', 'field', '整場敵人防禦歸零、攻擊 -15%', { foeDef: 0, foeAtk: .85 }),
+  taixu:    SH('太虛幻境', '領域', '無', 'field', '整場閃避 +35%', { dodge: .35 }),
+  leiyu:    SH('九霄雷獄', '禁錮', '雷', 'open', '開場一擊 ×3，敵人麻痺 2 回合', { nuke: 3, stun: 2 }),
+  xuanbing: SH('萬載玄冰', '禁錮', '冰', 'open', '冰封敵人 3 回合', { stun: 3 }),
+  zhenyu:   SH('鎮獄印', '禁錮', '無', 'open', '鎮住敵人 2 回合，並破防 30%', { stun: 2, brk: .3 }),
+  fengying: SH('風影化身', '分身', '風', 'open', '6 回合內分身每回合追加一次攻擊（五成威力）', { clone: [.5, 6, 1] }),
+  sanshen:  SH('一氣三身', '分身', '無', 'open', '5 回合內兩個分身各追加一次攻擊（五成威力）', { clone: [.5, 5, 2] }),
+  kurong:   SH('枯榮輪轉', '不滅', '木', 'lethal', '第一次受到致命傷時不死，回血 40%', { revive: .4 }),
+  chihuang: SH('赤凰涅槃', '不滅', '無', 'lethal', '第一次受到致命傷時浴火重生，回血 60%', { revive: .6 }),
+  yinian:   SH('一念千里', '遁法', '無', 'lethal', '快輸時直接遁走，不算落敗、不會負傷', { flee: 1 }),
+  tuntian:  SH('吞天噬地', '吞噬', '無', 'field', '整場吸血 +20%', { steal: .2 }),
+  yinguo:   SH('因果輪轉', '反彈', '無', 'field', '整場把受到的傷害反彈 30%', { reflect: .3 }),
+  lingtai:  SH('靈台清明', '回法', '無', 'field', '開場法力回滿，整場每回合多回 15% 法力，術法威力 +20%', { mpFull: 1, mpRegen: .15, skillUp: .2 }),
+  guangyin: SH('光陰剎那', '加速', '無', 'open', '前 4 回合每回合多出手一次', { clone: [1, 4, 1] }),
+  tianyan:  SH('天眼通', '洞察', '無', 'field', '看穿破綻，整場暴擊 +30%', { crit: .3 }),
+};
+// 天賦神通：稀有體質測根骨時就帶的神通
+const PHYS_SHEN = { leiling: 'leiyu', hanbing: 'xuanbing', fengling: 'fengying', daotai: 'tianyan', zhanti: 'jinshen', tiandu: 'guangyin', wanxiang: 'sanshen', changsheng: 'kurong' };

@@ -12,7 +12,7 @@ let fresh = false;          // 沒有存檔（全新開始）
 let deathView = 'sum';      // 坐化後：'sum' 總結 / 'tree' 悟道
 
 // ---------- 存檔 ----------
-// guo 道果（可花）、talents 悟道樹級數、auto 自動化開關、autoMajor 自動突破大境界的成功率門檻
+// guo 道果（可花）、talents 悟道樹級數、auto 化身天賦開關、autoMajor 自動突破大境界的成功率門檻
 // wins/pills/best 跨世累計：擊敗數、服丹數、到過的最高境界（解鎖頂端天賦用）
 function newMeta() { return { lives: 0, dao: 0, guo: 0, talents: {}, auto: {}, autoMajor: .5, wins: 0, pills: 0, best: 0, keepTech: null, arcDone: {}, arcLife: {}, memSeen: {}, history: [] }; }
 function newLife(meta) {
@@ -24,9 +24,11 @@ function newLife(meta) {
     root: null, phys: null, draw: null, mortal: newMortal(12 - 2 * t('tongyan')), arts: {}, gear: {}, tox: 0, body: 0, shop: null,
     lifeBonus: 0, brkBonus: 0, flags: {}, arcs: {}, encT: 15, evT: 100, ev: null, log: [], wins: 0, peak: 0,
   };
-  // 前世武學：隨機帶一個玄階武技；前世功法：保留上一世的主修（連同進度）
+  // 前世術法：隨機帶一個玄階術法；前世功法：保留上一世的主修（連同進度）
   if (t('kaiju')) { const id = pick(Object.keys(SKILLS).filter(k => SKILLS[k].grade === 2)); s.skills[id] = 0; s.equip.push(id); }
   if (t('qianshi') && meta.keepTech && TECHS[meta.keepTech.id]) s.techs[meta.keepTech.id] = meta.keepTech.xp;
+  // 宿世神通：帶上上一世的一門神通（報通）
+  s.shen = t('baotong') && meta.lastShen && meta.lastShen.length ? [pick(meta.lastShen)] : [];
   return s;
 }
 const tl = id => S.meta.talents[id] || 0;
@@ -45,6 +47,7 @@ function load() {
   const m = S.meta, d = newMeta();
   for (const k of ['talents', 'auto', 'autoMajor', 'wins', 'pills', 'keepTech']) if (m[k] === undefined) m[k] = d[k];
   if (m.guo === undefined) m.guo = m.dao;
+  if (m.talents.a_place) { m.guo += 4; delete m.talents.a_place; delete m.auto.a_place; }   // 自動選地點拿掉了，退還道果
   if (m.best === undefined) m.best = Math.max(s.peak || 0, ...m.history.map(h => STAGES.findIndex(x => x.name === h.stageName)));
   if (!s.items) { s.items = { heal: s.heal || 0 }; if (s.pill) s.items[BRK_PILLS[Math.min(3, stg(s).major)]] = s.pill; delete s.pill; delete s.heal; }
   for (const id in s.techs) if (!TECHS[id]) delete s.techs[id];
@@ -60,6 +63,10 @@ function load() {
   s.tox = s.tox || 0; s.body = s.body || 0;
   if (s.draw && !s.draw.rr) { s.draw.rr = { r: s.draw.rerolls, p: s.draw.rerolls }; delete s.draw.rerolls; }
   for (const slot of ART_SLOTS) if (s.gear[slot] && !artOk(s.gear[slot], s)) s.gear[slot] = null;   // 境界不夠的法寶先卸下
+  // 神通上線前的存檔：稀有體質補天賦神通，已過化神的補本命神通
+  s.shen = s.shen || []; s.flags = s.flags || {};
+  if (s.phys && PHYS_SHEN[s.phys] && !s.flags.physShen) { s.flags.physShen = 1; gainShen(PHYS_SHEN[s.phys], `${PHYSIQUES[s.phys].name}血脈甦醒`, s); }
+  if (s.root && s.stage >= 18 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
 }
 
 // ---------- 開局抽根骨 ----------
@@ -100,6 +107,7 @@ function confirmDraw() {
   const s = L(), d = s.draw; if (d.r < 0 || d.p < 0) return;
   const first = !s.root;
   s.root = d.roots[d.r]; s.phys = d.phys[d.p]; s.draw = null;
+  if (PHYS_SHEN[s.phys] && !s.flags.physShen) { s.flags.physShen = 1; gainShen(PHYS_SHEN[s.phys], `${PHYSIQUES[s.phys].name}血脈甦醒`); }   // 天賦神通
   if (s.mortal) { s.mortal.phase = 'qi'; s.mortal.qi = 0; lastNow = Date.now(); save(); render(); return; }   // 凡人篇：測完靈根去感氣
   log(first && S.meta.lives === 1 ? `你在青竹林外的一間茅屋醒來。十六歲，剛學會引氣。路過的老道說你身負${rootName()}、${PHYSIQUES[s.phys].name}。`
     : first ? `第 ${S.meta.lives} 世。你在一個陌生的村子醒來，心裡卻記得一些不該記得的事。這一世，你身負${rootName()}、${PHYSIQUES[s.phys].name}。`
@@ -127,7 +135,7 @@ const FATES = {
   scroll: { name: '山中殘卷', desc: '在山洞裡撿到半卷古書。沒有師門照應，但得到一部偏門功法。',
             test: '殘卷末頁畫著一套感氣的法門。照著練了幾夜，你隱約看見了自己體內的靈根。',
             enter: '你照著殘卷自己摸索，踏上了仙途', give: s => { const id = randomUnowned('tech', [2]); if (!id) return ''; learnTech(id); return `從殘卷裡悟出《${TECHS[id].name}》`; } },
-  sanxiu: { name: '散修收徒', desc: '一個背著酒葫蘆的怪老頭說你骨頭不錯。他會教你一門武技。',
+  sanxiu: { name: '散修收徒', desc: '一個背著酒葫蘆的怪老頭說你骨頭不錯。他會教你一門術法。',
             test: '老頭捏了捏你的手骨，又按了按你的眉心，嘖了一聲。',
             enter: '你跟著怪老頭走了，他沒說自己叫什麼', give: s => { const id = randomUnowned('skill', [2]); if (!id) return ''; learnSkill(id); return `老頭教了你${SKILLS[id].name}`; } },
   fruit:  { name: '誤食異果', desc: '在深山吃了一顆通紅的怪果子。體質必有玄品以上，但開局帶傷。',
@@ -303,7 +311,7 @@ function rootName(s = L()) {
 }
 // 這個屬性是否和靈根契合（空靈根只親和無屬性）
 const rootFits = (elem, s = L()) => elem === '無' ? s.root.type === 'void' : s.root.elems.includes(elem);
-// 武技是否享有靈根親和（萬象歸元體什麼屬性都算）
+// 術法是否享有靈根親和（萬象歸元體什麼屬性都算）
 const skillFits = (elem, s = L()) => rootFits(elem, s) || (s.phys && PHYSIQUES[s.phys].allAff);
 function canMain(id, s = L()) { const t = TECHS[id]; return t.type === '吐納' && (t.grade < 3 || t.elem === '無' || rootFits(t.elem, s)); }
 
@@ -350,10 +358,10 @@ function rate(s = L(), mode = s.mode) {
   return (1 + .2 * s.stage) * rootType(s).rate * (main.elem !== '無' && rootFits(main.elem, s) ? 1.15 : 1)
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
-    * (s.injury > 0 ? .5 : 1) * (mode === 'travel' ? .5 : 1);
+    * (s.injury > 0 ? .5 : 1) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s));
 }
 function stats(s = L()) {
-  const k = 1 + .5 * s.stage, b = 1 + s.body;
+  const k = 1 + .5 * s.stage, b = (1 + s.body) * (1 + qualBonus(s));   // 突破品質也加氣血、攻擊、防禦
   return {
     hp: Math.round(100 * k * (1 + eff('hp')) * b), mp: Math.round(50 * k * techMul(s.tech, s)), atk: 10 * k * (1 + eff('atk')) * b, def: 5 * k * (1 + eff('def')) * b,
     spd: Math.max(1, Math.round(10 + 2 * s.stage + eff('spd'))), crit: .05 + eff('crit'), critDmg: 1.5 + eff('critDmg'),
@@ -361,20 +369,39 @@ function stats(s = L()) {
   };
 }
 function brkPillsUsed(s = L()) { return isMajorNext(s) ? Math.min(count(BRK_PILLS[stg(s).major]), maxBrkPills()) : 0; }
-function brkChance(s = L()) {
+// mode：大境界的突破方式，safe 穩紮穩打、all 全力一搏（成功率打七五折）
+function brkChance(s = L(), mode = s.brkMode) {
   if (s.stage >= STAGES.length - 1) return 0;
   let p = isMajorNext(s) ? MAJORS[stg(s).major].brk + .05 * tl('pojing') : .92 - .03 * stg(s).major;
   p += eff('brk', s) + s.brkBonus + (s.found || 0) + BRK_PILL_BONUS.slice(0, brkPillsUsed(s)).reduce((a, b) => a + b, 0);
+  if (isMajorNext(s) && mode === 'all') p *= .75;
   return Math.max(.01, Math.min(.98, p));
+}
+// ---------- 突破品質（大境界成功時決定，這一世永久加成修煉、氣血、攻擊） ----------
+const QUAL_BONUS = [0, .05, .1, .2];
+const QUAL_RANK = ['下品', '中品', '上品', '極品'];
+// 依新境界的大境界編號（1 築基、2 金丹、3 元嬰、4 以後是法相）
+const QUAL_NAMES = {
+  1: ['下品道基', '中品道基', '上品道基', '無瑕道基'],
+  2: ['下品金丹', '中品金丹', '上品金丹', '九竅金丹'],
+  3: ['無異象', '霞光滿天', '紫氣東來', '萬象來朝'],
+};
+const qualName = (major, q) => (QUAL_NAMES[major] || ['虛影法相', '凝實法相', '通明法相', '不滅法相'])[q];
+const qualBonus = (s = L()) => Object.values(s.qual || {}).reduce((a, q) => a + QUAL_BONUS[q], 0);
+// 品質分數：根基、靈根、突破丹、全力一搏，再加一點運氣
+function rollQual(s, found, used, mode) {
+  const rt = rootType(s).id, root = ['heaven', 'mutant', 'void'].includes(rt) ? .3 : rt === 'dual' ? .15 : 0;
+  const sc = found / .3 + root + used * .1 + (mode === 'all' ? .5 : 0) + Math.random() * 1.2;
+  return sc >= 2.6 ? 3 : sc >= 1.8 ? 2 : sc >= 1 ? 1 : 0;
 }
 function skillPow(id, s = L()) {
   const sk = SKILLS[id], same = sk.elem !== '無' && sk.elem === TECHS[s.tech].elem;
   const boost = s.phys && PHYSIQUES[s.phys].boost === sk.elem ? 1.3 : 1;
   return sk.pow * (1 + .25 * skillLv(id, s)) * (same ? 1.2 : 1) * (1 + (skillFits(sk.elem, s) ? rootType(s).aff : 0)) * boost;
 }
-// 武技耗法力：看品階和境界（法力上限 50×境界係數×主修層數，每回合回 8%）
+// 術法耗法力：看品階和境界（法力上限 50×境界係數×主修層數，每回合回 8%）
 const SKILL_COST = [0, 1, 1.5, 2, 2.6];
-const skillCost = (id, s = L()) => Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade]);
+const skillCost = (id, s = L()) => SKILLS[id].kind === 'mana' ? 0 : Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade]);
 // 屬性相剋倍率：a 攻、d 守
 // mine：是不是你在出手（看破五行只強化你這一方）
 function elemMul(a, d, mine = true) {
@@ -420,7 +447,10 @@ function equipArt(id) { const s = L(), slot = ARTS[id].slot; if (s.gear[slot] !=
 const refinePrice = id => Math.round(ART_PRICE[ARTS[id].grade] * .4 * Math.pow(1.6, L().arts[id]));
 function refineArt(id) {
   const s = L(), p = refinePrice(id); if (s.stone < p || s.arts[id] >= ART_MAX_REFINE) return;
-  s.stone -= p; s.arts[id]++; log(`「${ARTS[id].name}」祭煉到第 ${s.arts[id]} 重。`); save(); render();
+  s.stone -= p; s.arts[id]++; log(`「${ARTS[id].name}」祭煉到第 ${s.arts[id]} 重。`);
+  // 器靈神通：天階法寶祭煉圓滿
+  if (s.arts[id] >= ART_MAX_REFINE && ARTS[id].grade === 4 && !s.flags['shenA_' + id]) { s.flags['shenA_' + id] = 1; gainShen(randShen(), `「${ARTS[id].name}」器靈甦醒`); }
+  save(); render();
 }
 
 // ---------- 戰鬥（自動回合制） ----------
@@ -429,24 +459,46 @@ function fight(foe) {
   const s = L(), p = stats(), myElem = TECHS[s.tech].elem, isVoid = s.root.type === 'void';
   // 從上一場剩下的氣血、法力開始打（連戰會越打越虛）
   let php = p.hp * Math.max(.05, s.hpNow ?? 1), ehp = foe.hp, mp = p.mp * (s.mpNow ?? 1), shield = 0, dodgeT = 0, dodgePow = 0, r = 0, charge = 1;
-  let burn = 0, burnT = 0, brkT = 0, brkV = 0, skip = 0, reflT = 0, reflV = 0, pill = false;
+  let burn = 0, burnT = 0, brkT = 0, brkV = 0, skip = 0, reflT = 0, reflV = 0, buffT = 0, buffV = 0, pill = false;
   const cd = {}, used = {};
-  const strike = (atk, elem, drain = 0) => {
+  // 神通：領域類整場生效，其他記下來等時機
+  const shens = (s.shen || []).map(id => SHENS[id]), shUsed = [], clones = [];
+  let faAtk = 1, faDef = 1, faT = 0, reflAll = 0, mpRegen = .08, skillUp = 0, fled = false;
+  for (const x of shens.filter(x => x.trig === 'field')) {
+    shUsed.push(x.name);
+    if (x.foeAtk) foe = { ...foe, atk: foe.atk * x.foeAtk };
+    if (x.foeDef !== undefined) foe = { ...foe, def: foe.def * x.foeDef };
+    p.regen += x.regen || 0; p.dodge += x.dodge || 0; p.lifesteal += x.steal || 0; p.crit += x.crit || 0;
+    reflAll += x.reflect || 0; mpRegen += x.mpRegen || 0; skillUp += x.skillUp || 0; if (x.mpFull) mp = p.mp;
+  }
+  const strike = (atk, elem, drain = 0, defMul = 1) => {
     let m = elemMul(elem, foe.elem); if (isVoid) m = Math.max(1, m);
-    let d = hit(atk * m, foe.def * (brkT > 0 ? 1 - brkV : 1));
+    let d = hit(atk * m * (buffT > 0 ? 1 + buffV : 1) * (faT > 0 ? faAtk : 1), foe.def * defMul * (brkT > 0 ? 1 - brkV : 1));
     if (pct(p.crit)) d *= p.critDmg;
     ehp -= d; php = Math.min(p.hp, php + d * (p.lifesteal + drain));
   };
   while (php > 0 && ehp > 0 && r < 30) {
     r++;
-    const ready = s.equip.filter(k => !(cd[k] > 0));
+    // 開場神通：第一回合先發動
+    if (r === 1) for (const x of shens.filter(x => x.trig === 'open')) {
+      shUsed.push(x.name);
+      if (x.brk) { brkT = 3; brkV = Math.max(brkV, x.brk); }
+      if (x.nuke) { if (x.pierce) ehp -= p.atk * x.nuke; else strike(p.atk * x.nuke, '無'); }
+      if (x.burn) { burn = p.atk * x.burn; burnT = 4; }
+      if (x.stun) skip = Math.max(skip, x.stun);
+      if (x.fa) { faAtk = x.fa[0]; faDef = x.fa[1]; faT = x.fa[2]; }
+      if (x.shield) shield += p.hp * x.shield;
+      if (x.clone) clones.push({ v: x.clone[0], t: x.clone[1], n: x.clone[2] });
+    }
+    // 冷卻好的術法；回法要法力不到一半才放，增益還在就不重複放
+    const ready = s.equip.filter(k => !(cd[k] > 0) && !(SKILLS[k].kind === 'mana' && mp > p.mp * .5) && !(SKILLS[k].kind === 'buff' && buffT > 0));
     // 法力不夠放招、又傷到一半：自動服回氣丹（每場一顆）
     if (!pill && ready.length && ready.every(k => skillCost(k) > mp) && php < p.hp * .5 && count('huiqi')) {
       s.items.huiqi--; S.meta.pills++; pill = true; mp = Math.min(p.mp, mp + p.mp * .6);
     }
     const id = ready.find(k => skillCost(k) <= mp);
     if (id) {
-      const sk = SKILLS[id], pw = skillPow(id);
+      const sk = SKILLS[id], pw = skillPow(id) * (1 + skillUp);
       mp -= skillCost(id); cd[id] = sk.cd + 1; s.skills[id] += 1 + .5 * tl('shulian'); used[id] = (used[id] || 0) + 1;
       if (sk.kind === 'dmg' || sk.kind === 'multi') {
         // 先上破防再打，打完才結算灼燒和控制
@@ -459,8 +511,11 @@ function fight(foe) {
       else if (sk.kind === 'heal') php = Math.min(p.hp, php + p.hp * .12 * pw);
       else if (sk.kind === 'shield') { shield += p.hp * .12 * pw; if (sk.reflect) { reflT = 3; reflV = sk.reflect; } }
       else if (sk.kind === 'charge') charge = 2 * (1 + .25 * skillLv(id));
+      else if (sk.kind === 'buff') { buffT = 3; buffV = .15 * pw; }
+      else if (sk.kind === 'mana') mp = Math.min(p.mp, mp + p.mp * .2 * pw);
       else { dodgeT = 3; dodgePow = pw; }
     } else strike(p.atk * charge, myElem), charge = 1;
+    for (const c of clones) if (c.t > 0) { for (let h = 0; h < c.n; h++) strike(p.atk * c.v, myElem, 0, .3); c.t--; }   // 分身追擊（神通之力，大半無視防禦）
     for (const k in cd) cd[k]--;
     if (burnT > 0) { ehp -= burn; burnT--; }
     brkT--;
@@ -470,22 +525,28 @@ function fight(foe) {
       const evade = Math.min(.75, Math.max(.03, .05 + (p.spd - foe.spd) * .01 + p.dodge + (dodgeT > 0 ? .35 * dodgePow : 0)));
       if (!pct(evade)) {
         let m = elemMul(foe.elem, myElem, false); if (isVoid) m = Math.min(1, m);
-        const d = hit(foe.atk * m, p.def), a = Math.min(shield, d); shield -= a; php -= d - a;
-        if (reflT > 0) ehp -= d * reflV;
+        const d = hit(foe.atk * m, p.def * (faT > 0 ? faDef : 1)), a = Math.min(shield, d); shield -= a; php -= d - a;
+        ehp -= d * ((reflT > 0 ? reflV : 0) + reflAll);
       }
     }
-    dodgeT--; reflT--;
+    // 保命神通：受到致命傷時發動（不滅回血、遁法直接走人）
+    if (php <= 0) {
+      const x = shens.find(x => x.trig === 'lethal' && !shUsed.includes(x.name));
+      if (x) { shUsed.push(x.name); if (x.flee) { fled = true; php = p.hp * .05; break; } php = p.hp * x.revive; }
+    }
+    dodgeT--; reflT--; buffT--; faT--;
     php = Math.min(p.hp, php + p.hp * p.regen);
-    mp = Math.min(p.mp, mp + p.mp * .08);
+    mp = Math.min(p.mp, mp + p.mp * mpRegen);
   }
-  return { win: ehp <= 0, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), pill, hp: Math.max(0, php) / p.hp, mp: mp / p.mp };
+  return { win: ehp <= 0, fled, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), shen: shUsed.join('、'), pill, hp: Math.max(0, php) / p.hp, mp: mp / p.mp };
 }
 // lv：敵人相當於第幾個小境界（1 起算），mult：強度倍率，elem：敵人屬性
 function battle(name, lv, mult = 1, loot = false, elem = '無') {
   const s = L(), i = lv - 1, k = 1 + .5 * i, rr = (.85 + Math.random() * .3) * mult;
   const res = fight({ hp: 115 * k * rr, atk: 11.5 * k * rr, def: 4.5 * k * mult, spd: 10 + 2 * i, elem });
   s.hpNow = res.hp; s.mpNow = res.mp;
-  const how = `${res.rounds} 回合${res.used ? '，施展' + res.used : ''}${res.pill ? '，服了一顆回氣丹' : ''}`;
+  const how = `${res.rounds} 回合${res.shen ? '，神通' + res.shen : ''}${res.used ? '，施展' + res.used : ''}${res.pill ? '，服了一顆回氣丹' : ''}`;
+  if (res.fled) { log(`不敵${name}，一念千里遁走了（${how}）。`); return false; }
   if (res.win) {
     s.wins++; S.meta.wins++;
     let msg = `擊敗${name}（${how}）`;
@@ -508,6 +569,8 @@ function growTechs(sec) {
     s.techs[id] += sec * mul * (i === 0 ? 1 : .5);
     const l = techLayer(id);
     if (l > before) log(`《${TECHS[id].name}》修至第 ${l} 層${l >= 9 ? '，功法圓滿' : ''}。`);
+    // 功法神通：地階以上的主修練到圓滿
+    if (l >= 9 && i === 0 && TECHS[id].grade >= 3 && !s.flags['shenT_' + id]) { s.flags['shenT_' + id] = 1; gainShen(randShen(), `《${TECHS[id].name}》功法圓滿`); }
   });
 }
 function tick(dt) {
@@ -542,7 +605,20 @@ function tick(dt) {
     } else die();
   }
 }
-// 自動化天賦：開著網頁時每秒檢查一次
+// 隨緣應變的選法：看選項內容判斷。會打架、受傷、看機率、扣靈石修為的算有風險；拿到東西的算收益
+const EV_RISK = /battle\(|injure\(|pct\(|stone -=|xiu \*|brkBonus -=|tox/;
+const EV_GAIN = /addStone|addXiu|addPill|addHeal|addLife|addTechXp|tryDrop|learnTech|learnSkill|gainArt|giftTech|giftArt|brkBonus \+=|techs\[|skills\[|lifeBonus/g;
+const EV_MODES = { gain: '收益最多', safe: '無風險', rand: '隨機' };
+function autoChoose() {
+  const ch = visible(curEvent()), src = c => c.run.toString(), mode = S.meta.evMode || 'safe';
+  let i;
+  if (mode === 'rand') i = Math.floor(Math.random() * ch.length);
+  else if (mode === 'safe') { i = ch.findIndex(c => !EV_RISK.test(src(c))); if (i < 0) i = ch.length - 1; }
+  else { const sc = ch.map(c => (src(c).match(EV_GAIN) || []).length); i = sc.indexOf(Math.max(...sc)); }
+  choose(i);
+}
+function setEvMode(v) { S.meta.evMode = v; save(); }
+// 化身天賦：開著網頁時每秒檢查一次
 function autoActs() {
   const s = L(), need = stg().need;
   if (autoOn('a_heal') && s.injury > 0 && count('heal')) usePill('heal');
@@ -552,7 +628,8 @@ function autoActs() {
     const best = Object.keys(s.techs).filter(id => canMain(id)).sort((a, b) => (TECHS[b].rate || 0) - (TECHS[a].rate || 0))[0];
     if (best && (TECHS[best].rate || 0) > (TECHS[s.tech].rate || 0)) switchTech(best, true);
   }
-  if (autoOn('a_place') && s.mode === 'travel') { const top = PLACES.filter(p => s.stage >= p.min).pop(); if (top.id !== s.place) setPlace(top.id); }
+  // 隨緣應變：普通事件 30 秒沒選就自動選（人物劇情、前世羈絆不算）
+  if (autoOn('a_event') && s.ev && s.ev.ev && (s.ev.w = (s.ev.w || 0) + 1) >= 30) autoChoose();
   if (autoOn('a_refine')) for (const slot of ART_SLOTS) { const id = s.gear[slot]; if (id && s.arts[id] < ART_MAX_REFINE && s.stone > refinePrice(id) * 3) refineArt(id); }
   if (s.xiu >= need && s.stage < STAGES.length - 1) {
     if (isMajorNext() ? autoOn('a_major') && brkChance() >= S.meta.autoMajor : autoOn('a_minor')) breakthrough();
@@ -627,31 +704,57 @@ function setMode(m) { L().mode = m; L().encT = 8; dirty = true; render(); }
 function setPlace(id) { L().place = id; dirty = true; render(); }
 function breakthrough() {
   const s = L(); if (s.xiu < stg().need || s.stage >= STAGES.length - 1) return;
-  const major = isMajorNext(), p = brkChance(), used = brkPillsUsed(), pill = major ? ITEMS[BRK_PILLS[stg().major]].name : '';
+  log(tryBreak().msg); save(); render();
+}
+// 衝擊下一個境界（手動和離線共用同一套規則），回傳結果文字
+// ---------- 神通的取得 ----------
+// 本命（化神，依靈根）、極品突破、天賦（稀有體質）、功法圓滿、法寶器靈、宿世（前世帶來）
+const hasShen = (id, s = L()) => (s.shen || []).includes(id);
+const randShen = (s = L()) => { const ids = Object.keys(SHENS).filter(id => !hasShen(id, s)); return ids.length ? pick(ids) : null; };
+const benmingShen = (s = L()) => s.root.type === 'void' ? 'guixu' : Object.keys(SHENS).find(id => SHENS[id].elem === s.root.elems[0]);
+// 指定的那門已經有了，就改給一門隨機的
+function gainShen(id, why, s = L()) {
+  if (id && hasShen(id, s)) id = randShen(s);
+  if (!id) return;
+  (s.shen = s.shen || []).push(id);
+  log(`${why}，覺醒神通「${SHENS[id].name}」：${SHENS[id].desc}。`);
+}
+function setBrkMode(v) { L().brkMode = v; save(); updateDyn(); }
+// offline：離線自動突破一律穩紮穩打
+function tryBreak(offline = false) {
+  const s = L(), major = isMajorNext(), mode = major && !offline ? s.brkMode : 'safe';
+  const p = brkChance(s, mode), used = brkPillsUsed(), pill = major ? ITEMS[BRK_PILLS[stg().major]].name : '', found = s.found || 0;
+  const hard = mode === 'all' ? 1.5 : 1;   // 全力一搏失敗更慘
   if (used) s.items[BRK_PILLS[stg().major]] -= used;
   s.brkBonus = 0; s.found = 0;
   if (pct(p)) {
     s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
-    log(`突破成功${used ? `（服下${pill} ${used} 顆）` : ''}，晉入${stg().name}！` + (major ? `壽元增至 ${Math.floor(lifespan())} 年。` : ''));
+    let ql = '';
+    if (major) {
+      const q = rollQual(s, found, used, mode), mj = stg().major; s.qual = s.qual || {}; s.qual[mj] = q;
+      ql = mj === 3 ? `元嬰出世，${qualName(mj, q)}。` : `成就${qualName(mj, q)}。`;
+      if (q === 3) gainShen(randShen(s), `${qualName(mj, q)}，天地共鳴`);
+      if (mj === 4 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '踏入化神，元神與天地相合'); }
+    }
+    return { ok: true, major, msg: `突破成功${used ? `（服下${pill} ${used} 顆）` : ''}，晉入${stg().name}！` + (major ? `${ql}壽元增至 ${Math.floor(lifespan())} 年。` : '') };
   } else {
-    const loss = Math.min(.9, (major ? .5 : .3) * (eff('risk') ? 2 : 1) * (tl('wenxin') ? .5 : 1));
+    const loss = Math.min(.9, (major ? .5 : .3) * hard * (eff('risk') ? 2 : 1) * (tl('wenxin') ? .5 : 1));
     s.xiu = Math.floor(s.xiu * (1 - loss));
     let extra = '';
     if (major) {
       // 大境界失敗：經脈受創、折損壽元，還可能跌落一個小境界。境界越高越兇險；道心穩固全部減半
       const half = tl('wenxin') ? .5 : 1, mj = stg().major;
       injure(120);
-      const yrs = Math.round(MAJORS[mj].life * .03 * half); s.age += yrs;
+      const yrs = Math.round(MAJORS[mj].life * .03 * half * hard); s.age += yrs;
       extra = `，經脈受創，折壽 ${yrs} 年`;
-      if (pct(Math.min(.45, .1 + .05 * mj) * half)) {
+      if (pct(Math.min(.6, (.1 + .05 * mj) * half * hard))) {
         s.stage--; s.xiu = Math.floor(stg().need * .5);
         if (place().min > s.stage) s.place = PLACES.filter(p => s.stage >= p.min).pop().id;
         extra += `，境界跌回${stg().name}`;
       }
     }
-    log(`突破失敗${used ? `（${pill} ${used} 顆也沒能撐住）` : ''}，修為散去 ${Math.round(loss * 100)}%${extra}。`);
+    return { ok: false, major, msg: `突破失敗${used ? `（${pill} ${used} 顆也沒能撐住）` : ''}，修為散去 ${Math.round(loss * 100)}%${extra}。` };
   }
-  save(); render();
 }
 // 換主修要散功：目前修為折半（各功法自己的層數保留）。手動換要按兩次確認
 function switchTech(id, force) {
@@ -709,7 +812,7 @@ function setTab(t) { tab = t; armed = ''; render(); }
 function restock() {
   const s = L(), slots = [];
   const grades = [1, 2, 3, 4].filter(g => s.stage >= GRADE_MIN_STAGE[g]);
-  // 功法、武技、法寶各有自己的圖鑑和價格表
+  // 功法、術法、法寶各有自己的圖鑑和價格表
   const kinds = { tech: [TECHS, s.techs, TECH_PRICE], skill: [SKILLS, s.skills, SKILL_PRICE], art: [ARTS, s.arts, ART_PRICE] };
   for (let i = 0; i < SHOP_SLOTS + 2 * tl('huojia'); i++) {
     let slot = null;
@@ -754,6 +857,7 @@ function die() {
   const s = L(); s.dead = true;
   S.meta.history.push({ life: S.meta.lives, stageName: STAGES[s.peak].name, age: Math.floor(s.age), root: s.root ? rootName(s) + (s.phys ? '、' + PHYSIQUES[s.phys].name : '') : '' });
   S.meta.keepTech = { id: s.tech, xp: s.techs[s.tech] };   // 給「前世功法」天賦用
+  S.meta.lastShen = (s.shen || []).slice();                // 給「宿世神通」天賦用
   // 坐化當下就拿到道心和道果，轉世前可以先在悟道樹上花掉
   s.daoGot = daoGain(); S.meta.dao += s.daoGot; S.meta.guo += s.daoGot;
   save(); dirty = true;
@@ -778,7 +882,7 @@ function applyOffline(sec) {
   const s = L(); if (s.dead || s.draw || s.mortal || sec < 30) return;
   s.hpNow = s.mpNow = 1;   // 離線回來一律回滿
   const off = Math.min(sec, offlineCap());
-  // 離線會自動突破小境界；卡在大境界前就停，等你回來親自突破
+  // 離線突破：小境界要有「水到渠成」，大境界要有「順勢破境」且成功率夠；規則和手動突破一樣
   const stage0 = s.stage;
   let left = off * offRate(), gained = 0;
   while (left > 0) {
@@ -786,14 +890,10 @@ function applyOffline(sec) {
     if (t > left) { s.xiu += r * left; gained += r * left; break; }
     left -= t; gained += stg().need - s.xiu; s.xiu = stg().need;
     if (s.stage >= STAGES.length - 1) break;
-    if (isMajorNext()) {
-      // 大境界：有「自動突破大境界」且成功率夠才衝，失敗就停下等你回來
-      if (!(autoOn('a_major') && brkChance() >= S.meta.autoMajor)) { addFound(left * r); break; }   // 卡在大境界前，剩下的時間化為根基
-      const p = brkChance(), used = brkPillsUsed(); if (used) s.items[BRK_PILLS[stg().major]] -= used;
-      s.brkBonus = 0; s.found = 0;
-      if (pct(p)) { s.stage++; s.xiu = 0; } else { s.xiu = Math.floor(s.xiu * (tl('wenxin') ? .75 : .5)); log('閉關時衝擊大境界失敗了。'); break; }
-    } else if (pct(brkChance())) { s.stage++; s.xiu = 0; } else s.xiu = Math.floor(s.xiu * .7);
-    s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
+    // 不能自動突破就停在這裡，剩下的時間化為根基
+    if (isMajorNext() ? !(autoOn('a_major') && brkChance(s, 'safe') >= S.meta.autoMajor) : !autoOn('a_minor')) { addFound(left * r); break; }
+    const res = tryBreak(true);
+    if (!res.ok && res.major) { log('閉關時衝擊大境界，' + res.msg); break; }   // 大境界失敗就停下等你回來
   }
   if (s.stage > stage0) log(`閉關期間突破到了${stg().name}。`);
   growTechs(off * offRate());
@@ -819,11 +919,11 @@ function effText(t, id, mul = 1) {
   }).join(' · ');
 }
 const gradeTag = (g, extra) => `<span class="g${g} small">${GRADES[g]}${extra ? ' · ' + extra : ''}</span>`;
-const TABS = [['cult', '功法'], ['skill', '武技'], ['art', '法寶'], ['bag', '行囊'], ['shop', '坊市'], ['log', '紀事'], ['dao', '道途']];
-const physDesc = id => { const x = PHYSIQUES[id]; return x.desc || [x.boost ? `${x.boost}屬性武技 +30%` : '', effText(x)].filter(Boolean).join(' · '); };
+const TABS = [['cult', '功法'], ['skill', '術法'], ['art', '法寶'], ['bag', '行囊'], ['shop', '坊市'], ['log', '紀事'], ['dao', '道途']];
+const physDesc = id => { const x = PHYSIQUES[id]; return x.desc || [x.boost ? `${x.boost}屬性術法 +30%` : '', effText(x)].filter(Boolean).join(' · '); };
 function rootDesc(root) {
   const t = ROOT_TYPES.find(r => r.id === root.type);
-  return `修煉 ×${t.rate}${t.aff ? ` · 親和武技 +${Math.round(t.aff * 100)}%` : ''}${t.desc ? ' · ' + t.desc : ''}`;
+  return `修煉 ×${t.rate}${t.aff ? ` · 親和術法 +${Math.round(t.aff * 100)}%` : ''}${t.desc ? ' · ' + t.desc : ''}`;
 }
 function renderDraw() {
   const s = L(), d = s.draw, fake = r => rootName({ root: r });
@@ -866,7 +966,8 @@ function render() {
         <select onchange="setPlace(this.value)" ${s.mode === 'travel' ? '' : 'disabled'}>
           ${PLACES.filter(p => s.stage >= p.min).map(p => `<option value="${p.id}" ${p.id === s.place ? 'selected' : ''}>${p.name}</option>`).join('')}
         </select>
-        <button id="brk" class="primary" onclick="breakthrough()"></button>
+        <span style="margin-left:auto;display:flex;gap:8px;align-items:center">${isMajorNext() ? `<select class="mini" onchange="setBrkMode(this.value)" title="大境界突破方式">${[['safe', '穩紮穩打'], ['all', '全力一搏']].map(([k, n]) => `<option value="${k}" ${(s.brkMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}
+        <button id="brk" class="primary" onclick="breakthrough()"></button></span>
       </div>
       <ul class="recent" id="recent"></ul>
     </section>
@@ -905,6 +1006,7 @@ function renderEvent() {
     <div class="row"><b>${e.title}</b>${e.who ? `<span class="who">${e.who}</span>` : ''}</div>
     <p>${val(e.text, s)}</p>
     <div class="choices">${visible(e).map((c, i) => `<button onclick="choose(${i})">${val(c.t, s)}</button>`).join('')}</div>
+    ${autoOn('a_event') && s.ev.ev ? `<p class="muted small">隨緣應變：30 秒內沒選，會照「${EV_MODES[S.meta.evMode || 'safe']}」自動選。</p>` : ''}
   </section>`;
 }
 function renderOffline() {
@@ -930,11 +1032,13 @@ function renderCult() {
     return s.subs.length < 2 ? `<button class="mini" onclick="toggleSub('${id}')">輔修</button>` : '<span class="muted">輔修已滿</span>';
   };
   return `<h3>靈根</h3>
-    <div class="item"><div class="row"><b>${rootName()}</b><span class="small">修煉 ×${rt.rate}${rt.aff ? ` · 親和屬性武技 +${Math.round(rt.aff * 100)}%` : ''}</span></div>
+    <div class="item"><div class="row"><b>${rootName()}</b><span class="small">修煉 ×${rt.rate}${rt.aff ? ` · 親和屬性術法 +${Math.round(rt.aff * 100)}%` : ''}</span></div>
       <div class="muted small">${rt.desc || (s.root.elems.length ? `親和：${s.root.elems.join('、')}。主修同屬性功法再快 15%，地階以上只能修這些屬性（或無屬性）的功法。` : '')}</div></div>
     <h3>體質</h3>
     <div class="item"><div class="row"><b class="g${PHYSIQUES[s.phys].r}">${PHYSIQUES[s.phys].name}</b><span class="small muted">${PHYS_RANK[PHYSIQUES[s.phys].r]}</span></div>
       <div class="small">${physDesc(s.phys)}</div></div>
+    <h3>境界品質</h3>${Object.keys(s.qual || {}).length ? `<div class="item">${Object.entries(s.qual).map(([mj, q]) => `<div class="row small"><span>${MAJORS[mj].name}：<b class="g${q + 1}">${qualName(+mj, q)}</b></span><span class="muted">${QUAL_RANK[q]}${q ? ` · +${QUAL_BONUS[q] * 100}%` : ''}</span></div>`).join('')}
+      <div class="small same">修煉、氣血、攻擊、防禦合計 +${Math.round(qualBonus() * 100)}%</div></div>` : '<p class="muted small">還沒突破過大境界。大境界突破成功時會決定品質：根基越厚、靈根越好、突破丹越多，品質越好；選「全力一搏」更容易出極品，但成功率較低、失敗更慘。</p>'}
     <h3>主修</h3>${techCard(s.tech)}
     <h3>輔修（${s.subs.length}/${maxSubs()}）</h3>${s.subs.map(id => techCard(id, `<button class="mini on" onclick="toggleSub('${id}')">卸下</button>`)).join('') || '<p class="muted small">空著。煉體、身法、劍修、長生、丹道、殺伐、悟性、尋寶類功法都能輔修，精進速度是主修的一半。</p>'}
     <h3>身體</h3>
@@ -951,9 +1055,12 @@ function renderSkill() {
       <div class="small">${skillDesc(k)}</div>
       <div class="row small"><span>${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗法 ${skillCost(id)}${k.elem !== '無' && k.elem === te ? ' · <span class="same">與主修同屬性</span>' : ''}${skillFits(k.elem) ? ' · <span class="same">靈根親和</span>' : ''}</span>
       <span>${on ? `<button class="mini" onclick="moveEquip('${id}',-1)">↑</button><button class="mini" onclick="moveEquip('${id}',1)">↓</button>` : ''}<button class="mini ${on ? 'on' : ''}" onclick="toggleEquip('${id}')">${on ? '卸下' : '裝備'}</button></span></div></div>`; };
-  return `<p class="small">法力 ${fmt(stats().mp)}，每回合回復 8%。</p><h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(row).join('') || '<p class="muted">沒有裝備武技，只會普通攻擊。</p>'}
-    <h3>其他武技</h3>${Object.keys(s.skills).filter(id => !s.equip.includes(id)).map(row).join('') || '<p class="muted">沒有了。</p>'}
-    <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好、法力也夠的武技施放；都放不了就普通攻擊。每場戰鬥從滿法力開始，武技品階越高越耗法力，主修功法層數越高法力越多。用得越多越熟練，和主修同屬性威力 +20%。</p>`;
+  const shen = s.shen || [];
+  return `<h3>神通（${shen.length}）</h3>${shen.map(id => { const x = SHENS[id]; return `<div class="item"><div class="row"><b class="g4">${x.name}</b><span class="small muted">${x.type} · ${{ open: '開場發動', field: '整場生效', lethal: '危急時發動' }[x.trig]}</span></div><div class="small">${x.desc}</div></div>`; }).join('')
+    || '<p class="muted small">還沒有神通。踏入化神時會依靈根覺醒本命神通；大境界突破出極品、稀有體質、地階以上主修功法圓滿、天階法寶祭煉圓滿，也都會覺醒神通。每門神通一場戰鬥發動一次，不耗法力。</p>'}
+    <p class="small">法力 ${fmt(stats().mp)}，每回合回復 8%。</p><h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(row).join('') || '<p class="muted">沒有裝備術法，只會普通攻擊。</p>'}
+    <h3>其他術法</h3>${Object.keys(s.skills).filter(id => !s.equip.includes(id)).map(row).join('') || '<p class="muted">沒有了。</p>'}
+    <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好、法力也夠的術法施放；都放不了就普通攻擊。法力會延續到下一場，戰鬥外慢慢回滿；術法品階越高越耗法力，主修功法層數越高法力越多。用得越多越熟練，和主修同屬性威力 +20%。</p>`;
 }
 function renderArt() {
   const s = L();
@@ -990,7 +1097,7 @@ function renderShop() {
     if (o.sold) return `<div class="item row muted"><span>（已售出）</span></div>`;
     const deal = o.deal ? '<span class="deal">奇貨</span> ' : '';
     if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><span>${deal}<b>《${t.name}》</b> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</span>${btn(o.price, `buySlot(${i})`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${t.type === '吐納' && !canMain(o.id) ? ' · <span class="hurt">你的靈根修不了</span>' : ''}</div></div>`; }
-    if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row"><span>${deal}<b>${k.name}</b> ${gradeTag(k.grade, `武技 · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</span>${btn(o.price, `buySlot(${i})`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div></div>`; }
+    if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row"><span>${deal}<b>${k.name}</b> ${gradeTag(k.grade, `術法 · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</span>${btn(o.price, `buySlot(${i})`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div></div>`; }
     if (o.k === 'art') { const a = ARTS[o.id]; return `<div class="item"><div class="row"><span>${deal}<b>${a.name}</b> ${gradeTag(a.grade, `法寶 · ${a.slot}`)}</span>${btn(o.price, `buySlot(${i})`)}</div><div class="small">${effText(a)}</div></div>`; }
     const it = ITEMS[o.id];
     return `<div class="item row"><span>${deal}<b>${it.name}</b> <span class="muted small">${it.desc}</span></span>${btn(o.price, `buySlot(${i})`)}</div>`;
@@ -1002,7 +1109,7 @@ function renderShop() {
     <div class="item row"><span><b>洞府 ${s.cave} 級</b> <span class="muted small">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</span></span>${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${s.shop.slots.map(slot).join('')}
-    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。功法、武技、法寶、丹藥都可能出現，境界越高越容易出現高階貨。</p>`;
+    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。功法、術法、法寶、丹藥都可能出現，境界越高越容易出現高階貨。</p>`;
 }
 function renderLog() { return `<ul class="log">${L().log.map(l => `<li><span class="muted">${l.age} 歲</span> ${l.text}</li>`).join('')}</ul>`; }
 function renderDao() {
@@ -1034,13 +1141,14 @@ function renderDeath() {
 
 // ---------- 開始介面 ----------
 const HELP = [
-  ['放置修煉', '開著網頁，修為就會自己增長。線上 2 分鐘是遊戲裡的 1 年。關掉網頁後修為照樣累積（效率較低），不會增加年歲，小境界也會自動突破。'],
+  ['放置修煉', '開著網頁，修為就會自己增長。線上 2 分鐘是遊戲裡的 1 年。關掉網頁後修為照樣累積（效率較低），不會增加年歲。點了「水到渠成」，離線時也會自動突破小境界；沒點的話修為滿了就停下，多的化為根基。'],
   ['閉關與遊歷', '閉關修為較穩，多出來的修為會變成根基，提高突破成功率，偶爾還會頓悟。遊歷會遇到事件、戰鬥和寶物，但可能受傷。'],
   ['凡人篇', '每一世都從凡人開始：先抽出身，做些凡人的事累積底子，等仙緣上門後選一條路，測出靈根、感氣入體，才算踏入練氣。'],
-  ['突破', '修為滿了就能突破。小境界容易，失敗只會散去一些修為。大境界有機率失敗，失敗會經脈受創、折損壽元，還可能跌回上一個小境界，境界越高越兇險。服用對應境界的突破丹可以提高成功率。'],
-  ['功法、武技、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。武技在戰鬥中自動施放，要耗法力，用得越多越熟練。法力不夠時會自動服回氣丹。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
+  ['突破', '修為滿了就能突破。小境界容易，失敗只會散去一些修為。大境界有機率失敗，失敗會經脈受創、折損壽元，還可能跌回上一個小境界，境界越高越兇險。服用對應境界的突破丹可以提高成功率。大境界成功時會決定品質（下品到極品，例如無瑕道基、九竅金丹），這一世永久提升修煉和戰力；選「全力一搏」成功率較低，但更容易出好品質。'],
+  ['神通', '比術法強得多的本事，每門一場戰鬥發動一次。踏入化神會依靈根覺醒本命神通；突破出極品、稀有體質、地階以上主修功法圓滿、天階法寶祭煉圓滿也會覺醒。神通跟著這一世，轉世後重來。'],
+  ['功法、術法、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。術法在戰鬥中自動施放，要耗法力，用得越多越熟練。法力不夠時會自動服回氣丹。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
   ['坐化與輪迴', '壽元用盡就會坐化。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
-  ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括自動化、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
+  ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括化身（自動處理雜事）、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
 ];
 function renderTitle() {
   const s = L(), m = S.meta;
@@ -1103,8 +1211,8 @@ function renderTree() {
       : !condOk ? `<span class="muted">解鎖條件：${t.condText}</span>`
       : full ? '<span class="same">已點滿</span>'
       : `<button class="mini" ${m.guo >= cost ? '' : 'disabled'} onclick="buyTalent('${t.id}')">${cost} 道果</button>`;
-    const auto = t.branch === '自動化' && lv ? `<button class="mini ${autoOn(t.id) ? 'on' : ''}" onclick="toggleAuto('${t.id}')">${autoOn(t.id) ? '開啟中' : '已關閉'}</button>` : '';
-    const thr = t.id === 'a_major' && lv ? `<select onchange="setAutoMajor(this.value)">${[.3, .5, .7, .9].map(v => `<option value="${v}" ${m.autoMajor === v ? 'selected' : ''}>成功率 ≥ ${v * 100}%</option>`).join('')}</select>` : '';
+    const auto = t.branch === '化身' && lv ? `<button class="mini ${autoOn(t.id) ? 'on' : ''}" onclick="toggleAuto('${t.id}')">${autoOn(t.id) ? '開啟中' : '已關閉'}</button>` : '';
+    const thr = t.id === 'a_major' && lv ? `<select onchange="setAutoMajor(this.value)">${[.3, .5, .7, .9].map(v => `<option value="${v}" ${m.autoMajor === v ? 'selected' : ''}>成功率 ≥ ${v * 100}%</option>`).join('')}</select>` : t.id === 'a_event' && lv ? `<select onchange="setEvMode(this.value)">${Object.entries(EV_MODES).map(([k, n]) => `<option value="${k}" ${(m.evMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '';
     return `<div class="node ${lv ? 'got' : ''} ${ok && condOk ? '' : 'locked'}">
       <div class="row"><b>${t.name}</b><span class="small muted">${lv}/${t.max}</span></div>
       <div class="small">${t.d(Math.max(1, lv))}${lv && !full ? `<span class="muted"> → ${t.d(lv + 1)}</span>` : ''}</div>

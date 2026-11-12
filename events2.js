@@ -1,7 +1,7 @@
 // 長生閒記：第二批遊歷事件、四位新人物、他們的前世羈絆
 // 每個事件都是不同的情境，不做換名字的重複事件。沒標 repeat 的一世只發生一次。
 
-// 小工具：給一件沒拿過的法寶／功法／武技，回傳文字（拿不到就給靈石）
+// 小工具：給一件沒拿過的法寶／功法／術法，回傳文字（拿不到就給靈石）
 function giftArt(grades) { const id = randomUnowned('art', grades); if (id) { gainArt(id); return `「${ARTS[id].name}」`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
 function giftTech(grades) { const id = randomUnowned('tech', grades); if (id) { learnTech(id); return `《${TECHS[id].name}》`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
 function giftSkill(grades) { const id = randomUnowned('skill', grades); if (id) { learnSkill(id); return `《${SKILLS[id].name}》`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }

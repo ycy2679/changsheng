@@ -1,4 +1,4 @@
-// 長生閒記：境界、靈根、功法、丹藥、地點、坊市（武技、法寶、體質在 gear.js）
+// 長生閒記：境界、靈根、功法、丹藥、地點、坊市（術法、法寶、體質在 gear.js）
 
 // 大境界：life 壽元（年）、brk 突破到下一個大境界的基礎成功率
 const MAJORS = [
@@ -27,11 +27,11 @@ const MUTANT = ['雷', '冰', '風'];
 const COUNTERS = { 金: ['木', '風'], 木: ['土'], 水: ['火'], 火: ['金', '冰'], 土: ['水', '雷'], 雷: ['水'], 冰: ['木'], 風: ['土'] };
 
 // ---------- 靈根：每一世開局隨機抽 ----------
-// n 幾種屬性、pool 從哪些屬性抽、w 權重、rate 修煉倍率、aff 親和屬性武技加成、good 道心越高越容易抽到
+// n 幾種屬性、pool 從哪些屬性抽、w 權重、rate 修煉倍率、aff 親和屬性術法加成、good 道心越高越容易抽到
 const ROOT_TYPES = [
   { id: 'heaven', name: '天靈根', n: 1, pool: FIVE, w: 4, rate: 1.6, aff: .4, good: 1 },
   { id: 'mutant', name: '變異靈根', n: 1, pool: MUTANT, w: 2, rate: 1.7, aff: .5, good: 1 },
-  { id: 'void', name: '空靈根', n: 0, pool: [], w: 2, rate: 1.4, aff: .5, good: 1, desc: '不沾任何屬性：無屬性武技 +50%，也不受相剋影響。' },
+  { id: 'void', name: '空靈根', n: 0, pool: [], w: 2, rate: 1.4, aff: .5, good: 1, desc: '不沾任何屬性：無屬性術法 +50%，也不受相剋影響。' },
   { id: 'dual', name: '雙靈根', n: 2, pool: FIVE, w: 14, rate: 1.3, aff: .2, good: 1 },
   { id: 'triple', name: '三靈根', n: 3, pool: FIVE, w: 30, rate: 1.1, aff: .1 },
   { id: 'quad', name: '四靈根', n: 4, pool: FIVE, w: 28, rate: 1, aff: 0 },
@@ -161,7 +161,7 @@ const BRK_PILL_PRICE = [600, 6000, 40000, 120000, 400000, 1.2e6, 4e6, 1.2e7];
 const BRK_PILL_BONUS = [.15, .1, .05, .05];   // 第 1～4 顆的效果（第 4 顆要悟道樹「海量」）
 
 // ---------- 遊歷地點 ----------
-// min 最低境界、lv 敵人相當於第幾個小境界、mult 敵人強度倍率、foes [名字, 屬性]、grades 掉落功法、武技、法寶的品階
+// min 最低境界、lv 敵人相當於第幾個小境界、mult 敵人強度倍率、foes [名字, 屬性]、grades 掉落功法、術法、法寶的品階
 const PLACES = [
   { id: 'bamboo', name: '青竹林', min: 0, lv: 1, mult: .9, foes: [['赤目山豬', '火'], ['青鱗蛇', '木'], ['灰背狼', '風']], grades: [1] },
   { id: 'wind', name: '黑風嶺', min: 6, lv: 9, mult: 1, foes: [['黑風寨匪修', '風'], ['鐵甲蜈蚣', '金'], ['獨眼妖猿', '土']], grades: [1, 2] },
