@@ -19,9 +19,9 @@ function newLife(meta) {
   meta.lives++;
   const t = id => meta.talents[id] || 0;
   const s = {
-    stage: 0, xiu: 0, age: 16 - 4 * t('tongyan'), stone: 300 * t('kaijushi') * t('kaijushi'), items: { heal: t('kaijudan'), juqi: 3 * t('kaijudan') }, mode: 'closed', place: 'bamboo',
+    stage: 0, xiu: 0, age: 12 - 2 * t('tongyan'), stone: 300 * t('kaijushi') * t('kaijushi'), items: { heal: t('kaijudan'), juqi: 3 * t('kaijudan') }, mode: 'closed', place: 'bamboo',
     tech: 'yinqi', subs: [], techs: { yinqi: 0 }, skills: { qijin: 0 }, equip: ['qijin'], cave: 0, injury: 0,
-    root: null, phys: null, draw: makeDraw(meta), arts: {}, gear: {}, tox: 0, body: 0, shop: null,
+    root: null, phys: null, draw: null, mortal: newMortal(12 - 2 * t('tongyan')), arts: {}, gear: {}, tox: 0, body: 0, shop: null,
     lifeBonus: 0, brkBonus: 0, flags: {}, arcs: {}, encT: 15, evT: 100, ev: null, log: [], wins: 0, peak: 0,
   };
   // 前世武學：隨機帶一個玄階武技；前世功法：保留上一世的主修（連同進度）
@@ -100,11 +100,152 @@ function confirmDraw() {
   const s = L(), d = s.draw; if (d.r < 0 || d.p < 0) return;
   const first = !s.root;
   s.root = d.roots[d.r]; s.phys = d.phys[d.p]; s.draw = null;
+  if (s.mortal) { s.mortal.phase = 'qi'; s.mortal.qi = 0; lastNow = Date.now(); save(); render(); return; }   // 凡人篇：測完靈根去感氣
   log(first && S.meta.lives === 1 ? `你在青竹林外的一間茅屋醒來。十六歲，剛學會引氣。路過的老道說你身負${rootName()}、${PHYSIQUES[s.phys].name}。`
     : first ? `第 ${S.meta.lives} 世。你在一個陌生的村子醒來，心裡卻記得一些不該記得的事。這一世，你身負${rootName()}、${PHYSIQUES[s.phys].name}。`
     : `你看清了自己的根骨：${rootName()}、${PHYSIQUES[s.phys].name}。`);
   lastNow = Date.now(); save(); render();
 }
+
+// ---------- 凡人篇 ----------
+// 每一世從凡人開始：做事累積入道前的底子 → 仙緣三選一 → 測靈根 → 感氣 → 練氣一層
+const MORTAL_YEARS = 2;   // 幾年後仙緣上門（線上 2 年 = 4 分鐘）
+// 凡人能做的事：acts 裡記的是「做了多少」（已乘上出身加成），入道時結算
+const MORTAL_ACTS = {
+  farm:  { name: '務農做工', desc: '攢下銀兩，入道後換成靈石', gain: n => `靈石 +${Math.floor(n * 2)}` },
+  trade: { name: '跑商',     desc: '賺得比務農多一倍，但偶爾會被搶、賠本', gain: n => `靈石 +${Math.floor(n * 4)}` },
+  wu:    { name: '習武',     desc: '打熬筋骨，入道後氣血、攻擊、防禦略高', gain: n => `體魄 +${(n * .04).toFixed(1)}%` },
+  book:  { name: '讀書',     desc: '開闊心智，入道後主修功法起步較快', gain: n => `功法進度 +${Math.floor(n * 2)}` },
+  herb:  { name: '採藥',     desc: '在山裡認草藥，入道時換成聚氣丹', gain: n => `聚氣丹 +${Math.floor(n / 30)}` },
+  story: { name: '聽說書',   desc: '茶館裡聽仙人的傳說，仙緣上門時選項更多', gain: n => `仙緣選項 +${storyFates(n)}` },
+};
+const storyFates = n => n >= 160 ? 2 : n >= 60 ? 1 : 0;
+const FATES = {
+  sect:   { name: '仙門收徒', desc: '仙門下山到鎮上測靈根收徒。入門後有宗門發的靈石和丹藥。',
+            test: '仙師取出一塊巴掌大的測靈石，讓你把手按上去。石頭亮了起來。',
+            enter: '你被收入仙門，成了外門弟子', give: s => { s.stone += 300; addItem('juqi', 2); addItem('heal', 2); return '宗門發下靈石 300、聚氣丹 2 顆、療傷丹 2 顆'; } },
+  scroll: { name: '山中殘卷', desc: '在山洞裡撿到半卷古書。沒有師門照應，但得到一部偏門功法。',
+            test: '殘卷末頁畫著一套感氣的法門。照著練了幾夜，你隱約看見了自己體內的靈根。',
+            enter: '你照著殘卷自己摸索，踏上了仙途', give: s => { const id = randomUnowned('tech', [2]); if (!id) return ''; learnTech(id); return `從殘卷裡悟出《${TECHS[id].name}》`; } },
+  sanxiu: { name: '散修收徒', desc: '一個背著酒葫蘆的怪老頭說你骨頭不錯。他會教你一門武技。',
+            test: '老頭捏了捏你的手骨，又按了按你的眉心，嘖了一聲。',
+            enter: '你跟著怪老頭走了，他沒說自己叫什麼', give: s => { const id = randomUnowned('skill', [2]); if (!id) return ''; learnSkill(id); return `老頭教了你${SKILLS[id].name}`; } },
+  fruit:  { name: '誤食異果', desc: '在深山吃了一顆通紅的怪果子。體質必有玄品以上，但開局帶傷。',
+            test: '異果的藥力在體內亂竄，痛得你在地上打滾。等它平息下來，你第一次看清了自己的身體。',
+            enter: '你靠著異果的藥力硬生生打通了經脈', give: s => { injure(240); return '藥力太猛，經脈帶傷'; } },
+  herb:   { name: '藥鋪學徒', desc: '鎮上藥鋪的老掌櫃收你當學徒。他年輕時好像煉過丹，會送你一些丹藥。',
+            test: '老掌櫃把一株靈草放在你掌心，盯著它是枯萎還是抽芽。',
+            enter: '老掌櫃教你認藥、引氣，你在藥香裡入了門', give: s => { addItem('juqi', 5); addItem('heal', 3); return '老掌櫃送了聚氣丹 5 顆、療傷丹 3 顆'; } },
+  ferry:  { name: '渡口艄公', desc: '渡口那個划了幾十年船的老艄公，忽然問你想不想活得久一點。',
+            test: '老艄公讓你把手伸進河裡。河水繞著你的手指打轉，他點了點頭。',
+            enter: '老艄公把你渡到了河的另一邊，那裡是修士的地界', give: s => { addItem('yanshou'); return '臨別時他塞給你一顆延壽丹'; } },
+  beast:  { name: '靈鹿報恩', desc: '你救下一隻被獸夾夾傷的白鹿。牠的眼睛像人一樣。',
+            test: '白鹿領你到一處山洞，洞壁上的石頭被你一碰就發出微光。',
+            enter: '白鹿領著你找到一座無主的洞府', give: s => { s.stone += 500; return '洞府裡有前人留下的靈石 500'; } },
+  dream:  { name: '夢中授法', desc: '連著好幾夜，你夢見一個看不清臉的人在教你呼吸。',
+            test: '夢裡那人在你眉心點了一下。醒來時，你感覺得到身體裡有東西在流動。',
+            enter: '照著夢裡學的法子，你自己引氣入體', give: s => { s.techs[s.tech] += 600; addItem('wudao'); return '主修功法起步更快，枕邊還多了一顆悟道丹'; } },
+};
+// 出身：每一世開頭抽 4 個選 1。r 稀有度（越高越少見）、mul 哪件事做得比較好、enter 入道時的額外好處
+const ORIGINS = {
+  nong:    { name: '農家子弟', r: 1, mul: { farm: 1.5 }, desc: '從小跟著下田。務農做工 +50%。' },
+  lie:     { name: '獵戶之子', r: 1, mul: { wu: 1.5 }, desc: '跟著父親進山打獵。習武 +50%。' },
+  gu:      { name: '街頭孤兒', r: 1, mul: {}, extraFate: 1, desc: '無牽無掛，哪裡都去得。仙緣選項 +1。' },
+  yu:      { name: '漁家兒女', r: 1, mul: { farm: 1.2, herb: 1.2 }, desc: '在水邊長大。務農做工、採藥 +20%。' },
+  yaonong: { name: '藥農之後', r: 1, mul: { herb: 1.5 }, desc: '家裡世代採藥。採藥 +50%。' },
+  shu:     { name: '書香門第', r: 2, mul: { book: 1.5 }, desc: '家裡藏書不少。讀書 +50%。' },
+  shang:   { name: '商賈之家', r: 2, mul: { trade: 1.3 }, enter: s => { s.stone += 300; return '家裡給的盤纏換成靈石 300'; }, desc: '家境殷實。跑商 +30%，入道時多帶靈石 300。' },
+  yi:      { name: '醫館之後', r: 2, mul: { book: 1.2, herb: 1.2 }, enter: s => { addItem('heal', 3); return '帶著家傳的療傷丹 3 顆'; }, desc: '家裡開醫館。讀書、採藥 +20%，入道時帶療傷丹 3 顆。' },
+  biao:    { name: '鏢局之子', r: 2, mul: { trade: 1.5, wu: 1.2 }, safe: 1, desc: '跟著鏢車走南闖北。跑商 +50% 而且不會被搶，習武 +20%。' },
+  xi:      { name: '戲班出身', r: 2, mul: { story: 2 }, desc: '台上演的都是神仙故事。聽說書的效果加倍。' },
+  wuguan:  { name: '武館少主', r: 3, mul: { wu: 2 }, desc: '自幼在武館長大。習武收穫翻倍。' },
+  xianyi:  { name: '落魄仙裔', r: 3, mul: { book: 1.2 }, rr: 1, desc: '祖上出過修士，家道早已中落。讀書 +20%，測靈根時靈根、體質各多重抽一次。' },
+  daoguan: { name: '道觀雜役', r: 3, mul: { book: 1.2 }, fastQi: 1, desc: '在山上道觀掃了幾年地，聽慣了早晚課。讀書 +20%，感氣快一倍。' },
+  wangzu:  { name: '沒落王族', r: 4, mul: { farm: 1.3, trade: 1.3, wu: 1.3, book: 1.3, herb: 1.3, story: 1.3 }, enter: s => { s.stone += 500; return '變賣祖傳的玉佩，得靈石 500'; }, desc: '前朝王族的遺孤。做什麼都 +30%，入道時多帶靈石 500。' },
+  yixiang: { name: '天生異象', r: 4, mul: {}, rr: 1, goodPhys: 1, desc: '出生那夜滿天星斗亂墜。測靈根時必有玄品以上體質，靈根、體質各多重抽一次。' },
+};
+const ORIGIN_W = { 1: 6, 2: 3, 3: 1.5, 4: .5 };
+function drawOrigins() { const ids = []; while (ids.length < 4) ids.push(pickW(Object.keys(ORIGINS).filter(id => !ids.includes(id)), id => ORIGIN_W[ORIGINS[id].r])); return ids; }
+const mortalYears = () => tl('xianyuan') >= 2 ? 0 : MORTAL_YEARS / (1 + tl('xianyuan'));
+// 感氣要幾秒：靈根越好越快
+const qiNeed = (s = L()) => tl('xianyuan') >= 2 ? 0 : Math.max(5, Math.round(40 / rootType(s).rate / (s.mortal && ORIGINS[s.mortal.origin]?.fastQi ? 2 : 1)));
+function newMortal(start) { return { phase: 'birth', origins: drawOrigins(), origin: null, act: 'farm', start, acts: Object.fromEntries(Object.keys(MORTAL_ACTS).map(k => [k, 0])), fates: null, fate: null, qi: 0, robT: 30 }; }
+function chooseOrigin(id) {
+  const s = L(), m = s.mortal; if (m.phase !== 'birth' || !m.origins.includes(id)) return;
+  m.origin = id; m.phase = 'live'; m.start = s.age; save(); render();
+}
+function setAct(a) { L().mortal.act = a; render(); }
+function mortalTick(dt) {
+  const s = L(), m = s.mortal;
+  if (m.phase === 'live') {
+    const o = ORIGINS[m.origin];
+    s.age += dt / YEAR_SEC; m.acts[m.act] += dt * (o.mul[m.act] || 1);
+    if (m.act === 'trade' && !o.safe && (m.robT -= dt) <= 0) { m.robT = 30; if (pct(.2)) m.acts.trade *= .7; }   // 跑商偶爾被搶
+    if (s.age - m.start >= mortalYears()) {
+      const n = 3 + (o.extraFate || 0) + storyFates(m.acts.story);
+      m.phase = 'fate'; m.fates = Object.keys(FATES).sort(() => Math.random() - .5).slice(0, n); dirty = true;
+    }
+  } else if (m.phase === 'qi') {
+    m.qi += dt; if (m.qi >= qiNeed()) enterPath();
+  }
+}
+function chooseFate(id) {
+  const s = L(), m = s.mortal; if (m.phase !== 'fate' || !m.fates.includes(id)) return;
+  const o = ORIGINS[m.origin];
+  m.fate = id; m.phase = 'test'; s.draw = makeDraw(S.meta);
+  if (o.rr) { s.draw.rr.r++; s.draw.rr.p++; }
+  if ((id === 'fruit' || o.goodPhys) && !s.draw.phys.some(p => PHYSIQUES[p].r >= 3)) s.draw.phys[0] = pick(Object.keys(PHYSIQUES).filter(p => PHYSIQUES[p].r >= 3 && !s.draw.phys.includes(p)));
+  save(); render();
+}
+// 感氣完成：凡人時做的事、出身和仙緣的好處在這時結算，正式成為練氣一層
+function enterPath() {
+  const s = L(), m = s.mortal, f = FATES[m.fate], o = ORIGINS[m.origin], a = m.acts;
+  s.stone += Math.floor(a.farm * 2 + a.trade * 4); s.body += a.wu * .0004; s.techs[s.tech] += Math.floor(a.book * 2);
+  if (a.herb >= 30) addItem('juqi', Math.floor(a.herb / 30));
+  const gift = [o.enter ? o.enter(s) : '', f.give(s)].filter(Boolean).join('；'), age = Math.floor(s.age);
+  s.mortal = null;
+  const intro = S.meta.lives === 1 ? `${age} 歲那年，${f.enter}。` : `第 ${S.meta.lives} 世。${age} 歲那年，${f.enter}，心裡卻記得一些不該記得的事。`;
+  log(`${intro}你出身${o.name}，身負${rootName()}、${PHYSIQUES[s.phys].name}。引氣入體的那一刻，你成了練氣一層的修士。${gift ? gift + '。' : ''}`);
+  save(); dirty = true;
+}
+function renderMortal() {
+  const s = L(), m = s.mortal;
+  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 凡人${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  if (m.phase === 'birth') return `${head}<section class="panel card"><b>出身</b>
+    <p>${S.meta.lives === 1 ? '你降生在山腳下的一個小鎮。聽說山裡住著會飛的仙人，但沒有人真的見過。' : '你又一次生在凡人家裡，前世的事像一場記不清的夢。'}這一世，你生在什麼樣的人家？</p>
+    <div class="opts">${m.origins.map(id => { const o = ORIGINS[id]; return `<button class="opt" onclick="chooseOrigin('${id}')"><b class="g${o.r}">${o.name}</b><span class="small">${o.desc}</span></button>`; }).join('')}</div></section>`;
+  if (m.phase === 'fate') return `${head}<section class="panel card"><b>仙緣</b>
+    <p>${Math.floor(s.age)} 歲這年，平靜的日子起了波瀾。你只能抓住其中一個機會。</p>
+    <div class="opts">${m.fates.map(id => `<button class="opt" onclick="chooseFate('${id}')"><b>${FATES[id].name}</b><span class="small">${FATES[id].desc}</span></button>`).join('')}</div></section>`;
+  if (m.phase === 'qi') return `${head}<section class="panel card"><b>感氣</b>
+    <p>${FATES[m.fate].test.split('。')[0]}。如今你身負${rootName()}，正盤坐著感應天地間的靈氣。</p>
+    <div class="row small"><span>感氣</span><span id="qitxt"></span></div>${bar('xiu', 0, 'qibar')}
+    <p class="small muted">靈根越好，感氣越快。感氣完成就能踏入練氣一層。</p></section>`;
+  const yrs = mortalYears(), left = Math.max(0, m.start + yrs - s.age);
+  return `${head}<section class="panel card"><b>凡人 · ${ORIGINS[m.origin].name} · <span id="mage">${Math.floor(s.age)}</span> 歲</b>
+    <p class="small muted">仙緣還沒到。在那之前，先做點凡人能做的事，入道後都用得上。隨時可以換。</p>
+    <div class="opts">${Object.entries(MORTAL_ACTS).map(([k, a]) => `<button class="opt ${m.act === k ? 'on' : ''}" onclick="setAct('${k}')"><b>${a.name}</b><span class="small">${a.desc}</span><span class="small same" id="act_${k}">${a.gain(m.acts[k])}</span></button>`).join('')}</div>
+    <div class="row small"><span>仙緣將至</span><span id="ftxt">約 ${left.toFixed(1)} 年</span></div>${bar('xiu', 0, 'fbar')}</section>`;
+}
+function updateMortal() {
+  const s = L(), m = s.mortal;
+  if (m.phase === 'live' && $('fbar')) {
+    const yrs = mortalYears() || 1, left = Math.max(0, m.start + mortalYears() - s.age);
+    $('fbar').firstChild.style.width = Math.min(100, (s.age - m.start) / yrs * 100) + '%';
+    $('ftxt').textContent = `約 ${left.toFixed(1)} 年`; $('mage').textContent = Math.floor(s.age);
+    for (const k in MORTAL_ACTS) $('act_' + k).textContent = MORTAL_ACTS[k].gain(m.acts[k]);
+  }
+  if (m.phase === 'qi' && $('qibar')) {
+    const need = qiNeed() || 1;
+    $('qibar').firstChild.style.width = Math.min(100, m.qi / need * 100) + '%';
+    $('qitxt').textContent = `${Math.floor(Math.min(100, m.qi / need * 100))}%`;
+  }
+}
+
+// ---------- 時間加速（光陰如梭）----------
+const gameSpeed = () => Math.max(1, Math.min(S.meta.speed || 1, 1 + tl('guangyin')));
+function setSpeed(v) { S.meta.speed = +v; save(); render(); }
+const speedCtl = () => tl('guangyin') ? `<select class="mini" onchange="setSpeed(this.value)">${Array.from({ length: 1 + tl('guangyin') }, (_, i) => i + 1).map(v => `<option value="${v}" ${gameSpeed() === v ? 'selected' : ''}>×${v}</option>`).join('')}</select>` : '';
 
 // ---------- 小工具 ----------
 const L = () => S.life;
@@ -359,6 +500,7 @@ function growTechs(sec) {
 }
 function tick(dt) {
   const s = L(); if (s.dead || s.draw) return;   // 還在抽根骨時不算時間
+  if (s.mortal) { mortalTick(dt); return; }      // 還是凡人
   s.age += dt / YEAR_SEC;
   const heal = s.mode === 'closed' ? 2 : 1;   // 閉關時養傷、排毒加倍
   if (s.injury > 0) s.injury = Math.max(0, s.injury - dt * heal);
@@ -407,6 +549,9 @@ function autoLife() {
   if (!autoOn('a_rebirth')) return;
   const s = L();
   if (s.dead) { rebirth(); return; }
+  const m = s.mortal;   // 凡人篇：挑最稀有的出身、第一個仙緣
+  if (m && m.phase === 'birth') chooseOrigin([...m.origins].sort((a, b) => ORIGINS[b].r - ORIGINS[a].r)[0]);
+  if (m && m.phase === 'fate') chooseFate(m.fates[0]);
   if (s.draw) {
     const d = s.draw, rt = r => ROOT_TYPES.find(x => x.id === r.type).rate;
     d.r = d.roots.indexOf([...d.roots].sort((a, b) => rt(b) - rt(a))[0]);
@@ -477,8 +622,20 @@ function breakthrough() {
   } else {
     const loss = Math.min(.9, (major ? .5 : .3) * (eff('risk') ? 2 : 1) * (tl('wenxin') ? .5 : 1));
     s.xiu = Math.floor(s.xiu * (1 - loss));
-    if (major) injure(120);
-    log(`突破失敗${used ? `（${pill} ${used} 顆也沒能撐住）` : ''}，修為散去 ${Math.round(loss * 100)}%${major ? '，經脈受創' : ''}。`);
+    let extra = '';
+    if (major) {
+      // 大境界失敗：經脈受創、折損壽元，還可能跌落一個小境界。境界越高越兇險；道心穩固全部減半
+      const half = tl('wenxin') ? .5 : 1, mj = stg().major;
+      injure(120);
+      const yrs = Math.round(MAJORS[mj].life * .03 * half); s.age += yrs;
+      extra = `，經脈受創，折壽 ${yrs} 年`;
+      if (pct(Math.min(.45, .1 + .05 * mj) * half)) {
+        s.stage--; s.xiu = Math.floor(stg().need * .5);
+        if (place().min > s.stage) s.place = PLACES.filter(p => s.stage >= p.min).pop().id;
+        extra += `，境界跌回${stg().name}`;
+      }
+    }
+    log(`突破失敗${used ? `（${pill} ${used} 顆也沒能撐住）` : ''}，修為散去 ${Math.round(loss * 100)}%${extra}。`);
   }
   save(); render();
 }
@@ -603,7 +760,7 @@ function arm(what) {
 const offlineCap = () => tl('yinian') ? Infinity : (2 + L().cave + eff('offline') + 2 * tl('lixian')) * 3600;
 const offRate = () => OFFLINE_RATE + .1 * tl('lixianxiao');   // 神遊太虛：滿級 100%
 function applyOffline(sec) {
-  const s = L(); if (s.dead || s.draw || sec < 30) return;
+  const s = L(); if (s.dead || s.draw || s.mortal || sec < 30) return;
   const off = Math.min(sec, offlineCap());
   // 離線會自動突破小境界；卡在大境界前就停，等你回來親自突破
   const stage0 = s.stage;
@@ -653,12 +810,14 @@ function rootDesc(root) {
   return `修煉 ×${t.rate}${t.aff ? ` · 親和武技 +${Math.round(t.aff * 100)}%` : ''}${t.desc ? ' · ' + t.desc : ''}`;
 }
 function renderDraw() {
-  const d = L().draw, fake = r => rootName({ root: r });
+  const s = L(), d = s.draw, fake = r => rootName({ root: r });
+  const intro = s.mortal ? FATES[s.mortal.fate].test : S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。';
   const opt = (kind, i, on, title, cls, desc) => `<button class="opt ${on ? 'on' : ''}" onclick="pickDraw('${kind}',${i})"><b class="${cls}">${title}</b><span class="small">${desc}</span></button>`;
   const rootCls = r => ({ heaven: 'g4', mutant: 'g4', void: 'g4', dual: 'g3', triple: 'g2', quad: 'g1', five: 'g1' })[r.type];
   return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
-    <section class="panel card"><b>測根骨</b>
-      <p class="small">${S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。'}各選一個。靈根、體質各能重抽 ${d.rr.r}／${d.rr.p} 次（道心越高次數越多，好根骨也越常出現）。</p>
+    <section class="panel card"><b>${s.mortal ? '測靈根' : '測根骨'}</b>
+      <p>${intro}</p>
+      <p class="small">靈根、體質各選一個。靈根、體質各能重抽 ${d.rr.r}／${d.rr.p} 次（道心越高次數越多，好根骨也越常出現）。</p>
       <div class="row"><h3>靈根</h3><button class="mini" ${d.rr.r ? '' : 'disabled'} onclick="rerollDraw('r')">重抽靈根</button></div>
       <div class="opts">${d.roots.map((r, i) => opt('r', i, d.r === i, fake(r), rootCls(r), rootDesc(r))).join('')}</div>
       <div class="row"><h3>體質</h3><button class="mini" ${d.rr.p ? '' : 'disabled'} onclick="rerollDraw('p')">重抽體質</button></div>
@@ -673,9 +832,10 @@ function render() {
   if (title) { app.innerHTML = renderTitle(); return; }
   if (s.dead) { app.innerHTML = renderDeath(); return; }
   if (s.draw) { app.innerHTML = renderDraw(); return; }
+  if (s.mortal) { app.innerHTML = renderMortal(); updateMortal(); return; }
   if (tab === 'shop') ensureShop();
   app.innerHTML = `
-    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
+    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel">
       <div class="row"><span><b class="realm">${stg().name}</b> <span class="root">${rootName()}</span></span><span class="muted" id="age"></span></div>
       ${bar('life', 0, 'lifebar')}
@@ -700,7 +860,8 @@ function render() {
 }
 
 function updateDyn() {
-  const s = L(); if (s.dead || !$('xtxt')) return;
+  const s = L(); if (s.mortal && !s.draw) { updateMortal(); return; }
+  if (s.dead || !$('xtxt')) return;
   const need = stg().need, life = lifespan();
   $('age').textContent = `${Math.floor(s.age)} 歲 / 壽元 ${Math.floor(life)}`;
   $('lifebar').firstChild.style.width = Math.min(100, s.age / life * 100) + '%';
@@ -852,14 +1013,15 @@ function renderDeath() {
 const HELP = [
   ['放置修煉', '開著網頁，修為就會自己增長。線上 2 分鐘是遊戲裡的 1 年。關掉網頁後修為照樣累積（效率較低），不會增加年歲，小境界也會自動突破。'],
   ['閉關與遊歷', '閉關修為較穩，多出來的修為會變成根基，提高突破成功率，偶爾還會頓悟。遊歷會遇到事件、戰鬥和寶物，但可能受傷。'],
-  ['突破', '修為滿了就能突破。小境界容易，大境界有機率失敗。服用對應境界的突破丹可以提高成功率，丹藥吃多了會累積丹毒。'],
+  ['凡人篇', '每一世都從凡人開始：先抽出身，做些凡人的事累積底子，等仙緣上門後選一條路，測出靈根、感氣入體，才算踏入練氣。'],
+  ['突破', '修為滿了就能突破。小境界容易，失敗只會散去一些修為。大境界有機率失敗，失敗會經脈受創、折損壽元，還可能跌回上一個小境界，境界越高越兇險。服用對應境界的突破丹可以提高成功率。'],
   ['功法、武技、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。武技在戰鬥中自動施放，用得越多越熟練。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
   ['坐化與輪迴', '壽元用盡就會坐化。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
   ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括自動化、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
 ];
 function renderTitle() {
   const s = L(), m = S.meta;
-  const where = s.dead ? `第 ${m.lives} 世已坐化，等待轉世` : s.draw ? `第 ${m.lives} 世，正在抽根骨` : `第 ${m.lives} 世 · ${stg().name} · ${Math.floor(s.age)} 歲`;
+  const where = s.dead ? `第 ${m.lives} 世已坐化，等待轉世` : s.draw ? `第 ${m.lives} 世，正在測靈根` : s.mortal ? `第 ${m.lives} 世 · 凡人 · ${Math.floor(s.age)} 歲` : `第 ${m.lives} 世 · ${stg().name} · ${Math.floor(s.age)} 歲`;
   return `<section class="title">
     <h1>長生閒記</h1>
     <p class="lead">凡人百年，修士千載，仙人不記歲月。<br>你只是一縷不肯散去的念頭，一世又一世地回到人間。<br>這一世，能走多遠？</p>
@@ -940,7 +1102,7 @@ setInterval(() => {
   const now = Date.now(), dt = (now - lastNow) / 1000; lastNow = now;
   if (title) return;   // 停在開始介面時不算時間
   autoLife();
-  if (dt > 30) applyOffline(dt); else tick(dt);    // 分頁在背景太久就當成離線
+  if (dt > 30) applyOffline(dt); else tick(dt * gameSpeed());    // 分頁在背景太久就當成離線；光陰如梭只加速線上時間
   if ((saveT += dt) >= 10) { saveT = 0; save(); }
   // 下拉選單打開時不要整頁重繪，不然選單會被關掉
   if (dirty && document.activeElement?.tagName !== 'SELECT') render(); else updateDyn();
