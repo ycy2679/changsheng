@@ -427,7 +427,8 @@ function refineArt(id) {
 function hit(atk, def) { return Math.max(atk * .15, atk - def * .6) * (.9 + Math.random() * .2); }
 function fight(foe) {
   const s = L(), p = stats(), myElem = TECHS[s.tech].elem, isVoid = s.root.type === 'void';
-  let php = p.hp, ehp = foe.hp, mp = p.mp, shield = 0, dodgeT = 0, dodgePow = 0, r = 0, charge = 1;
+  // 從上一場剩下的氣血、法力開始打（連戰會越打越虛）
+  let php = p.hp * Math.max(.05, s.hpNow ?? 1), ehp = foe.hp, mp = p.mp * (s.mpNow ?? 1), shield = 0, dodgeT = 0, dodgePow = 0, r = 0, charge = 1;
   let burn = 0, burnT = 0, brkT = 0, brkV = 0, skip = 0, reflT = 0, reflV = 0, pill = false;
   const cd = {}, used = {};
   const strike = (atk, elem, drain = 0) => {
@@ -516,8 +517,8 @@ function tick(dt) {
   const heal = s.mode === 'closed' ? 2 : 1;   // 閉關時養傷、排毒加倍
   if (s.injury > 0) s.injury = Math.max(0, s.injury - dt * heal);
   if (s.tox > 0) s.tox = Math.max(0, s.tox - dt / 6 * (1 + .5 * tl('jiedu')) * heal);
-  // 上一場戰鬥剩下的氣血、法力（比例），戰鬥外約 1 分鐘回滿，只是顯示用
-  s.hpNow = Math.min(1, (s.hpNow ?? 1) + dt / 60 * heal); s.mpNow = Math.min(1, (s.mpNow ?? 1) + dt / 60 * heal);
+  // 目前氣血、法力（比例），下一場戰鬥從這裡開始；戰鬥外約 40 秒回滿，閉關快一倍
+  s.hpNow = Math.min(1, (s.hpNow ?? 1) + dt / 40 * heal); s.mpNow = Math.min(1, (s.mpNow ?? 1) + dt / 40 * heal);
   if (s.xiu < stg().need) s.xiu = Math.min(stg().need, s.xiu + rate() * dt);
   else if (s.mode === 'closed') addFound(rate() * dt);
   growTechs(dt * (s.mode === 'travel' ? .5 : 1));
@@ -686,7 +687,7 @@ function usePill(id) {
   if (!count(id)) return;
   const pe = 1 + eff('pillEff'), tf = toxFactor(), addTox = n => { s.tox = Math.min(100, s.tox + n * (1 - toxRes())); };
   let msg;
-  if (it.kind === 'heal') { if (!s.injury) return; s.injury = 0; msg = '服下療傷丹，傷勢痊癒。'; }
+  if (it.kind === 'heal') { if (!s.injury && (s.hpNow ?? 1) >= 1) return; s.injury = 0; s.hpNow = 1; msg = '服下療傷丹，傷勢痊癒，氣血回滿。'; }
   else if (it.kind === 'xiu') {
     if (s.xiu >= need) return;
     const diff = stg().major - it.major;
@@ -775,6 +776,7 @@ const offlineCap = () => tl('yinian') ? Infinity : (2 + L().cave + eff('offline'
 const offRate = () => OFFLINE_RATE + .1 * tl('lixianxiao');   // 神遊太虛：滿級 100%
 function applyOffline(sec) {
   const s = L(); if (s.dead || s.draw || s.mortal || sec < 30) return;
+  s.hpNow = s.mpNow = 1;   // 離線回來一律回滿
   const off = Math.min(sec, offlineCap());
   // 離線會自動突破小境界；卡在大境界前就停，等你回來親自突破
   const stage0 = s.stage;
@@ -973,7 +975,7 @@ function renderBag() {
     const k = ITEMS[id].kind;
     if (k === 'brk') return `<span class="muted small">${ITEMS[id].major === stg().major && isMajorNext() ? '突破時自動服用' : '突破對應大境界時自動服用'}</span>`;
     if (k === 'mp') return '<span class="muted small">戰鬥中自動服用</span>';
-    const ok = k === 'heal' ? s.injury > 0 : k === 'xiu' ? s.xiu < stg().need : true;
+    const ok = k === 'heal' ? s.injury > 0 || (s.hpNow ?? 1) < 1 : k === 'xiu' ? s.xiu < stg().need : true;
     return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>`;
   };
   const sell = id => `<button class="mini" onclick="sellItem('${id}')">賣 ${fmt(sellItemPrice(id))}</button>`;
