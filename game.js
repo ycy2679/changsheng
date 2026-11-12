@@ -7,6 +7,9 @@ let S = null;               // { meta, life, t }
 let tab = 'cult';
 let dirty = true;
 let armed = '';             // 兩段式確認：'rebirth' / 'reset'
+let title = true;           // 開始介面：每次打開都先顯示，停在這裡時不算時間
+let fresh = false;          // 沒有存檔（全新開始）
+let deathView = 'sum';      // 坐化後：'sum' 總結 / 'tree' 悟道
 
 // ---------- 存檔 ----------
 // guo 道果（可花）、talents 悟道樹級數、auto 自動化開關、autoMajor 自動突破大境界的成功率門檻
@@ -31,7 +34,8 @@ const autoOn = id => tl(id) > 0 && S.meta.auto[id] !== false;
 function save() { S.t = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 function load() {
   try { S = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { S = null; }
-  if (!S || !S.meta || !S.life) {
+  fresh = !S || !S.meta || !S.life;
+  if (fresh) {
     const meta = newMeta(); S = { meta, life: newLife(meta), t: Date.now() };
     return;
   }
@@ -556,13 +560,14 @@ function die() {
 function rebirth() {
   const g = L().daoGot || 0; S.life = newLife(S.meta);
   log(`上一世的感悟化為道心 +${g}、道果 +${g}。`);
-  armed = ''; save(); render();
+  armed = ''; deathView = 'sum'; save(); render();
 }
+function setDeathView(v) { deathView = v; render(); scrollTo(0, 0); }
 function arm(what) {
   if (armed !== what) { armed = what; render(); return; }
   armed = '';
   if (what === 'rebirth') { log('你散去一身修為，兵解轉世。'); die(); render(); }
-  if (what === 'reset') { localStorage.removeItem(SAVE_KEY); S = null; load(); render(); }
+  if (what === 'reset') { localStorage.removeItem(SAVE_KEY); S = null; load(); title = true; render(); }
 }
 
 // ---------- 離線收益 ----------
@@ -622,7 +627,7 @@ function renderDraw() {
   const d = L().draw, fake = r => rootName({ root: r });
   const opt = (kind, i, on, title, cls, desc) => `<button class="opt ${on ? 'on' : ''}" onclick="pickDraw('${kind}',${i})"><b class="${cls}">${title}</b><span class="small">${desc}</span></button>`;
   const rootCls = r => ({ heaven: 'g4', mutant: 'g4', void: 'g4', dual: 'g3', triple: 'g2', quad: 'g1', five: 'g1' })[r.type];
-  return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}</span></header>
+  return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel card"><b>測根骨</b>
       <p class="small">${S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。'}各選一個。還能重抽 ${d.rerolls} 次（道心越高次數越多，好根骨也越常出現）。</p>
       <div class="row"><h3>靈根</h3><button class="mini" ${d.rerolls ? '' : 'disabled'} onclick="rerollDraw('r')">重抽靈根</button></div>
@@ -636,11 +641,12 @@ function renderDraw() {
 function render() {
   dirty = false;
   const s = L(), app = $('app');
+  if (title) { app.innerHTML = renderTitle(); return; }
   if (s.dead) { app.innerHTML = renderDeath(); return; }
   if (s.draw) { app.innerHTML = renderDraw(); return; }
   if (tab === 'shop') ensureShop();
   app.innerHTML = `
-    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}</span></header>
+    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel">
       <div class="row"><span><b class="realm">${stg().name}</b> <span class="root">${rootName()}</span></span><span class="muted" id="age"></span></div>
       ${bar('life', 0, 'lifebar')}
@@ -795,13 +801,68 @@ function renderDao() {
 }
 function renderDeath() {
   const s = L(), h = S.meta.history[S.meta.history.length - 1];
-  return `<header><h1>長生閒記</h1></header><section class="panel card">
+  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 坐化<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  if (deathView === 'tree') return `${head}<section class="panel card">
+    <div class="row"><b>悟道</b><span>可用道果 <b class="same">${S.meta.guo}</b></span></div>
+    <p class="small muted">天賦永久保留，下一世開始就生效。點好了就轉世，重新抽根骨。</p>
+    <div class="choices"><button onclick="setDeathView('sum')">回顧這一世</button><button class="primary" onclick="rebirth()">轉世</button></div></section>
+    <section class="panel">${renderTree()}</section>`;
+  return `${head}<section class="panel card">
     <b>第 ${S.meta.lives} 世 · 坐化</b>
     <p>你在 ${h.age} 歲走到了盡頭。這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
-    <p>道心 +${s.daoGot}、道果 +${s.daoGot}。轉世前可以先在下面的悟道樹點天賦。</p>
-    <div class="choices"><button class="primary" onclick="rebirth()">轉世</button></div></section>
-    <section class="panel">${renderTree()}</section>
+    <p>這一世的感悟化為道心 +${s.daoGot}、道果 +${s.daoGot}。現在共有道果 <b class="same">${S.meta.guo}</b>，可以到悟道樹點天賦。</p>
+    <div class="choices"><button class="primary" onclick="setDeathView('tree')">入悟道</button></div></section>
     <section class="panel"><h3>這一世的紀事</h3>${renderLog()}</section>`;
+}
+
+// ---------- 開始介面 ----------
+const HELP = [
+  ['放置修煉', '開著網頁，修為就會自己增長。線上 2 分鐘是遊戲裡的 1 年。關掉網頁後修為照樣累積（效率較低），不會增加年歲，小境界也會自動突破。'],
+  ['閉關與遊歷', '閉關修為較穩，多出來的修為會變成根基，提高突破成功率，偶爾還會頓悟。遊歷會遇到事件、戰鬥和寶物，但可能受傷。'],
+  ['突破', '修為滿了就能突破。小境界容易，大境界有機率失敗。服用對應境界的突破丹可以提高成功率，丹藥吃多了會累積丹毒。'],
+  ['功法、武技、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。武技在戰鬥中自動施放，用得越多越熟練。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
+  ['坐化與輪迴', '壽元用盡就會坐化。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
+  ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括自動化、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
+];
+function renderTitle() {
+  const s = L(), m = S.meta;
+  const where = s.dead ? `第 ${m.lives} 世已坐化，等待轉世` : s.draw ? `第 ${m.lives} 世，正在抽根骨` : `第 ${m.lives} 世 · ${stg().name} · ${Math.floor(s.age)} 歲`;
+  return `<section class="title">
+    <h1>長生閒記</h1>
+    <p class="lead">凡人百年，修士千載，仙人不記歲月。<br>你只是一縷不肯散去的念頭，一世又一世地回到人間。<br>這一世，能走多遠？</p>
+    <button class="primary big" onclick="enterGame()">${fresh ? '踏入仙途' : '繼續修行'}</button>
+    ${fresh ? '' : `<p class="small muted">${where} · 道心 ${m.dao}</p>`}
+  </section>
+  <section class="panel"><details><summary>玩法說明</summary>
+    ${HELP.map(([h, t]) => `<p><b>${h}</b><br><span class="small">${t}</span></p>`).join('')}
+  </details></section>
+  <section class="panel"><details ${ioMsg ? 'open' : ''}><summary>存檔匯出／匯入</summary>
+    <p class="small muted">存檔只存在這個瀏覽器裡。換裝置或清除瀏覽器資料前，先把存檔匯出複製下來，之後再貼回來匯入。</p>
+    <textarea id="io" rows="4" placeholder="匯入：把存檔文字貼在這裡"></textarea>
+    <div class="btns"><button onclick="exportSave()">匯出並複製</button><button onclick="importSave()">匯入</button></div>
+    ${ioMsg ? `<p class="small">${ioMsg}</p>` : ''}
+  </details></section>
+  ${fresh ? '' : `<section class="panel"><div class="row"><span class="small muted">清除所有進度，包括悟道樹，從頭開始。</span>
+    <button class="danger" onclick="arm('reset')">${armed === 'reset' ? '再按一次：全部清除' : '重新開始'}</button></div></section>`}`;
+}
+let ioMsg = '';
+function enterGame() { title = false; fresh = false; armed = ''; ioMsg = ''; lastNow = Date.now(); render(); }
+function goTitle() { save(); title = true; armed = ''; render(); scrollTo(0, 0); }
+function exportSave() {
+  save();
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  $('io').value = code; $('io').select();
+  navigator.clipboard?.writeText(code).then(() => { ioMsg = '已匯出並複製到剪貼簿，請找個地方貼上保存。'; render(); $('io').value = code; },
+    () => { ioMsg = '已匯出，請手動複製上面的文字。'; render(); $('io').value = code; });
+}
+function importSave() {
+  let d;
+  try { d = JSON.parse(decodeURIComponent(escape(atob($('io').value.trim())))); } catch (e) { d = null; }
+  if (!d || !d.meta || !d.life) { ioMsg = '這不是有效的存檔文字，存檔沒有變動。'; render(); return; }
+  d.t = Date.now();   // 匯入不補離線收益，避免同一份存檔在兩台裝置重複領取
+  localStorage.setItem(SAVE_KEY, JSON.stringify(d));
+  load(); deathView = 'sum'; armed = '';
+  ioMsg = `匯入成功：第 ${S.meta.lives} 世。`; render();
 }
 
 // ---------- 悟道樹 ----------
@@ -844,6 +905,7 @@ render();
 let lastNow = Date.now(), saveT = 0;
 setInterval(() => {
   const now = Date.now(), dt = (now - lastNow) / 1000; lastNow = now;
+  if (title) return;   // 停在開始介面時不算時間
   autoLife();
   if (dt > 30) applyOffline(dt); else tick(dt);    // 分頁在背景太久就當成離線
   if ((saveT += dt) >= 10) { saveT = 0; save(); }
