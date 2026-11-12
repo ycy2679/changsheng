@@ -477,12 +477,13 @@ function fight(foe) {
     php = Math.min(p.hp, php + p.hp * p.regen);
     mp = Math.min(p.mp, mp + p.mp * .08);
   }
-  return { win: ehp <= 0, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), pill };
+  return { win: ehp <= 0, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), pill, hp: Math.max(0, php) / p.hp, mp: mp / p.mp };
 }
 // lv：敵人相當於第幾個小境界（1 起算），mult：強度倍率，elem：敵人屬性
 function battle(name, lv, mult = 1, loot = false, elem = '無') {
   const s = L(), i = lv - 1, k = 1 + .5 * i, rr = (.85 + Math.random() * .3) * mult;
   const res = fight({ hp: 115 * k * rr, atk: 11.5 * k * rr, def: 4.5 * k * mult, spd: 10 + 2 * i, elem });
+  s.hpNow = res.hp; s.mpNow = res.mp;
   const how = `${res.rounds} 回合${res.used ? '，施展' + res.used : ''}${res.pill ? '，服了一顆回氣丹' : ''}`;
   if (res.win) {
     s.wins++; S.meta.wins++;
@@ -515,6 +516,8 @@ function tick(dt) {
   const heal = s.mode === 'closed' ? 2 : 1;   // 閉關時養傷、排毒加倍
   if (s.injury > 0) s.injury = Math.max(0, s.injury - dt * heal);
   if (s.tox > 0) s.tox = Math.max(0, s.tox - dt / 6 * (1 + .5 * tl('jiedu')) * heal);
+  // 上一場戰鬥剩下的氣血、法力（比例），戰鬥外約 1 分鐘回滿，只是顯示用
+  s.hpNow = Math.min(1, (s.hpNow ?? 1) + dt / 60 * heal); s.mpNow = Math.min(1, (s.mpNow ?? 1) + dt / 60 * heal);
   if (s.xiu < stg().need) s.xiu = Math.min(stg().need, s.xiu + rate() * dt);
   else if (s.mode === 'closed') addFound(rate() * dt);
   growTechs(dt * (s.mode === 'travel' ? .5 : 1));
@@ -852,6 +855,8 @@ function render() {
       ${bar('life', 0, 'lifebar')}
       <div class="row"><span>修為</span><span id="xtxt"></span></div>
       ${bar('xiu', 0, 'xbar')}
+      <div class="vit small"><div><div class="row"><span>氣血</span><span id="hptxt"></span></div>${bar('hp thin', 1, 'hpbar')}</div>
+        <div><div class="row"><span>法力</span><span id="mptxt"></span></div>${bar('mp thin', 1, 'mpbar')}</div></div>
       <div class="row small"><span id="res"></span><span id="inj"></span></div>
       <div class="btns">
         <button class="${s.mode === 'closed' ? 'on' : ''}" onclick="setMode('closed')">閉關</button>
@@ -879,6 +884,9 @@ function updateDyn() {
   $('lifebar').classList.toggle('warn', life - s.age < 10);
   $('xtxt').textContent = `${fmt(s.xiu)} / ${fmt(need)}（+${rate().toFixed(1)}/秒）`;
   $('xbar').firstChild.style.width = Math.min(100, s.xiu / need * 100) + '%';
+  const st = stats(), hp = s.hpNow ?? 1, mp = s.mpNow ?? 1;
+  $('hptxt').textContent = `${fmt(Math.round(st.hp * hp))} / ${fmt(st.hp)}`; $('hpbar').firstChild.style.width = hp * 100 + '%';
+  $('mptxt').textContent = `${fmt(Math.round(st.mp * mp))} / ${fmt(st.mp)}`; $('mpbar').firstChild.style.width = mp * 100 + '%';
   $('res').innerHTML = `靈石 ${fmt(s.stone)}${s.found >= .01 ? ` · <span class="same">根基 +${Math.round(s.found * 100)}%</span>` : ''}${s.tox >= 1 ? ` · <span class="${s.tox > 50 ? 'hurt' : ''}">丹毒 ${Math.ceil(s.tox)}%</span>` : ''}`;
   $('inj').innerHTML = s.injury > 0 ? `<span class="hurt">負傷 ${Math.ceil(s.injury)} 秒</span>${count('heal') ? ' <button class="mini" onclick="useHeal()">服療傷丹</button>' : ''}` : (s.mode === 'travel' ? `遊歷${place().name}` : '閉關中');
   const b = $('brk'), last = s.stage >= STAGES.length - 1, u = brkPillsUsed();
