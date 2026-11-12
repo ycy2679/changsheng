@@ -241,3 +241,11 @@ EVENTS.push(
     { t: () => `出價收購（靈石 ${tcBuyPrice()}）`, cond: s => s.stone >= tcBuyPrice(), run(s) { s.stone -= tcBuyPrice(); return `搶到手的修士開價不低，你還是買下了${addTc()}。`; } },
     { t: '看看就好', run() { return '寶物最後落到一位大宗門弟子手裡。'; } }] },
 );
+
+// 五行之精：靈根補得進去才會出現（可重複，一世最多 4 次、隔 40 年）
+EVENTS.push(
+  { id: 'wuxingjing', repeat: true, min: 2, title: '地脈凝精', cond: s => !!essenceNext(s), text: '一處山谷的地脈五行失衡，石縫裡凝出一團精氣，靈光忽明忽暗。旁邊坐著一個看守地脈的老修士。', choices: [
+    { t: '深入地脈取精', run() { if (pct(.6)) return `你頂著亂竄的地氣取出了${addEssence()}。`; injure(100); return '地氣反噬，你被震傷，精氣也散了。'; } },
+    { t: () => `跟老修士換（靈石 ${fmt(ESSENCE_PRICE * .6)}）`, cond: s => s.stone >= ESSENCE_PRICE * .6, run(s) { s.stone -= ESSENCE_PRICE * .6; return `老修士收下靈石，替你取出了${addEssence()}。`; } },
+    { t: '不碰地脈', run() { return '老修士朝你點了點頭。'; } }] },
+);
