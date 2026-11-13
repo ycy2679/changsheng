@@ -70,6 +70,7 @@ function load() {
   for (const k in s.gear) if (s.gear[k] && !artOk(s.gear[k], s)) s.gear[k] = null;   // 境界不夠的法寶先卸下
   // 神通上線前的存檔：稀有體質補天賦神通，已過化神的補本命神通
   s.shen = s.shen || []; s.shenEquip = s.shenEquip || s.shen.slice(0, maxShen(s)); s.flags = s.flags || {};
+  s.equip = s.equip.filter(id => !SKILLS[id] || !SKILLS[id].only);   // 大招搬到專屬欄位，讓出出招欄
   if (!s.paths && !s.mortal) { s.paths = ['fa']; s.flags.pathFree = 1; }   // 修行路線上線前的存檔
   if (m.arcDone && m.arcDone.bei) { m.story = m.story || {}; m.story.n4 = 1; (m.codex.m = m.codex.m || {}).n4 = 1; }
   if (!m.tips) { m.tips = {}; if (m.lives > 1) TIPS.forEach(x => m.tips[x.id] = 1); else if (!s.mortal && s.root) TIPS.forEach(x => { try { if (['rudao', 'tupo', 'fight', 'event'].includes(x.id) || x.when(s)) m.tips[x.id] = 1; } catch (e) {} }); }
@@ -689,7 +690,9 @@ function addTechXp(sec) {
 function addLife(n) { L().lifeBonus += n; }
 function injure(sec) { const s = L(); s.injury = Math.max(s.injury, sec * (1 - .25 * tl('liaoshang'))); }
 function learnTech(id) { const s = L(); if (!(id in s.techs)) s.techs[id] = 0; codexAdd('t', id); }
-function learnSkill(id) { const s = L(); if (!(id in s.skills)) { s.skills[id] = 0; if (s.equip.length < maxEquip()) s.equip.push(id); } codexAdd('k', id); }
+function learnSkill(id) { const s = L(); if (!(id in s.skills)) { s.skills[id] = 0; if (!SKILLS[id].only && s.equip.length < maxEquip()) s.equip.push(id); } codexAdd('k', id); }
+// 路線大招：自成一欄，不佔出招欄位，學會就自動施展
+const ultList = (s = L()) => Object.keys(s.skills).filter(id => SKILLS[id].only);
 // ---------- 輪迴錄：歷世見過的東西都記在 meta.codex；每收錄 20 項給 2 道果 ----------
 // t 功法、k 術法、a 法寶、s 神通、p 體質、r 靈根種類、el 靈根屬性、v 遊歷事件；人物結局直接看 meta.arcDone
 const CODEX_STEP = 20, CODEX_GUO = 2;
@@ -842,7 +845,7 @@ function fight(foe) {
       if (x.clone) clones.push({ v: x.clone[0] * sm, t: x.clone[1], n: x.clone[2] });
     }
     // 冷卻好的術法；回法要法力不到一半才放，增益還在就不重複放
-    const ready = s.equip.filter(k => !(cd[k] > 0) && !(SKILLS[k].kind === 'mana' && pool(k).v > pool(k).m * .5) && !(SKILLS[k].kind === 'buff' && (buffT > 0 || (SKILLS[k].fa && faT > 0))));
+    const ready = [...ultList(s), ...s.equip].filter(k => !(cd[k] > 0) && !(SKILLS[k].kind === 'mana' && pool(k).v > pool(k).m * .5) && !(SKILLS[k].kind === 'buff' && (buffT > 0 || (SKILLS[k].fa && faT > 0))));
     // 資源不夠放招、又傷到一半：自動服回氣丹（每場一顆，回主路線的資源）
     if (!pill && ready.length && ready.every(k => skillCost(k) > pool(k).v) && php < p.hp * .5 && count('huiqi')) {
       s.items.huiqi--; S.meta.pills++; pill = true; mainR.v = Math.min(mainR.m, mainR.v + mainR.m * .6);
@@ -1343,6 +1346,7 @@ function toggleSub(id) {
   save(); render();
 }
 function toggleEquip(id) {
+  if (SKILLS[id].only) return;   // 大招自成一欄，不走這裡
   const s = L(), i = s.equip.indexOf(id);
   if (i >= 0) s.equip.splice(i, 1); else if (s.equip.length < maxEquip()) s.equip.push(id);
   save(); render();
@@ -1830,12 +1834,18 @@ function renderSkill() {
       <div class="small">${skillDesc(k)}${hint ? ' · ' + hint : ''}</div>
       <div class="small">${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}${ownSch(id) || isSupport(id) ? '' : ' · <span class="hurt">非本路：威力 -40%、耗費 ×1.5</span>'}${k.elem !== '無' && k.elem === te ? ' · <span class="same">與主修同屬性</span>' : ''}${skillFits(k.elem) ? ' · <span class="same">靈根親和</span>' : ''}</div>
       <div class="btnrow">${on ? `<button class="mini" onclick="moveEquip('${id}',-1)">↑</button><button class="mini" onclick="moveEquip('${id}',1)">↓</button>` : ''}<button class="mini ${on ? 'on' : ''}" onclick="toggleEquip('${id}')">${on ? '卸下' : '裝備'}</button>${on ? '' : dropBtns('skill', id)}</div></div>`; };
-  const all = Object.keys(s.skills).filter(id => !s.equip.includes(id));
+  const all = Object.keys(s.skills).filter(id => !s.equip.includes(id) && !SKILLS[id].only);
+  const ult = ultList(s);
+  const ultRow = id => { const k = SKILLS[id], lv = skillLv(id), nx = MASTERY_USES[lv + 1];
+    return `<div class="item"><div class="row"><b>${k.name}</b>${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
+      <div class="small">${skillDesc(k)}</div>
+      <div class="small">${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
   const elems = SKILL_ELEMS.filter(e => all.some(id => SKILLS[id].elem === e));
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
   const list = all.filter(id => (skillTab === '全部' || SKILLS[id].elem === skillTab) && (skillKind === '全部' || KIND_GROUP[SKILLS[id].kind] === skillKind))
     .sort((a, b) => skillSort === 'pow' ? skillPow(b) - skillPow(a) : skillSort === 'lv' ? s.skills[b] - s.skills[a] : SKILLS[b].grade - SKILLS[a].grade || skillPow(b) - skillPow(a));
   return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}（${{ fa: '每回合回 8%，帶到下一場', ti: '開戰只有兩成，出手 +10%、挨打 +8%', hun: '每回合只回 4%，帶到下一場，戰鬥外也回得慢' }[k]}）`).join('；')}。法術耗法力、體術耗血氣、神魂術耗神識；不是本路的術法從${RES_NAME[myPaths()[0]]}轉換；攻擊術法威力 -40%、耗費 ×1.5，回復、護盾、增益、身法這類輔助術法是通用小術，不受影響。兼修那條路就沒有懲罰。</p><h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(id => row(id)).join('') || '<p class="muted">沒有裝備術法，只會普通攻擊。</p>'}
+    ${ult.length ? `<h3>大招欄（${ult.length}）</h3><p class="muted small">路線專屬，不佔出招欄位，學會就自動施展，優先於一般術法。</p>${ult.map(ultRow).join('')}` : ''}
     <div class="row"><h3>其他術法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setSkillView('kind', this.value)">${['全部', '攻', '防', '輔'].map(k => `<option value="${k}" ${skillKind === k ? 'selected' : ''}>${k === '全部' ? '攻防輔全部' : k === '攻' ? '只看攻擊' : k === '防' ? '只看防禦' : '只看輔助'}</option>`).join('')}</select>
       <select class="mini" onchange="setSkillView('sort', this.value)">${[['grade', '品階'], ['pow', '威力'], ['lv', '熟練度']].map(([k, n]) => `<option value="${k}" ${skillSort === k ? 'selected' : ''}>依${n}排序</option>`).join('')}</select></span></div>
@@ -1858,7 +1868,7 @@ function dropBtns(kind, id) {
 }
 function canDrop(kind, id) {
   const s = L();
-  return kind === 'tech' ? id in s.techs && !equipped().includes(id) && id !== s.tech2 : id in s.skills && !s.equip.includes(id);
+  return kind === 'tech' ? id in s.techs && !equipped().includes(id) && id !== s.tech2 : id in s.skills && !s.equip.includes(id) && !SKILLS[id].only;
 }
 function studySplit(id, s = L()) {
   const g = techStudyGain(id), subs = s.subs.filter(x => x !== id && techLayer(x, s) < 9), main = techLayer(s.tech, s) < 9;
