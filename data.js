@@ -332,8 +332,8 @@ const FORGE_RANK = ['學徒', '器師', '大師', '宗師'];
 // 陣法：佈在洞府裡，洞府 0／3／5／8 級各開一座陣位；每座最多 3 級，第 N 級要 N 階礦材 5 份和靈石
 const ARRAYS = {
   juling:   { name: '聚靈陣', desc: l => `修煉速度 +${8 * l}%` },
-  yaoyuan:  { name: '藥園陣', desc: l => `每 ${ARRAY_GROW[l]} 秒長出一份當前境界的靈草` },
-  kuangmai: { name: '礦脈陣', desc: l => `每 ${ARRAY_GROW[l]} 秒採出一份當前境界的礦材` },
+  yaoyuan:  { name: '藥園陣', desc: l => `每 ${ARRAY_GROW[l]} 秒長出一份靈草（可選品階）` },
+  kuangmai: { name: '礦脈陣', desc: l => `每 ${ARRAY_GROW[l]} 秒採出一份礦材（可選品階）` },
   danshi:   { name: '丹室陣', desc: l => `煉丹成功率 +${5 * l}%，出爐快 ${15 * l}%` },
   dihuo:    { name: '地火陣', desc: l => `煉器成功率 +${5 * l}%，出爐快 ${15 * l}%` },
   hushan:   { name: '護山陣', desc: l => `離線修煉效率 +${10 * l}%` },

@@ -921,8 +921,7 @@ function enterSecret(id) {
 }
 function renderSecret() {
   const s = L();
-  return `<section class="panel card"><div class="row"><b>秘境</b><button class="mini" onclick="toggleSecret()">收起</button>
-        <button class="${showSect ? 'on' : ''}" onclick="toggleSect()">宗門</button></div>
+  return `<section class="panel card"><div class="row"><b>秘境</b><button class="mini" onclick="toggleSecret()">收起</button></div>
     <p class="small muted">三層連戰，中間氣血、法力不回滿。前兩層是精英，第三層是頭目；打敗頭目必得高階寶物（闖的是當前境界的秘境，還會得到天材地寶），第一次通關還有頭目專屬掉落。戰敗會重傷退出，不會身死。每座秘境闖完要等 ${SECRET_CD} 年。</p>
     ${SECRETS.map(x => { const open = secretOpen(x), w = open ? secretWait(x) : 0;
       return `<div class="item"><div class="row"><b>${x.name}</b><span class="small muted">${MAJORS[x.mj].name}以上 · 頭目：${x.boss}${s.flags['sjc_' + x.id] ? ' · 已通關' : ''}</span></div>
@@ -948,11 +947,12 @@ function sectEff(key, s = L()) {
   if (s.sect) return (SECTS[s.sect.id].eff[key] || 0) * (s.sect.rank + 1);
   return s.stage >= 9 && (key === 'stone' || key === 'evRate') ? .2 : 0;
 }
-// 招收：還沒有宗門、這個大境界被問不到兩次；修行路線對得上的宗門比較容易來
+// 招收：還沒有宗門、這個大境界被問不到兩次；只有對得上你修行之法的宗門會來（劍宗、丹宗不挑路線），本路的宗門來得比較勤
 function recruitCands(s = L()) {
   if (s.sect || s.stage < 1 || (s.flags['rc_' + stg(s).major] || 0) >= 2) return [];
-  return Object.keys(SECTS);
+  return Object.keys(SECTS).filter(id => !SECTS[id].path || myPaths(s).includes(SECTS[id].path));
 }
+const recruitPick = (s = L()) => pickW(recruitCands(s), id => SECTS[id].path ? 2 : 1);
 function joinSect(id) {
   const s = L(); s.sect = { id, rank: 0, contrib: 0, total: 0, pay: s.age + SECT_PAY, duty: s.age, bigbi: s.age + 5 };
   log(`你拜入${SECTS[id].name}，成了外門弟子。`);
@@ -1184,7 +1184,7 @@ function popEvent(storyOnly) {
     c.push({ ref: { ev: e.id }, w: 1 });
   }
   for (const e of STORY) if (e.cond(s)) c.push({ ref: { story: e.id }, w: 8 });
-  if (!storyOnly && recruitCands(s).length) c.push({ ref: { recruit: pick(recruitCands(s)) }, w: 2 });   // 宗門招收   // 主線，閉關時也會夢到
+  if (!storyOnly && recruitCands(s).length) c.push({ ref: { recruit: recruitPick(s) }, w: 2 });   // 宗門招收   // 主線，閉關時也會夢到
   if (!c.length) return;
   s.ev = pickW(c, o => o.w).ref;
   dirty = true;
@@ -1313,14 +1313,15 @@ function toggleEquip(id) {
 function moveEquip(id, d) { const e = L().equip, i = e.indexOf(id), j = i + d; if (j < 0 || j >= e.length) return; [e[i], e[j]] = [e[j], e[i]]; save(); render(); }
 function buy(kind, id) {
   const s = L();
-  const price = kind === 'heal' ? healPrice() : kind === 'mp' ? mpPillPrice() : kind === 'xiu' ? xiuPillPrice() : kind === 'herb' || kind === 'ore' ? herbPrice() : cavePrice();
+  const price = kind === 'heal' ? healPrice() : kind === 'mp' ? mpPillPrice() : kind === 'xiu' ? xiuPillPrice() : kind === 'herb' || kind === 'ore' ? herbPrice(id) : cavePrice();
+  if ((kind === 'herb' || kind === 'ore') && id > matGrade()) return;
   if (s.stone < price || (kind === 'cave' && s.cave >= 8)) return;
   s.stone -= price;
   if (kind === 'heal') addItem('heal');
   else if (kind === 'mp') addItem('huiqi');
   else if (kind === 'xiu') addItem(XIU_PILLS[stg().major]);
-  else if (kind === 'herb') addItem(MAT_HERB[matGrade()]);
-  else if (kind === 'ore') addItem(MAT_ORE[matGrade()]);
+  else if (kind === 'herb') addItem(MAT_HERB[id || matGrade()]);
+  else if (kind === 'ore') addItem(MAT_ORE[id || matGrade()]);
   else s.cave++;
   save(); render();
 }
@@ -1604,6 +1605,7 @@ function render() {
         <button class="${s.mode === 'closed' ? 'on' : ''}" onclick="setMode('closed')">閉關</button>
         <button class="${s.mode === 'travel' ? 'on' : ''}" onclick="setMode('travel')">遊歷</button>
         <button class="${showSecret ? 'on' : ''}" onclick="toggleSecret()" ${stg().major >= 1 ? '' : 'disabled'}>秘境</button>
+        <button class="${showSect ? 'on' : ''}" onclick="toggleSect()">宗門</button>
         <select onchange="setPlace(this.value)" ${s.mode === 'travel' ? '' : 'disabled'}>
           ${PLACES.filter(p => s.stage >= p.min).map(p => `<option value="${p.id}" ${p.id === s.place ? 'selected' : ''}>${p.name}</option>`).join('')}
         </select>
@@ -1876,8 +1878,7 @@ function renderShop() {
   return `<h3>櫃台</h3>
     <div class="item row"><span><b>療傷丹</b> <span class="muted small">立刻治好傷勢</span></span>${btn(healPrice(), "buy('heal')")}</div>
     <div class="item row"><span><b>回氣丹</b> <span class="muted small">戰鬥中法力不夠又受傷時自動服用</span></span>${btn(mpPillPrice(), "buy('mp')")}</div>
-    <div class="item row"><span><b>${ITEMS[MAT_HERB[matGrade()]].name}</b> <span class="muted small">煉丹用的靈草（${GRADES[matGrade()]}）</span></span>${btn(herbPrice(), "buy('herb')")}</div>
-    <div class="item row"><span><b>${ITEMS[MAT_ORE[matGrade()]].name}</b> <span class="muted small">煉器、祭煉用的礦材（${GRADES[matGrade()]}）</span></span>${btn(herbPrice(), "buy('ore')")}</div>
+    ${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => `<div class="item row"><span><b>${ITEMS[MAT_HERB[g]].name}</b>／<b>${ITEMS[MAT_ORE[g]].name}</b> <span class="muted small">${GRADES[g]}靈草／礦材</span></span><span>${btn(herbPrice(g), `buy('herb', ${g})`).replace('</button>', ' 買靈草</button>')}${btn(herbPrice(g), `buy('ore', ${g})`).replace('</button>', ' 買礦材</button>')}</span></div>`).join('')}
     <div class="item row"><span><b>${xp.name}</b> <span class="muted small">${xp.desc}服用後修為增加</span></span>${btn(xiuPillPrice(), "buy('xiu')")}</div>
     <div class="item row"><span><b>洞府 ${s.cave} 級</b> <span class="muted small">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</span></span>${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
@@ -1887,7 +1888,7 @@ function renderShop() {
 // ---------- 百藝・煉丹：丹方（跨世保留）、開爐、出爐 ----------
 const matGrade = (s = L()) => majorGrade(stg(s).major);
 const pl_grades = () => place().grades;
-const herbPrice = () => Math.round(MAT_PRICE[matGrade()] * 1.3 * pillDisc());
+const herbPrice = (g = matGrade()) => Math.round(MAT_PRICE[g] * 1.3 * pillDisc());
 function addMat(g, type, n = 1) { const id = (type === 'ore' ? MAT_ORE : type === 'herb' ? MAT_HERB : pick([MAT_HERB, MAT_ORE]))[g]; addItem(id, n); return `${ITEMS[id].name}${n > 1 ? ' ×' + n : ''}`; }
 const knowRecipe = id => RECIPES[id].g === 1 || !!S.meta.recipes[id];
 const unknownRecipes = () => Object.keys(RECIPES).filter(id => !knowRecipe(id));
@@ -1987,7 +1988,7 @@ function renderForge() {
     ${lv < 3 ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : '<p class="small same">已是宗師。</p>'}
     <h3>器爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b>${GRADES[f.g]}${f.slot}</b></span><span>還要 <span id="forT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'forB')}</div>` : '<p class="small muted">爐火已熄。選部位和品階開爐，關掉網頁也會照煉。</p>'}
     <p class="small">礦材：${ores}</p>
-    ${gs.map(g => `<h4 class="g${g}">${GRADES[g]}</h4>${ART_SLOTS.map(slot => cell(slot, g)).join('')}`).join('')}
+    ${gradeNav('qi', gs)}${ART_SLOTS.map(slot => cell(slot, craftG('qi', gs))).join('')}
     <p class="muted small">出爐隨機得到一件這個部位、品階、你還沒有的法寶；品質決定一出爐就有幾重祭煉：下品 0、中品 1、上品 2、極品 3。玄階法寶要築基、地階要金丹、天階要元嬰才煉得出來。失敗礦材會燒掉，地階以上還可能受傷。礦材從遊歷打怪、秘境、坊市櫃台取得。</p>`;
 }
 // ---------- 百藝・陣法 ----------
@@ -2006,13 +2007,16 @@ function breakArray(id) {
   if (armed !== 'arr:' + id) { armed = 'arr:' + id; render(); return; }
   armed = ''; delete s.arrays[id]; log(`你撤掉了${ARRAYS[id].name}。`); save(); render();
 }
+// 藥園、礦脈長哪一階：沒選（0）就跟著當前境界，選了比當前境界高的也照當前境界
+const arrGrade = (id, s = L()) => { const g = (s.arrG || {})[id] || 0; return g && g <= matGrade(s) ? g : matGrade(s); };
+function setArrGrade(id, g) { const s = L(); (s.arrG = s.arrG || {})[id] = +g; save(); render(); }
 // 藥園、礦脈：累積時間，每滿一輪長出一份
 function arrayTick(dt, s = L()) {
   s.arrT = s.arrT || {};
   for (const [id, type] of [['yaoyuan', 'herb'], ['kuangmai', 'ore']]) {
     const l = arrLv(id, s); if (!l) continue;
     s.arrT[id] = (s.arrT[id] || 0) + dt;
-    const n = Math.floor(s.arrT[id] / ARRAY_GROW[l]); if (n > 0) { s.arrT[id] -= n * ARRAY_GROW[l]; addMat(matGrade(s), type, n); }
+    const n = Math.floor(s.arrT[id] / ARRAY_GROW[l]); if (n > 0) { s.arrT[id] -= n * ARRAY_GROW[l]; addMat(arrGrade(id, s), type, n); }
   }
 }
 function renderArrays() {
@@ -2024,12 +2028,18 @@ function renderArrays() {
     const btn = !c ? '<span class="same">已滿級</span>' : !l && used >= slots ? '<span class="muted">陣位已滿</span>'
       : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${ITEMS[c.ore].name} ×${c.n}＋${fmt(c.stone)} 靈石</button>`;
     return `<div class="item"><div class="row small"><span><b>${a.name}</b>${l ? ` <span class="same">第 ${l} 級</span>` : ''}</span><span>${btn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</span></div>
-      <div class="small muted">${l ? '目前：' + a.desc(l) : '佈下後：' + a.desc(1)}${l && l < 3 ? `；升級後：${a.desc(l + 1)}` : ''}</div></div>`;
+      <div class="small muted">${l ? '目前：' + a.desc(l) : '佈下後：' + a.desc(1)}${l && l < 3 ? `；升級後：${a.desc(l + 1)}` : ''}</div>
+      ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>跟著境界（${GRADES[matGrade()]}）</option>${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}</div>`;
   };
   return `<h3>陣位 ${used}/${slots}</h3><p class="small muted">${next !== undefined ? `洞府升到 ${next} 級多一座陣位。` : '陣位已全開。'}佈陣、升級要礦材和靈石（第 N 級用 N 階礦材），撤陣材料不退。</p>
     <p class="small">礦材：${ores}</p>${Object.keys(ARRAYS).map(row).join('')}`;
 }
 let craftTab = 'dan';
+// 煉丹、煉器的品階小分頁：沒選過就停在當前境界那一階（沒有就取最高的）
+const craftGrade = {};
+function craftG(k, gs) { if (!gs.includes(craftGrade[k])) craftGrade[k] = gs.includes(matGrade()) ? matGrade() : gs[gs.length - 1]; return craftGrade[k]; }
+function setCraftGrade(k, g) { craftGrade[k] = g; render(); }
+const gradeNav = (k, gs) => `<nav>${gs.map(g => `<button class="${craftG(k, gs) === g ? 'on' : ''}" onclick="setCraftGrade('${k}', ${g})">${GRADES[g]}</button>`).join('')}</nav>`;
 function setCraftTab(k) { craftTab = k; render(); }
 const craftNav = () => `<nav>${[['dan', '煉丹'], ['qi', '煉器'], ['zhen', '陣法']].map(([k, n]) => `<button class="${craftTab === k ? 'on' : ''}" onclick="setCraftTab('${k}')">${n}</button>`).join('')}</nav>`;
 function renderCraft() {
@@ -2049,7 +2059,7 @@ function renderCraft() {
     <h3>丹爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b>${ITEMS[f.id].name}</b></span><span>還要 <span id="furT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'furB')}</div>` : '<p class="small muted">爐火已熄，選一張丹方開爐。關掉網頁也會照煉。</p>'}
     <p class="small">靈草：${herbs}</p>
     <h3>丹方（${known.length}/${total}）</h3>
-    ${[1, 2, 3, 4].map(g => { const ids = known.filter(id => RECIPES[id].g === g); return ids.length ? `<h4 class="g${g}">${GRADES[g]}</h4>${ids.map(row).join('')}` : ''; }).join('')}
+    ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))([1, 2, 3, 4].filter(g => known.some(id => RECIPES[id].g === g)))}
     <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的靈石當爐費。失敗靈草會燒掉，地階以上的丹還可能炸爐受傷。黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
