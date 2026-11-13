@@ -2043,7 +2043,7 @@ const forgeLv = (s = L()) => ALCH_NEED.filter(n => (s.forge || 0) >= n).length -
 const forgeChance = (g, s = L()) => Math.min(.95, BREW_RATE[g] + .1 * forgeLv(s) + .05 * arrLv('dihuo', s));
 const forgeFee = g => Math.round(ART_PRICE[g] * .3);
 // 這個部位、品階還有沒拿過的法寶（頭目專屬、宗門賞賜不算）
-const forgePool = (slot, g, s = L()) => Object.keys(ARTS).filter(id => ARTS[id].slot === slot && ARTS[id].grade === g && !(id in s.arts) && !ARTS[id].boss && !ARTS[id].sect && !ARTS[id].only && !ARTS[id].path && !ARTS[id].char);
+const forgePool = (slot, g, s = L()) => Object.keys(ARTS).filter(id => ARTS[id].slot === slot && ARTS[id].grade === g && !ARTS[id].boss && !ARTS[id].sect && !ARTS[id].only && !ARTS[id].path && !ARTS[id].char);
 const forgeGrades = (s = L()) => [1, 2, 3, 4].filter(g => s.stage >= ART_REALM[g]);   // 驅使得動的品階才煉得出來
 const forgeSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrLv('dihuo', s));
 function startForge(slot, g) { if (tryForge(slot, g)) { log(`開爐煉製${GRADES[g]}${slot}。`); save(); render(); } }
@@ -2067,8 +2067,11 @@ function forgeDone(f, s) {
   const pool = forgePool(f.slot, f.g, s);
   if (pool.length && pct(forgeChance(f.g, s))) {
     const id = pick(pool), q = (sc => sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0)(.5 * forgeLv(s) + Math.random() * 2);
-    gainArt(id); s.arts[id] = q; s.forge = (s.forge || 0) + BREW_XP[f.g] * (q === 3 ? 2 : 1);
-    log(`器成！${QUAL_RANK[q]}${f.slot}「${ARTS[id].name}」出爐${q ? `，一出爐就有 ${q} 重祭煉` : ''}。`);
+    s.forge = (s.forge || 0) + BREW_XP[f.g] * (q === 3 ? 2 : 1);
+    if (id in s.arts) {
+      if (q > s.arts[id]) { s.arts[id] = q; log(`器成！又煉出一件「${ARTS[id].name}」，比原本的${QUAL_RANK[q]}，直接升到 ${q} 重祭煉！`); }
+      else log(`器成！又煉出一件「${ARTS[id].name}」，品質沒有比原本的好，材料就當練手了。`);
+    } else { gainArt(id); s.arts[id] = q; log(`器成！${QUAL_RANK[q]}${f.slot}「${ARTS[id].name}」出爐${q ? `，一出爐就有 ${q} 重祭煉` : ''}。`); }
   } else {
     s.forge = (s.forge || 0) + Math.ceil(BREW_XP[f.g] / 2);
     if (f.g >= 3 && pct(.3)) { injure(60 * f.g); log(`煉器時地火失控，你受了點傷，礦材全毀。`); }
@@ -2080,9 +2083,9 @@ function renderForge() {
   const s = L(), lv = forgeLv(), xp = s.forge || 0, f = s.anvil, gs = forgeGrades();
   const ores = MAT_ORE.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const cell = (slot, g) => {
-    const n = forgePool(slot, g).length, ok = !f && n && count(MAT_ORE[g]) >= FORGE_ORE[g] && s.stone >= forgeFee(g);
+    const n = forgePool(slot, g).filter(id => !(id in s.arts)).length, ok = !f && forgePool(slot, g).length && count(MAT_ORE[g]) >= FORGE_ORE[g] && s.stone >= forgeFee(g);
     return `<div class="item"><div class="row"><b>${GRADES[g]}${slot}</b></div>
-      <div class="small muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g]}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g))} · ${Math.round(forgeSec(g))} 秒 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '這類都有了'}</div>
+      <div class="small muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g]}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g))} · ${Math.round(forgeSec(g))} 秒 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '身上都有了，可以再煉重複的賭品質'}</div>
       <div class="btnrow"><button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g})">開爐</button></div></div>`;
   };
   return `<h3>煉器術・${FORGE_RANK[lv]}</h3>
