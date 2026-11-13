@@ -339,7 +339,7 @@ const sellItemPrice = id => {
     : k === 'heal' ? 20 : k === 'mp' ? 15 : { life: 200, body: 500, tech: 150 }[k];
   return Math.max(1, Math.round(base * SELL_RATE));
 };
-const sellArtPrice = id => Math.round(ART_PRICE[ARTS[id].grade] * SELL_RATE);
+const sellArtPrice = id => Math.round(ART_PRICE[ARTS[id].grade] * SELL_RATE * (1 + .3 * (L().arts[id] || 0)));   // 每祭煉一重 +30%
 function sellItem(id) { const s = L(); if (!count(id)) return; s.items[id]--; s.stone += sellItemPrice(id); save(); render(); }
 function sellArt(id) {
   const s = L(); if (!(id in s.arts) || isOn(id)) return;
@@ -467,7 +467,7 @@ const isMainType = ty => ty in MAIN_PATH;
 const subOk = t => !isMainType(t.type) || t.type === '鍛體';
 const myPaths = (s = L()) => s.paths && s.paths.length ? s.paths : ['fa'];
 const pathOk = (id, s = L()) => myPaths(s).includes(MAIN_PATH[TECHS[id].type]);
-function canMain(id, s = L()) { const t = TECHS[id]; return isMainType(t.type) && pathOk(id, s) && (t.grade < 3 || t.elem === '無' || t.type === '鍛體' || rootFits(t.elem, s)); }   // 鍛體借外力淬身，不挑靈根
+function canMain(id, s = L()) { const t = TECHS[id]; return isMainType(t.type) && pathOk(id, s) && (t.grade < 3 || t.elem === '無' || t.type === '鍛體' || s.root.type === 'void' || rootFits(t.elem, s)); }   // 鍛體借外力淬身、空靈根不沾屬性，都不挑靈根   // 鍛體借外力淬身，不挑靈根
 // 修不了的原因（給介面用）
 const mainBlock = (id, s = L()) => !pathOk(id, s) ? `需走${PATHS[MAIN_PATH[TECHS[id].type]].name}` : `需${TECHS[id].elem}屬性靈根`;
 
@@ -570,9 +570,11 @@ function lifespan(s = L()) { return (MAJORS[stg(s).major].life + eff('life', s) 
 function skillLv(id, s = L()) { const u = s.skills[id] || 0; return MASTERY_USES.filter(x => u >= x).length - 1; }
 const toxFactor = (s = L()) => Math.max(.1, 1 - s.tox / 100);
 const toxRes = () => Math.min(.8, eff('toxRes'));
+// 主修親和：主修屬性和靈根相合；空靈根什麼屬性的主修都算
+const mainAff = (s = L()) => s.root.type === 'void' || (TECHS[s.tech].elem !== '無' && rootFits(TECHS[s.tech].elem, s));
 function rate(s = L(), mode = s.mode) {
   const main = TECHS[s.tech];
-  return (1 + .2 * s.stage) * rootRate(s) * (main.elem !== '無' && rootFits(main.elem, s) ? 1.15 : 1)
+  return (1 + .2 * s.stage) * rootRate(s) * (mainAff(s) ? 1.15 : 1)
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
     * (s.injury > 0 ? .5 : 1) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrLv('juling', s));
@@ -622,7 +624,7 @@ function rollQual(s, found, used, mode, tc) {
 }
 // 路數威力：本路法術吃法修加成、本路體術吃一半普攻加成；別路 ×0.6
 function schPow(id, s = L()) {
-  if (!ownSch(id, s)) return .6;
+  if (!ownSch(id, s)) return isSupport(id) ? 1 : .6;
   const c = schOf(id); return c === 'fa' ? 1 + pathEff('faUp', s) : c === 'ti' ? 1 + .5 * eff('normalAtk', s) : 1 + pathEff('hunUp', s);
 }
 function skillPow(id, s = L()) {
@@ -635,7 +637,9 @@ const SKILL_COST = [0, 1, 1.5, 2, 2.6];
 // 路數：本路（有那條路線）耗本路資源，神魂術耗費 ×0.5；別路的從主路資源轉換，耗費 ×1.5、威力 ×0.6
 const schOf = id => skillSchool(SKILLS[id]);
 const ownSch = (id, s = L()) => myPaths(s).includes(schOf(id));
-const skillCost = (id, s = L()) => SKILLS[id].kind === 'mana' ? 0 : Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade] * (!ownSch(id, s) ? 1.5 : schOf(id) === 'hun' ? .5 : 1));
+// 輔助術法（回復、護盾、增益、回法、身法、蓄力）是通用小術，不吃非本路懲罰；本路加成照算
+const isSupport = id => !['dmg', 'multi'].includes(SKILLS[id].kind);
+const skillCost = (id, s = L()) => SKILLS[id].kind === 'mana' ? 0 : Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade] * (!ownSch(id, s) ? (isSupport(id) ? 1 : 1.5) : schOf(id) === 'hun' ? .5 : 1));
 // 這招從哪條資源條扣
 const skillRes = (id, s = L()) => ownSch(id, s) ? schOf(id) : myPaths(s)[0];
 // 神魂術的控制機率：魂修 ×1.5（兼修 ×1.25），沒走魂修 ×0.6
@@ -1678,10 +1682,10 @@ function renderOffline() {
     <div class="choices"><button onclick="closeOffline()">知道了</button></div></section>`;
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
-const techAff = t => t.elem !== '無' && rootFits(t.elem) ? ` · <span class="same">靈根親和${isMainType(t.type) ? '（主修時修煉 +15%）' : ''}</span>` : '';
+const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem !== '無' && rootFits(t.elem)) ? ` · <span class="same">靈根親和${isMainType(t.type) ? '（主修時修煉 +15%）' : ''}</span>` : '';
 function techCard(id, btns = '', hint = '') {
   const s = L(), t = TECHS[id], l = techLayer(id);
-  return `<div class="item"><div class="row"><b>《${t.name}》</b>${gradeTag(t.grade, `${t.custom ? '自創 · ' : ''}${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : ''}`)}</div>
+  return `<div class="item"><div class="row"><b>《${t.name}》</b>${gradeTag(t.grade, `${t.custom ? '自創 · ' : ''}${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
     <div class="row small"><span>${effText(t, id) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${hint ? ' · ' + hint : ''}</span><span>${btns}</span></div>
     ${l < 9 ? bar('xiu thin', ((s.techs[id] || 0) - techNeed(id, l)) / (techNeed(id, l + 1) - techNeed(id, l))) : ''}</div>`;
 }
@@ -1759,7 +1763,7 @@ function renderGong() {
       <button class="mini ${techUsable ? 'on' : ''}" onclick="setTechView('usable')">只看修得了的</button></span></div>
     ${all.length ? `<nav class="wrap">${['全部', ...types].map(ty => `<button class="${techTab === ty ? 'on' : ''}" onclick="setTechView('tab', '${ty}')">${ty}</button>`).join('')}</nav>` : ''}
     ${list.map(id => techCard(id, extra(id), techHint(id))).join('') || '<p class="muted">沒有符合的功法。坊市、遊歷、奇遇都可能得到。</p>'}
-    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為主修的精進，或賣給坊市。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。</p>`;
+    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（主修七成、輔修平分三成；主修圓滿就全給輔修），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。</p>`;
 }
 // ---------- 術法分頁：屬性分頁、攻防輔篩選、排序 ----------
 let skillTab = '全部', skillKind = '全部', skillSort = 'grade';
@@ -1778,14 +1782,14 @@ function renderSkill() {
   const row = (id, hint = '') => { const k = SKILLS[id], on = s.equip.includes(id), lv = skillLv(id), nx = MASTERY_USES[lv + 1];
     return `<div class="item"><div class="row"><b>${k.name}</b>${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}${hint ? ' · ' + hint : ''}</div>
-      <div class="row small"><span>${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}${ownSch(id) ? '' : ' · <span class="hurt">非本路：威力 -40%、耗費 ×1.5</span>'}${k.elem !== '無' && k.elem === te ? ' · <span class="same">與主修同屬性</span>' : ''}${skillFits(k.elem) ? ' · <span class="same">靈根親和</span>' : ''}</span>
+      <div class="row small"><span>${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}${ownSch(id) || isSupport(id) ? '' : ' · <span class="hurt">非本路：威力 -40%、耗費 ×1.5</span>'}${k.elem !== '無' && k.elem === te ? ' · <span class="same">與主修同屬性</span>' : ''}${skillFits(k.elem) ? ' · <span class="same">靈根親和</span>' : ''}</span>
       <span>${on ? `<button class="mini" onclick="moveEquip('${id}',-1)">↑</button><button class="mini" onclick="moveEquip('${id}',1)">↓</button>` : ''}<button class="mini ${on ? 'on' : ''}" onclick="toggleEquip('${id}')">${on ? '卸下' : '裝備'}</button>${on ? '' : dropBtns('skill', id)}</span></div></div>`; };
   const all = Object.keys(s.skills).filter(id => !s.equip.includes(id));
   const elems = SKILL_ELEMS.filter(e => all.some(id => SKILLS[id].elem === e));
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
   const list = all.filter(id => (skillTab === '全部' || SKILLS[id].elem === skillTab) && (skillKind === '全部' || KIND_GROUP[SKILLS[id].kind] === skillKind))
     .sort((a, b) => skillSort === 'pow' ? skillPow(b) - skillPow(a) : skillSort === 'lv' ? s.skills[b] - s.skills[a] : SKILLS[b].grade - SKILLS[a].grade || skillPow(b) - skillPow(a));
-  return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}（${{ fa: '每回合回 8%，帶到下一場', ti: '開戰只有兩成，出手 +10%、挨打 +8%', hun: '每回合只回 4%，帶到下一場，戰鬥外也回得慢' }[k]}）`).join('；')}。法術耗法力、體術耗血氣、神魂術耗神識；不是本路的術法從${RES_NAME[myPaths()[0]]}轉換，威力 -40%、耗費 ×1.5。兼修那條路就沒有懲罰。</p><h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(id => row(id)).join('') || '<p class="muted">沒有裝備術法，只會普通攻擊。</p>'}
+  return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}（${{ fa: '每回合回 8%，帶到下一場', ti: '開戰只有兩成，出手 +10%、挨打 +8%', hun: '每回合只回 4%，帶到下一場，戰鬥外也回得慢' }[k]}）`).join('；')}。法術耗法力、體術耗血氣、神魂術耗神識；不是本路的術法從${RES_NAME[myPaths()[0]]}轉換；攻擊術法威力 -40%、耗費 ×1.5，回復、護盾、增益、身法這類輔助術法是通用小術，不受影響。兼修那條路就沒有懲罰。</p><h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(id => row(id)).join('') || '<p class="muted">沒有裝備術法，只會普通攻擊。</p>'}
     <div class="row"><h3>其他術法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setSkillView('kind', this.value)">${['全部', '攻', '防', '輔'].map(k => `<option value="${k}" ${skillKind === k ? 'selected' : ''}>${k === '全部' ? '攻防輔全部' : k === '攻' ? '只看攻擊' : k === '防' ? '只看防禦' : '只看輔助'}</option>`).join('')}</select>
       <select class="mini" onchange="setSkillView('sort', this.value)">${[['grade', '品階'], ['pow', '威力'], ['lv', '熟練度']].map(([k, n]) => `<option value="${k}" ${skillSort === k ? 'selected' : ''}>依${n}排序</option>`).join('')}</select></span></div>
@@ -1794,27 +1798,37 @@ function renderSkill() {
     <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好、法力也夠的術法施放；都放不了就普通攻擊。法力會延續到下一場，戰鬥外慢慢回滿；術法品階越高越耗法力，主修功法層數越高法力越多。用得越多越熟練，和主修同屬性威力 +20%。用不到的術法可以「參悟」化為出招中術法的熟練度，或賣給坊市。</p>`;
 }
 // ---------- 參悟、賣出用不到的功法和術法 ----------
-const techSellPrice = id => Math.round(TECH_PRICE[TECHS[id].grade] * SELL_RATE);
-const skillSellPrice = id => Math.round(SKILL_PRICE[SKILLS[id].grade] * SELL_RATE);
-// 參悟功法：化為主修的精進（約 5 分鐘 × 品階平方，加上它原本一半的進度）
+const techSellPrice = id => Math.round(TECH_PRICE[TECHS[id].grade] * SELL_RATE * (1 + .2 * techLayer(id)));   // 每一層 +20%
+const skillSellPrice = id => Math.round(SKILL_PRICE[SKILLS[id].grade] * SELL_RATE * (1 + .5 * skillLv(id)));   // 小成、大成、圓滿各 +50%
+// 參悟功法：化為精進（約 5 分鐘 × 品階平方，加上它原本一半的進度）；主修七成、其他輔修平分三成，圓滿的不分
 const techStudyGain = id => Math.round(300 * TECHS[id].grade ** 2 + (L().techs[id] || 0) * .5);
 // 參悟術法：出招中的每個術法熟練度 +5 × 品階平方
 const skillStudyGain = id => 5 * SKILLS[id].grade ** 2;
 function dropBtns(kind, id) {
   const price = kind === 'tech' ? techSellPrice(id) : skillSellPrice(id);
   const a = armed === `study:${kind}:${id}`, b = armed === `sellx:${kind}:${id}`;
-  return `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`
+  return (kind === 'tech' && !studySplit(id) ? '<span class="muted small">功法都圓滿了</span>' : `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`)
     + `<button class="mini ${b ? 'danger' : ''}" onclick="sellIt('${kind}','${id}')">${b ? '確定賣出？' : `賣 ${fmt(price)}`}</button>`;
 }
 function canDrop(kind, id) {
   const s = L();
   return kind === 'tech' ? id in s.techs && !equipped().includes(id) && id !== s.tech2 : id in s.skills && !s.equip.includes(id);
 }
+function studySplit(id, s = L()) {
+  const g = techStudyGain(id), subs = s.subs.filter(x => x !== id && techLayer(x, s) < 9), main = techLayer(s.tech, s) < 9;
+  if (!main && !subs.length) return null;
+  const toMain = !main ? 0 : subs.length ? g * .7 : g;
+  return { main: Math.round(toMain), subs, each: subs.length ? Math.round((g - toMain) / subs.length) : 0 };
+}
 function studyIt(kind, id) {
   const s = L(); if (!canDrop(kind, id)) return;
   if (armed !== `study:${kind}:${id}`) { armed = `study:${kind}:${id}`; render(); return; }
   armed = '';
-  if (kind === 'tech') { const g = techStudyGain(id); s.techs[s.tech] += g; log(`參悟《${TECHS[id].name}》，心得化入《${TECHS[s.tech].name}》。`); delete s.techs[id]; }
+  if (kind === 'tech') {
+    const sp = studySplit(id); if (!sp) return;
+    if (sp.main) s.techs[s.tech] += sp.main; for (const x of sp.subs) s.techs[x] += sp.each;
+    log(`參悟《${TECHS[id].name}》：${[sp.main ? `主修《${TECHS[s.tech].name}》+${fmt(sp.main)}` : '', sp.subs.length ? `輔修${sp.subs.map(x => `《${TECHS[x].name}》`).join('')}各 +${fmt(sp.each)}` : ''].filter(Boolean).join('，')}。`); delete s.techs[id];
+  }
   else { const g = skillStudyGain(id); for (const x of s.equip) s.skills[x] += g; log(`參悟《${SKILLS[id].name}》，出招中的術法熟練度各 +${g}。`); delete s.skills[id]; }
   save(); render();
 }
@@ -1840,8 +1854,13 @@ function renderArt() {
   return ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
     + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。</p>';
 }
+// 行囊小分頁：丹藥、寶物（天材地寶、五行之精）、材料
+let bagTab = 'dan';
+function setBagTab(k) { bagTab = k; render(); }
+const BAG_TABS = [['dan', '丹藥', k => !['tc', 'root', 'mat'].includes(k)], ['bao', '寶物', k => k === 'tc' || k === 'root'], ['mat', '材料', k => k === 'mat']];
 function renderBag() {
-  const s = L(), all = Object.keys(ITEMS).filter(id => count(id) > 0), ids = all.filter(id => ITEMS[id].kind !== 'mat'), mats = all.filter(id => ITEMS[id].kind === 'mat');
+  const s = L(), all = Object.keys(ITEMS).filter(id => count(id) > 0);
+  const tb = BAG_TABS.find(x => x[0] === bagTab) || BAG_TABS[0], ids = all.filter(id => tb[2](ITEMS[id].kind));
   const btn = id => {
     const k = ITEMS[id].kind;
     if (k === 'brk') return `<span class="muted small">${ITEMS[id].major === stg().major && isMajorNext() ? '突破時自動服用' : '突破對應大境界時自動服用'}</span>`;
@@ -1858,10 +1877,11 @@ function renderBag() {
     return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>`;
   };
   const sell = id => `<button class="mini" onclick="sellItem('${id}')">賣 ${fmt(sellItemPrice(id))}</button>`;
-  return `<h3>丹毒 ${Math.ceil(s.tox)}%</h3>${bar('tox', s.tox / 100)}
-    <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。用不到的丹藥可以按原價七成賣給坊市。</p>
-    <h3>丹藥</h3>${ids.map(id => `<div class="item row"><span><b>${ITEMS[id].name}</b> ×${count(id)} <span class="muted small">${ITEMS[id].desc}</span></span><span>${btn(id)}${sell(id)}</span></div>`).join('') || '<p class="muted">行囊空空。</p>'}
-    ${mats.length ? `<h3>材料</h3>${mats.map(id => `<div class="item row"><span><b>${ITEMS[id].name}</b> ×${count(id)} ${gradeTag(ITEMS[id].grade)} <span class="muted small">${ITEMS[id].desc}</span></span><span>${btn(id)}${sell(id)}</span></div>`).join('')}` : ''}`;
+  const nav = `<nav>${BAG_TABS.map(([k, n, f]) => `<button class="${tb[0] === k ? 'on' : ''}" onclick="setBagTab('${k}')">${n}（${all.filter(id => f(ITEMS[id].kind)).length}）</button>`).join('')}</nav>`;
+  const head = tb[0] === 'dan' ? `<h3>丹毒 ${Math.ceil(s.tox)}%</h3>${bar('tox', s.tox / 100)}
+    <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。用不到的丹藥可以按原價七成賣給坊市。</p>` : '';
+  const empty = { dan: '沒有丹藥。', bao: '沒有天材地寶或五行之精。秘境、遊歷和奇遇有機會得到。', mat: '沒有材料。遊歷打怪、宗門採藥、秘境、坊市櫃台和藥園礦脈都能得到。' }[tb[0]];
+  return nav + head + (ids.map(id => `<div class="item row"><span><b>${ITEMS[id].name}</b> ×${count(id)}${ITEMS[id].grade ? ' ' + gradeTag(ITEMS[id].grade) : ''} <span class="muted small">${ITEMS[id].desc}</span></span><span>${btn(id)}${sell(id)}</span></div>`).join('') || `<p class="muted">${empty}</p>`);
 }
 function renderShop() {
   const s = L(), btn = (price, call, ok = true) => `<button class="mini" ${s.stone >= price && ok ? '' : 'disabled'} onclick="${call}">${fmt(price)} 靈石</button>`;
@@ -1995,10 +2015,10 @@ function renderForge() {
 const arrLv = (id, s = L()) => (s.arrays && s.arrays[id]) || 0;
 const arraySlots = (s = L()) => ARRAY_SLOT_CAVE.filter(c => s.cave >= c).length;
 const arrayUsed = (s = L()) => Object.keys(s.arrays || {}).length;
-const arrayCost = l => ({ ore: MAT_ORE[l], n: 5, stone: ARRAY_STONE[l] });
+const arrayCost = (l, id) => ({ ore: (id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[l], n: 5, stone: ARRAY_STONE[l] });
 function buildArray(id) {
-  const s = L(), l = arrLv(id) + 1, c = arrayCost(l); s.arrays = s.arrays || {};
-  if (l > 3 || (l === 1 && arrayUsed() >= arraySlots()) || count(c.ore) < c.n || s.stone < c.stone) return;
+  const s = L(), l = arrLv(id) + 1, c = arrayCost(l, id); s.arrays = s.arrays || {};
+  if (l > 4 || (l === 1 && arrayUsed() >= arraySlots()) || count(c.ore) < c.n || s.stone < c.stone) return;
   s.items[c.ore] -= c.n; s.stone -= c.stone; s.arrays[id] = l;
   log(l === 1 ? `你在洞府佈下${ARRAYS[id].name}。` : `${ARRAYS[id].name}升到第 ${l} 級。`); save(); render();
 }
@@ -2008,7 +2028,8 @@ function breakArray(id) {
   armed = ''; delete s.arrays[id]; log(`你撤掉了${ARRAYS[id].name}。`); save(); render();
 }
 // 藥園、礦脈長哪一階：沒選（0）就跟著當前境界，選了比當前境界高的也照當前境界
-const arrGrade = (id, s = L()) => { const g = (s.arrG || {})[id] || 0; return g && g <= matGrade(s) ? g : matGrade(s); };
+// 藥園、礦脈長哪一階：最高到陣法等級那一階；沒選（0）就長最高的
+const arrGrade = (id, s = L()) => { const g = (s.arrG || {})[id] || 0, l = arrLv(id, s); return g && g <= l ? g : l; };
 function setArrGrade(id, g) { const s = L(); (s.arrG = s.arrG || {})[id] = +g; save(); render(); }
 // 藥園、礦脈：累積時間，每滿一輪長出一份
 function arrayTick(dt, s = L()) {
@@ -2021,18 +2042,18 @@ function arrayTick(dt, s = L()) {
 }
 function renderArrays() {
   const s = L(), slots = arraySlots(), used = arrayUsed(), next = ARRAY_SLOT_CAVE[slots];
-  const ores = MAT_ORE.slice(1, 4).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
+  const ores = [...MAT_HERB.slice(1), ...MAT_ORE.slice(1)].map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
-    const a = ARRAYS[id], l = arrLv(id), c = l < 3 ? arrayCost(l + 1) : null;
+    const a = ARRAYS[id], l = arrLv(id), c = l < 4 ? arrayCost(l + 1, id) : null;
     const can = c && count(c.ore) >= c.n && s.stone >= c.stone && (l || used < slots);
     const btn = !c ? '<span class="same">已滿級</span>' : !l && used >= slots ? '<span class="muted">陣位已滿</span>'
       : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${ITEMS[c.ore].name} ×${c.n}＋${fmt(c.stone)} 靈石</button>`;
     return `<div class="item"><div class="row small"><span><b>${a.name}</b>${l ? ` <span class="same">第 ${l} 級</span>` : ''}</span><span>${btn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</span></div>
-      <div class="small muted">${l ? '目前：' + a.desc(l) : '佈下後：' + a.desc(1)}${l && l < 3 ? `；升級後：${a.desc(l + 1)}` : ''}</div>
-      ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>跟著境界（${GRADES[matGrade()]}）</option>${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}</div>`;
+      <div class="small muted">${l ? '目前：' + a.desc(l) : '佈下後：' + a.desc(1)}${l && l < 4 ? `；升級後：${a.desc(l + 1)}` : ''}</div>
+      ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[l]}）</option>${[1, 2, 3, 4].filter(g => g <= l).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}</div>`;
   };
-  return `<h3>陣位 ${used}/${slots}</h3><p class="small muted">${next !== undefined ? `洞府升到 ${next} 級多一座陣位。` : '陣位已全開。'}佈陣、升級要礦材和靈石（第 N 級用 N 階礦材），撤陣材料不退。</p>
-    <p class="small">礦材：${ores}</p>${Object.keys(ARRAYS).map(row).join('')}`;
+  return `<h3>陣位 ${used}/${slots}</h3><p class="small muted">${next !== undefined ? `洞府升到 ${next} 級多一座陣位。` : '陣位已全開。'}每座陣最多 4 級，佈陣、升級要材料和靈石（第 N 級用 N 階材料 5 份，藥園陣用靈草，其他用礦材），撤陣材料不退。藥園、礦脈能長到陣法等級那一階。</p>
+    <p class="small">材料：${ores}</p>${Object.keys(ARRAYS).map(row).join('')}`;
 }
 let craftTab = 'dan';
 // 煉丹、煉器的品階小分頁：沒選過就停在當前境界那一階（沒有就取最高的）
@@ -2048,8 +2069,9 @@ function renderCraft() {
   const herbs = MAT_HERB.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
     const r = RECIPES[id], nd = brewNeed(id), ok = !f && count(nd.id) >= nd.n && s.stone >= brewFee(id);
-    return `<div class="item row small"><span><b>${ITEMS[id].name}</b> ${gradeTag(r.g)} <span class="muted">${ITEMS[nd.id].name} ×${nd.n}（有 ${count(nd.id)}）＋靈石 ${fmt(brewFee(id))} · ${Math.round(brewSec(r.g))} 秒 · 成功 ${Math.round(brewChance(id) * 100)}%</span></span>
-      <button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}')">開爐</button></div>`;
+    return `<div class="item"><div class="row small"><span><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}　${ITEMS[id].desc}</span></div>
+      <div class="row small"><span class="muted">${ITEMS[nd.id].name} ×${nd.n}（有 ${count(nd.id)}）＋靈石 ${fmt(brewFee(id))} · ${Math.round(brewSec(r.g))} 秒 · 成功 ${Math.round(brewChance(id) * 100)}%</span>
+      <button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}')">開爐</button></div></div>`;
   };
   if (craftTab === 'qi') return craftNav() + renderForge();
   if (craftTab === 'zhen') return craftNav() + renderArrays();
@@ -2069,7 +2091,7 @@ const TIPS = [
   { id: 'fight', title: '戰鬥', when: s => !!s.flags.fought, text: '戰鬥是自動打的：會照「術法」分頁的出招順序放招，資源不夠就普通攻擊。氣血、法力打完不會馬上回滿，連戰會越打越虛。' },
   { id: 'injury', title: '負傷', when: s => s.injury > 0, text: '負傷時修煉減半，遊歷時也會避開妖獸。可以服療傷丹，或乾脆閉關，閉關養傷快一倍。' },
   { id: 'tech', title: '功法', tab: 'cult', when: s => Object.keys(s.techs).length > 1, text: '你學到了新功法。「修行」→「功法」可以換主修（主修決定修煉速度，換掉要散功，修為減半），或拿來輔修疊加效果。用不到的可以參悟或賣掉。' },
-  { id: 'skill', title: '術法', tab: 'skill', when: s => Object.keys(s.skills).length > 1, text: '你學到了新術法。到「術法」分頁裝上並排好出招順序。法術、體術、神魂術三種路數，自己這條路的最划算，別條路的威力打折、耗費變多。' },
+  { id: 'skill', title: '術法', tab: 'skill', when: s => Object.keys(s.skills).length > 1, text: '你學到了新術法。到「術法」分頁裝上並排好出招順序。法術、體術、神魂術三種路數，自己這條路的最划算，別條路的攻擊術法威力打折、耗費變多，輔助術法則不受影響。' },
   { id: 'art', title: '法寶', tab: 'art', when: s => Object.keys(s.arts).length > 0, text: '你得到了法寶。到「法寶」分頁裝備；花靈石祭煉，每重效果 +15%。高階法寶要到一定境界才驅使得動。' },
   { id: 'event', title: '奇遇', when: s => !!(s.ev && (s.ev.ev || s.ev.arc)), text: '遇到事情了，選一個選項。不同的選擇收穫不同，有些有風險。有名字的人物會跟你結下羈絆，前世的緣分還會延續到之後的輪迴。' },
   { id: 'mat', title: '材料與百藝', tab: 'craft', when: s => Object.keys(s.items).some(id => ITEMS[id] && ITEMS[id].kind === 'mat' && s.items[id] > 0), text: '你採到了材料。靈草可以到「百藝」照丹方煉丹，礦材可以煉器或祭煉法寶。煉得越多越熟練，成功率越高。' },

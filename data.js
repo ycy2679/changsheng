@@ -31,7 +31,7 @@ const COUNTERS = { 金: ['木', '風'], 木: ['土'], 水: ['火'], 火: ['金',
 const ROOT_TYPES = [
   { id: 'heaven', name: '天靈根', n: 1, pool: FIVE, w: 4, rate: 1.6, aff: .4, good: 1 },
   { id: 'mutant', name: '變異靈根', n: 1, pool: MUTANT, w: 2, rate: 1.7, aff: .5, good: 1 },
-  { id: 'void', name: '空靈根', n: 0, pool: [], w: 2, rate: 1.4, aff: .5, good: 1, desc: '不沾任何屬性：無屬性術法 +50%，也不受相剋影響。' },
+  { id: 'void', name: '空靈根', n: 0, pool: [], w: 2, rate: 1.4, aff: .5, good: 1, desc: '不沾任何屬性，所以什麼屬性的功法都能修，主修都算親和：無屬性術法 +50%，也不受相剋影響。' },
   { id: 'dual', name: '雙靈根', n: 2, pool: FIVE, w: 14, rate: 1.3, aff: .2, good: 1 },
   { id: 'triple', name: '三靈根', n: 3, pool: FIVE, w: 30, rate: 1.1, aff: .1 },
   { id: 'quad', name: '四靈根', n: 4, pool: FIVE, w: 28, rate: 1, aff: 0 },
@@ -329,18 +329,18 @@ const BREW_XP = [0, 1, 3, 8, 20];
 // 煉器：選部位和品階，出爐隨機得到一件還沒有的法寶；品質決定出爐時的祭煉重數
 const FORGE_ORE = [0, 3, 4, 5, 6];             // 要幾份同階礦材
 const FORGE_RANK = ['學徒', '器師', '大師', '宗師'];
-// 陣法：佈在洞府裡，洞府 0／3／5／8 級各開一座陣位；每座最多 3 級，第 N 級要 N 階礦材 5 份和靈石
+// 陣法：佈在洞府裡，洞府 0／3／5／8 級各開一座陣位；每座最多 4 級，第 N 級要 N 階材料 5 份（藥園用靈草，其他用礦材）和靈石
 const ARRAYS = {
   juling:   { name: '聚靈陣', desc: l => `修煉速度 +${8 * l}%` },
-  yaoyuan:  { name: '藥園陣', desc: l => `每 ${ARRAY_GROW[l]} 秒長出一份靈草（可選品階）` },
-  kuangmai: { name: '礦脈陣', desc: l => `每 ${ARRAY_GROW[l]} 秒採出一份礦材（可選品階）` },
+  yaoyuan:  { name: '藥園陣', desc: l => `每 ${ARRAY_GROW[l]} 秒長出一份靈草，最高${GRADES[l]}` },
+  kuangmai: { name: '礦脈陣', desc: l => `每 ${ARRAY_GROW[l]} 秒採出一份礦材，最高${GRADES[l]}` },
   danshi:   { name: '丹室陣', desc: l => `煉丹成功率 +${5 * l}%，出爐快 ${15 * l}%` },
   dihuo:    { name: '地火陣', desc: l => `煉器成功率 +${5 * l}%，出爐快 ${15 * l}%` },
   hushan:   { name: '護山陣', desc: l => `離線修煉效率 +${10 * l}%` },
 };
 const ARRAY_SLOT_CAVE = [0, 3, 5, 8];
-const ARRAY_GROW = [0, 90, 60, 40];
-const ARRAY_STONE = [0, 250, 3000, 30000];
+const ARRAY_GROW = [0, 90, 60, 40, 30];
+const ARRAY_STONE = [0, 250, 3000, 30000, 180000];
 const BRK_PILL_PRICE = [600, 6000, 40000, 120000, 400000, 1.2e6, 4e6, 1.2e7];
 const BRK_PILL_BONUS = [.15, .1, .05, .05];   // 第 1～4 顆的效果（第 4 顆要悟道樹「海量」）
 
