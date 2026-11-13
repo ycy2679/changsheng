@@ -15,10 +15,12 @@ let deathView = 'sum';      // 坐化後：'sum' 總結 / 'tree' 悟道
 // ---------- 存檔 ----------
 // guo 道果（可花）、talents 悟道樹級數、auto 化身天賦開關、autoMajor 自動突破大境界的成功率門檻
 // wins/pills/best 跨世累計：擊敗數、服丹數、到過的最高境界（解鎖頂端天賦用）
-function newMeta() { return { lives: 0, dao: 0, guo: 0, talents: {}, auto: {}, autoMajor: .5, wins: 0, pills: 0, best: 0, keepTech: null, arcDone: {}, arcLife: {}, memSeen: {}, recipes: {}, tips: {}, history: [] }; }
+// talents 是「已點選」的等級（點了立刻算數，用來排悟道樹前置、花費）；talentsEff 是「這一世實際生效」的等級，
+// 每次轉世（rebirth）開局那一刻才從 talents 同步過來，所以這一世新點的天賦效果要到下一世才會套用
+function newMeta() { return { lives: 0, dao: 0, guo: 0, talents: {}, talentsEff: {}, auto: {}, autoMajor: .5, wins: 0, pills: 0, best: 0, keepTech: null, arcDone: {}, arcLife: {}, memSeen: {}, recipes: {}, tips: {}, history: [] }; }
 function newLife(meta) {
   meta.lives++;
-  const t = id => meta.talents[id] || 0;
+  const t = id => meta.talentsEff[id] || 0;   // 這一世的效果一律看 talentsEff（已套用、凍結的那份）
   const s = {
     stage: 0, xiu: 0, age: 12 - 2 * t('tongyan'), stone: 300 * t('kaijushi') * t('kaijushi'), items: { heal: t('kaijudan'), juqi: 3 * t('kaijudan') }, mode: 'closed', place: 'bamboo',
     tech: 'yinqi', subs: [], techs: { yinqi: 0 }, skills: { qijin: 0 }, equip: ['qijin'], cave: 0, injury: 0,
@@ -34,7 +36,8 @@ function newLife(meta) {
   s.shenEquip = s.shen.slice();
   return s;
 }
-const tl = id => S.meta.talents[id] || 0;
+const tl = id => S.meta.talentsEff[id] || 0;   // 這一世實際生效的等級
+const talLv = id => S.meta.talents[id] || 0;   // 已經點選（花過道果）的等級，不管這一世有沒有生效
 const autoOn = id => tl(id) > 0 && S.meta.auto[id] !== false;
 function save() { S.t = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 function load() {
@@ -51,6 +54,8 @@ function load() {
   for (const k of ['talents', 'auto', 'autoMajor', 'wins', 'pills', 'keepTech']) if (m[k] === undefined) m[k] = d[k];
   if (m.guo === undefined) m.guo = m.dao;
   if (m.talents.a_place) { m.guo += 4; delete m.talents.a_place; delete m.auto.a_place; }   // 自動選地點拿掉了，退還道果
+  // 天賦延後生效上線前的存檔：已經點的天賦當作本來就生效，不受影響；之後新點的才要等下一世
+  if (!m.talentsEff) m.talentsEff = { ...m.talents };
   if (m.best === undefined) m.best = Math.max(s.peak || 0, ...m.history.map(h => STAGES.findIndex(x => x.name === h.stageName)));
   if (!s.items) { s.items = { heal: s.heal || 0 }; if (s.pill) s.items[BRK_PILLS[Math.min(3, stg(s).major)]] = s.pill; delete s.pill; delete s.heal; }
   for (const id in s.custom || {}) TECHS[id] = s.custom[id];   // 自創功法
@@ -92,7 +97,7 @@ function rollPhys(dao, not = []) {
 }
 // 根骨選項：多看一眼 +1 個；天不負我保證好靈根和道體以上體質；先天聖體保證聖體以上體質
 function drawRoots(meta, keep) {
-  const t = id => meta.talents[id] || 0, n = 3 + t('duoxuan');
+  const t = id => meta.talentsEff[id] || 0, n = 3 + t('duoxuan');
   const roots = keep ? [keep] : [];
   while (roots.length < n) roots.push(rollRoot(meta.dao));
   if (t('baodi') && !roots.some(r => ROOT_TYPES.find(x => x.id === r.type).good)) {
@@ -101,7 +106,7 @@ function drawRoots(meta, keep) {
   return roots;
 }
 function drawPhys(meta) {
-  const t = id => meta.talents[id] || 0, n = 3 + t('duoxuan'), phys = [];
+  const t = id => meta.talentsEff[id] || 0, n = 3 + t('duoxuan'), phys = [];
   for (let i = 0; i < n; i++) phys.push(rollPhys(meta.dao, phys));
   const need = t('xiantian') ? 4 : t('baodi') ? 3 : 0;
   if (need && !phys.some(id => PHYSIQUES[id].r >= need)) phys[n - 1] = pick(Object.keys(PHYSIQUES).filter(id => PHYSIQUES[id].r >= need && !phys.includes(id)));
@@ -111,7 +116,7 @@ function makeDraw(meta, keepRoot) {
   return { roots: drawRoots(meta, keepRoot), phys: drawPhys(meta), r: -1, p: -1, rr: rerollN(meta) };
 }
 // 靈根、體質各自有重抽次數
-function rerollN(meta) { const n = 1 + Math.floor(meta.dao / 15) + (meta.talents.chongchou || 0); return { r: n, p: n }; }
+function rerollN(meta) { const n = 1 + Math.floor(meta.dao / 15) + (meta.talentsEff.chongchou || 0); return { r: n, p: n }; }
 function pickDraw(kind, i) { L().draw[kind] = i; render(); }
 function rerollDraw(kind) {
   const d = L().draw; if (d.rr[kind] <= 0) return;
@@ -1563,7 +1568,9 @@ function die() {
   save(); dirty = true;
 }
 function rebirth() {
-  const g = L().daoGot || 0; S.life = newLife(S.meta);
+  const g = L().daoGot || 0;
+  S.meta.talentsEff = { ...S.meta.talents };   // 新一世開局：這一世點的天賦從現在起才生效
+  S.life = newLife(S.meta);
   log(`上一世的感悟化為道心 +${g}、道果 +${g}。`);
   armed = ''; deathView = 'sum'; save(); render();
 }
@@ -2313,7 +2320,10 @@ function setDaoTab(k) { daoTab = k; armed = ''; render(); }
 function renderDao() {
   const m = S.meta;
   const nav = `<nav>${[['tree', '悟道'], ['lun', '輪迴錄'], ['guide', '指南'], ['misc', '羈絆前世']].map(([k, n]) => `<button class="${daoTab === k ? 'on' : ''}" onclick="setDaoTab('${k}')">${n}</button>`).join('')}</nav>`;
-  if (daoTab === 'tree') return nav + `<h3>道心 ${m.dao}</h3><p class="small">每點道心讓修煉 +3%，也更容易抽到好根骨，每 15 點多一次重抽。</p>${renderTree()}`;
+  if (daoTab === 'tree') { const pend = pendingTalents();
+    return nav + `<h3>道心 ${m.dao}</h3><p class="small">每點道心讓修煉 +3%，也更容易抽到好根骨，每 15 點多一次重抽。</p>
+    ${pend.length ? `<div class="item"><div class="row small"><b>已點待生效（${pend.length}）</b><span class="muted">下一世開局才會套用</span></div><div class="small">${pend.map(id => `${TAL[id].name}（${tl(id)}→${talLv(id)}）`).join('、')}</div></div>` : ''}
+    ${renderTree()}`; }
   if (daoTab === 'lun') return nav + '<h3>輪迴錄</h3>' + renderCodex();
   if (daoTab === 'guide') return nav + renderGuide();
   const bonds = Object.entries(m.arcDone).map(([id, end]) => `<li><b>${ARCS[id].name}</b>：${ARC_END_LABEL[end]}（第 ${m.arcLife[id]} 世）</li>`).join('');
@@ -2399,13 +2409,15 @@ function importSave() {
 }
 
 // ---------- 悟道樹 ----------
-const reqOk = t => t.req.every(r => tl(r) > 0);
+const reqOk = t => t.req.every(r => talLv(r) > 0);   // 前置看「已點選」，同一世可以照樣往下點，只是效果要等下一世
 function buyTalent(id) {
-  const t = TAL[id], m = S.meta, lv = tl(id), c = talentCost(t, lv);
+  const t = TAL[id], m = S.meta, lv = talLv(id), c = talentCost(t, lv);
   if (lv >= t.max || !reqOk(t) || (t.cond && !t.cond(m)) || m.guo < c) return;
   m.guo -= c; m.talents[id] = lv + 1;
   save(); render();
 }
+// 已點選但這一世還沒生效的天賦（等下一世開局才套用）
+const pendingTalents = () => Object.keys(S.meta.talents).filter(id => TAL[id] && talLv(id) > tl(id));
 let treeTab = TALENT_BRANCHES[0];   // 悟道樹目前顯示的分類
 function setTreeTab(b) { treeTab = b; render(); }
 function toggleAuto(id) { S.meta.auto[id] = !autoOn(id); save(); render(); }
@@ -2415,16 +2427,17 @@ const talDepth = t => t.req.length ? 1 + Math.max(...t.req.map(r => talDepth(TAL
 function renderTree() {
   const m = S.meta;
   const node = t => {
-    const lv = tl(t.id), full = lv >= t.max, ok = reqOk(t), condOk = !t.cond || t.cond(m), cost = talentCost(t, lv);
+    const lv = talLv(t.id), eff = tl(t.id), full = lv >= t.max, ok = reqOk(t), condOk = !t.cond || t.cond(m), cost = talentCost(t, lv);
     const action = !ok ? '<span class="muted">先點前置</span>'
       : !condOk ? `<span class="muted">解鎖條件：${t.condText}</span>`
       : full ? '<span class="same">已點滿</span>'
       : `<button class="mini" ${m.guo >= cost ? '' : 'disabled'} onclick="buyTalent('${t.id}')">${cost} 道果</button>`;
-    const auto = t.branch === '化身' && lv ? `<button class="mini ${autoOn(t.id) ? 'on' : ''}" onclick="toggleAuto('${t.id}')">${autoOn(t.id) ? '開啟中' : '已關閉'}</button>` : '';
-    const thr = t.id === 'a_major' && lv ? `<select onchange="setAutoMajor(this.value)">${[.3, .5, .7, .9].map(v => `<option value="${v}" ${m.autoMajor === v ? 'selected' : ''}>成功率 ≥ ${v * 100}%</option>`).join('')}</select>` : t.id === 'a_event' && lv ? `<select onchange="setEvMode(this.value)">${Object.entries(EV_MODES).map(([k, n]) => `<option value="${k}" ${(m.evMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '';
+    const auto = t.branch === '化身' && eff ? `<button class="mini ${autoOn(t.id) ? 'on' : ''}" onclick="toggleAuto('${t.id}')">${autoOn(t.id) ? '開啟中' : '已關閉'}</button>` : '';
+    const thr = t.id === 'a_major' && eff ? `<select onchange="setAutoMajor(this.value)">${[.3, .5, .7, .9].map(v => `<option value="${v}" ${m.autoMajor === v ? 'selected' : ''}>成功率 ≥ ${v * 100}%</option>`).join('')}</select>` : t.id === 'a_event' && eff ? `<select onchange="setEvMode(this.value)">${Object.entries(EV_MODES).map(([k, n]) => `<option value="${k}" ${(m.evMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '';
     return `<div class="node ${lv ? 'got' : ''} ${ok && condOk ? '' : 'locked'}">
       <div class="row"><b>${t.name}</b><span class="small muted">${lv}/${t.max}</span></div>
       <div class="small">${t.d(Math.max(1, lv))}${lv && !full ? `<span class="muted"> → ${t.d(lv + 1)}</span>` : ''}</div>
+      ${lv > eff ? `<div class="small same">已點到 ${lv} 級，這一世仍按 ${eff} 級生效，下一世開局才會套用到 ${lv} 級</div>` : ''}
       ${t.req.length ? `<div class="small ${ok ? 'muted' : 'hurt'}">前置：${t.req.map(r => TAL[r].name).join('、')}</div>` : ''}
       ${next(t).length ? `<div class="small muted">通往：${next(t).map(x => x.name).join('、')}</div>` : ''}
       <div class="row small">${action}<span>${thr}${auto}</span></div></div>`;
