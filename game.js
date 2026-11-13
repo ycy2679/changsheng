@@ -367,9 +367,10 @@ const sellItemPrice = id => {
 const sellArtPrice = id => Math.round(ART_PRICE[ARTS[id].grade] * SELL_RATE * (1 + .3 * (L().arts[id] || 0)));   // 每祭煉一重 +30%
 function sellItem(id) { const s = L(); if (!count(id)) return; s.items[id]--; s.stone += sellItemPrice(id); save(); render(); }
 function sellArt(id) {
-  const s = L(); if (!(id in s.arts) || isOn(id)) return;
+  if (!canDrop('art', id)) return;
   if (armed !== 'sell:' + id) { armed = 'sell:' + id; render(); return; }
-  armed = ''; const p = sellArtPrice(id); delete s.arts[id]; s.stone += p;
+  armed = '';
+  const s = L(), p = applySell('art', id, s);
   log(`把${ARTS[id].name}賣給了坊市，得靈石 ${fmt(p)}。`); save(); render();
 }
 const refreshPrice = () => Math.round(20 * Math.pow(1.4, L().stage));
@@ -1834,9 +1835,10 @@ function renderGong() {
     <div class="row"><h3>已學功法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setTechView('sort', this.value)">${[['grade', '品階高的在前'], ['layer', '層數高的在前']].map(([k, n]) => `<option value="${k}" ${techSort === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <button class="mini ${techUsable ? 'on' : ''}" onclick="setTechView('usable')">只看修得了的</button></span></div>
+    ${renderBatch('tech')}
     ${all.length ? `<nav class="wrap">${['全部', ...types].map(ty => `<button class="${techTab === ty ? 'on' : ''}" onclick="setTechView('tab', '${ty}')">${ty}</button>`).join('')}</nav>` : ''}
     ${list.map(id => techCard(id, extra(id), techHint(id))).join('') || '<p class="muted">沒有符合的功法。坊市、遊歷、奇遇都可能得到。</p>'}
-    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（主修七成、輔修平分三成；主修圓滿就全給輔修），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。</p>`;
+    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（主修七成、輔修平分三成；主修圓滿就全給輔修），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。鎖定的不會被批量處理。</p>`;
 }
 // ---------- 術法分頁：屬性分頁、攻防輔篩選、排序 ----------
 let skillTab = '全部', skillKind = '全部', skillSort = 'grade';
@@ -1873,6 +1875,7 @@ function renderSkill() {
     <div class="row"><h3>其他術法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setSkillView('kind', this.value)">${['全部', '攻', '防', '輔'].map(k => `<option value="${k}" ${skillKind === k ? 'selected' : ''}>${k === '全部' ? '攻防輔全部' : k === '攻' ? '只看攻擊' : k === '防' ? '只看防禦' : '只看輔助'}</option>`).join('')}</select>
       <select class="mini" onchange="setSkillView('sort', this.value)">${[['grade', '品階'], ['pow', '威力'], ['lv', '熟練度']].map(([k, n]) => `<option value="${k}" ${skillSort === k ? 'selected' : ''}>依${n}排序</option>`).join('')}</select></span></div>
+    ${renderBatch('skill')}
     ${all.length ? `<nav class="wrap">${['全部', ...elems].map(e => `<button class="${skillTab === e ? 'on' : ''}" onclick="setSkillView('tab', '${e}')">${e}</button>`).join('')}</nav>` : ''}
     ${list.map(id => row(id, skillHint(id))).join('') || '<p class="muted">沒有符合的術法。</p>'}
     <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好、法力也夠的術法施放；都放不了就普通攻擊。法力會延續到下一場，戰鬥外慢慢回滿；術法品階越高越耗法力，主修功法層數越高法力越多。用得越多越熟練，和主修同屬性威力 +20%。用不到的術法可以「參悟」化為出招中術法的熟練度，或賣給坊市。</p>`;
@@ -1884,15 +1887,31 @@ const skillSellPrice = id => Math.round(SKILL_PRICE[SKILLS[id].grade] * SELL_RAT
 const techStudyGain = id => Math.round(300 * TECHS[id].grade ** 2 + (L().techs[id] || 0) * .5);
 // 參悟術法：出招中的每個術法熟練度 +5 × 品階平方
 const skillStudyGain = id => 5 * SKILLS[id].grade ** 2;
+// 鎖定：防止誤賣、誤參悟。功法、術法、法寶各自一份鎖定清單（存 id -> true）
+const LOCK_KEY = { tech: 'techLock', skill: 'skillLock', art: 'artLock' };
+const KIND_NAME = { tech: '功法', skill: '術法', art: '法寶' };
+const isLocked = (kind, id, s = L()) => !!(s[LOCK_KEY[kind]] || {})[id];
+function toggleLock(kind, id) {
+  const s = L(); s[LOCK_KEY[kind]] = s[LOCK_KEY[kind]] || {};
+  if (s[LOCK_KEY[kind]][id]) delete s[LOCK_KEY[kind]][id]; else s[LOCK_KEY[kind]][id] = 1;
+  save(); render();
+}
+const lockBtn = (kind, id) => `<button class="mini ${isLocked(kind, id) ? 'on' : ''}" onclick="toggleLock('${kind}','${id}')">${isLocked(kind, id) ? '🔒已鎖定' : '🔓鎖定'}</button>`;
 function dropBtns(kind, id) {
   const price = kind === 'tech' ? techSellPrice(id) : skillSellPrice(id);
+  if (isLocked(kind, id)) return lockBtn(kind, id) + '<span class="muted small">鎖定中，不會被參悟或賣出</span>';
   const a = armed === `study:${kind}:${id}`, b = armed === `sellx:${kind}:${id}`;
-  return (kind === 'tech' && !studySplit(id) ? '<span class="muted small">功法都圓滿了</span>' : `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`)
+  return lockBtn(kind, id)
+    + (kind === 'tech' && !studySplit(id) ? '<span class="muted small">功法都圓滿了</span>' : `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`)
     + `<button class="mini ${b ? 'danger' : ''}" onclick="sellIt('${kind}','${id}')">${b ? '確定賣出？' : `賣 ${fmt(price)}`}</button>`;
 }
+// canDrop 同時當作「能不能賣／參悟」的資格判斷：裝備中、鎖定中的都不行
 function canDrop(kind, id) {
   const s = L();
-  return kind === 'tech' ? id in s.techs && !equipped().includes(id) && id !== s.tech2 : id in s.skills && !s.equip.includes(id) && !SKILLS[id].only;
+  if (isLocked(kind, id)) return false;
+  if (kind === 'tech') return id in s.techs && !equipped().includes(id) && id !== s.tech2;
+  if (kind === 'skill') return id in s.skills && !s.equip.includes(id) && !SKILLS[id].only;
+  return id in s.arts && !isOn(id);
 }
 function studySplit(id, s = L()) {
   const g = techStudyGain(id), subs = s.subs.filter(x => x !== id && techLayer(x, s) < 9), main = techLayer(s.tech, s) < 9;
@@ -1900,40 +1919,91 @@ function studySplit(id, s = L()) {
   const toMain = !main ? 0 : subs.length ? g * .7 : g;
   return { main: Math.round(toMain), subs, each: subs.length ? Math.round((g - toMain) / subs.length) : 0 };
 }
+// 參悟、賣出的實際動作（不含 armed 確認、log、save/render），單筆和批量都靠這兩個函式
+function applyStudy(kind, id, s = L()) {
+  if (kind === 'tech') {
+    const sp = studySplit(id); if (!sp) return null;
+    if (sp.main) s.techs[s.tech] += sp.main; for (const x of sp.subs) s.techs[x] += sp.each;
+    delete s.techs[id]; return sp;
+  }
+  const g = skillStudyGain(id); for (const x of s.equip) s.skills[x] += g; delete s.skills[id]; return { gain: g };
+}
+function applySell(kind, id, s = L()) {
+  const p = kind === 'tech' ? techSellPrice(id) : kind === 'skill' ? skillSellPrice(id) : sellArtPrice(id);
+  s.stone += p;
+  if (kind === 'tech') delete s.techs[id]; else if (kind === 'skill') delete s.skills[id]; else delete s.arts[id];
+  return p;
+}
 function studyIt(kind, id) {
-  const s = L(); if (!canDrop(kind, id)) return;
+  if (!canDrop(kind, id)) return;
   if (armed !== `study:${kind}:${id}`) { armed = `study:${kind}:${id}`; render(); return; }
   armed = '';
-  if (kind === 'tech') {
-    const sp = studySplit(id); if (!sp) return;
-    if (sp.main) s.techs[s.tech] += sp.main; for (const x of sp.subs) s.techs[x] += sp.each;
-    log(`參悟《${TECHS[id].name}》：${[sp.main ? `主修《${TECHS[s.tech].name}》+${fmt(sp.main)}` : '', sp.subs.length ? `輔修${sp.subs.map(x => `《${TECHS[x].name}》`).join('')}各 +${fmt(sp.each)}` : ''].filter(Boolean).join('，')}。`); delete s.techs[id];
-  }
-  else { const g = skillStudyGain(id); for (const x of s.equip) s.skills[x] += g; log(`參悟《${SKILLS[id].name}》，出招中的術法熟練度各 +${g}。`); delete s.skills[id]; }
+  const s = L(), sp = applyStudy(kind, id, s); if (!sp) return;
+  if (kind === 'tech') log(`參悟《${TECHS[id].name}》：${[sp.main ? `主修《${TECHS[s.tech].name}》+${fmt(sp.main)}` : '', sp.subs.length ? `輔修${sp.subs.map(x => `《${TECHS[x].name}》`).join('')}各 +${fmt(sp.each)}` : ''].filter(Boolean).join('，')}。`);
+  else log(`參悟《${SKILLS[id].name}》，出招中的術法熟練度各 +${sp.gain}。`);
   save(); render();
 }
 function sellIt(kind, id) {
-  const s = L(); if (!canDrop(kind, id)) return;
+  if (!canDrop(kind, id)) return;
   if (armed !== `sellx:${kind}:${id}`) { armed = `sellx:${kind}:${id}`; render(); return; }
   armed = '';
-  const p = kind === 'tech' ? techSellPrice(id) : skillSellPrice(id), name = kind === 'tech' ? TECHS[id].name : SKILLS[id].name;
-  s.stone += p; if (kind === 'tech') delete s.techs[id]; else delete s.skills[id];
+  const s = L(), name = kind === 'tech' ? TECHS[id].name : SKILLS[id].name, p = applySell(kind, id, s);
   log(`把《${name}》的抄本賣給坊市，得靈石 ${fmt(p)}。`); save(); render();
+}
+// 批量：依品階選出這一頁裡所有未鎖定、能賣／能參悟的，一次處理
+function poolIds(kind) {
+  const s = L();
+  if (kind === 'tech') return Object.keys(s.techs).filter(id => !equipped().includes(id) && id !== s.tech2);
+  if (kind === 'skill') return Object.keys(s.skills).filter(id => !s.equip.includes(id) && !SKILLS[id].only);
+  return Object.keys(s.arts).filter(id => !isOn(id));
+}
+const gradeOf = (kind, id) => (kind === 'tech' ? TECHS : kind === 'skill' ? SKILLS : ARTS)[id].grade;
+const batchEligible = (kind, grade, study) => poolIds(kind).filter(id => gradeOf(kind, id) === grade && canDrop(kind, id) && (!study || (kind === 'tech' ? studySplit(id) : kind === 'skill')));
+function batchSell(kind, grade) {
+  const list = batchEligible(kind, grade, false); if (!list.length) return;
+  const key = `bsell:${kind}:${grade}`;
+  if (armed !== key) { armed = key; render(); return; }
+  armed = '';
+  const s = L(); let total = 0;
+  for (const id of list) total += applySell(kind, id, s);
+  log(`批量賣出${GRADES[grade]}${KIND_NAME[kind]} ${list.length} 件，得靈石 ${fmt(total)}。`); save(); render();
+}
+function batchStudy(kind, grade) {
+  if (kind === 'art') return;
+  const list = batchEligible(kind, grade, true); if (!list.length) return;
+  const key = `bstudy:${kind}:${grade}`;
+  if (armed !== key) { armed = key; render(); return; }
+  armed = '';
+  const s = L();
+  for (const id of list) applyStudy(kind, id, s);
+  log(`批量參悟${GRADES[grade]}${KIND_NAME[kind]} ${list.length} 件。`); save(); render();
+}
+// 批量操作面板：依品階列出，未鎖定的才算數
+function renderBatch(kind) {
+  const grades = [...new Set(poolIds(kind).map(id => gradeOf(kind, id)))].sort((a, b) => b - a);
+  const rows = grades.map(g => {
+    const sellN = batchEligible(kind, g, false).length, studyN = kind === 'art' ? 0 : batchEligible(kind, g, true).length;
+    if (!sellN && !studyN) return '';
+    const sKey = `bsell:${kind}:${g}`, tKey = `bstudy:${kind}:${g}`;
+    return `<div class="row small"><span>${GRADES[g]}</span><span>${studyN ? `<button class="mini ${armed === tKey ? 'danger' : ''}" onclick="batchStudy('${kind}', ${g})">${armed === tKey ? `確定參悟 ${studyN} 件？` : `批量參悟（${studyN}）`}</button>` : ''}${sellN ? `<button class="mini ${armed === sKey ? 'danger' : ''}" onclick="batchSell('${kind}', ${g})">${armed === sKey ? `確定賣出 ${sellN} 件？` : `批量賣出（${sellN}）`}</button>` : ''}</span></div>`;
+  }).join('');
+  return rows ? `<div class="item"><div class="row small muted"><span>批量操作</span><span>依品階選未鎖定的${KIND_NAME[kind]}一次處理</span></div>${rows}</div>` : '';
 }
 function renderArt() {
   const s = L();
   const card = id => {
-    const a = ARTS[id], lv = s.arts[id], on = isOn(id), full = lv >= ART_MAX_REFINE, p = refinePrice(id);
+    const a = ARTS[id], lv = s.arts[id], on = isOn(id), full = lv >= ART_MAX_REFINE, p = refinePrice(id), locked = isLocked('art', id);
     return `<div class="item"><div class="row"><b>${a.name}</b>${gradeTag(a.legend ? 5 : a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
       <div class="small">${effText(a, null, artMul(id))}${a.path ? ` · <span class="same">${PATHS[a.path].name}專屬</span>` : ''}</div>
       <div class="btnrow">
         <button class="mini" ${full || s.stone < p || (refineOre(id) && !count(refineOre(id))) ? 'disabled' : ''} onclick="refineArt('${id}')">${full ? '已祭煉圓滿' : `祭煉 ${fmt(p)} 靈石${refineOre(id) ? `＋${ITEMS[refineOre(id)].name}（有 ${count(refineOre(id))}）` : ''}`}</button>
         ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">${artBlock(id)}</span>` : '<span class="muted">欄位已滿</span>'}
-        ${on ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</div></div>`;
+        ${on ? '' : lockBtn('art', id)}
+        ${on || locked ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</div></div>`;
   };
   const owned = Object.keys(s.arts);
-  return ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
-    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，只有那條路線能裝備。</p>';
+  return renderBatch('art') + ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
+    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，只有那條路線能裝備。鎖定的不會被批量賣出。</p>';
 }
 // 行囊小分頁：丹藥、寶物（天材地寶、五行之精）、材料
 let bagTab = 'dan';
