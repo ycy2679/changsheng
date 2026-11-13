@@ -75,6 +75,7 @@ function load() {
   if (m.arcDone && m.arcDone.bei) { m.story = m.story || {}; m.story.n4 = 1; (m.codex.m = m.codex.m || {}).n4 = 1; }
   if (!m.tips) { m.tips = {}; if (m.lives > 1) TIPS.forEach(x => m.tips[x.id] = 1); else if (!s.mortal && s.root) TIPS.forEach(x => { try { if (['rudao', 'tupo', 'fight', 'event'].includes(x.id) || x.when(s)) m.tips[x.id] = 1; } catch (e) {} }); }
   m.recipes = m.recipes || {}; s.alch = s.alch || 0; s.forge = s.forge || 0; s.arrays = s.arrays || {};
+  if (!s.arrOn) s.arrOn = Object.fromEntries(Object.keys(s.arrays).map(id => [id, true]));   // 舊存檔：原本蓋的都沒超過陣位上限，照常全部算啟用
   codexSync(s);   // 輪迴錄
   if (s.root) pathSkillCheck(s);
   if (s.phys && PHYS_SHEN[s.phys] && !s.flags.physShen) { s.flags.physShen = 1; gainShen(PHYS_SHEN[s.phys], `${PHYSIQUES[s.phys].name}血脈甦醒`, s); }
@@ -599,7 +600,7 @@ function rate(s = L(), mode = s.mode) {
   return (1 + .2 * s.stage) * rootRate(s) * (mainAff(s) ? 1.15 : 1)
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
-    * (s.injury > 0 ? .5 : 1) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrLv('juling', s));
+    * (s.injury > 0 ? .5 : 1) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
 }
 // 靈根後期路線的修煉倍率
 function pathRate(s = L()) {
@@ -1573,7 +1574,7 @@ function arm(what) {
 
 // ---------- 離線收益 ----------
 const offlineCap = () => tl('yinian') ? Infinity : (2 + L().cave + eff('offline') + 2 * tl('lixian')) * 3600;
-const offRate = () => OFFLINE_RATE + .1 * tl('lixianxiao') + .1 * arrLv('hushan');   // 神遊太虛：滿級 100%
+const offRate = () => OFFLINE_RATE + .1 * tl('lixianxiao') + .1 * arrEff('hushan');   // 神遊太虛：滿級 100%
 function applyOffline(sec) {
   const s = L(); if (s.dead || s.draw || s.mortal || sec < 30) return;
   s.hpNow = s.mpNow = s.snNow = 1;   // 離線回來一律回滿
@@ -2002,12 +2003,12 @@ const alchLv = (s = L()) => ALCH_NEED.filter(n => (s.alch || 0) >= n).length - 1
 // 成功率：品階基礎、煉丹術每級 +10%、丹藥效果加成的兩成、丹宗弟子 +5%（每升一階再 +2%）
 function brewChance(id, s = L()) {
   const g = RECIPES[id].g, sect = s.sect && s.sect.id === 'dan' ? .05 + .02 * s.sect.rank : 0;
-  return Math.min(.95, BREW_RATE[g] + .1 * alchLv(s) + .2 * eff('pillEff', s) + sect + .05 * arrLv('danshi', s));
+  return Math.min(.95, BREW_RATE[g] + .1 * alchLv(s) + .2 * eff('pillEff', s) + sect + .05 * arrEff('danshi', s));
 }
 const brewNeed = id => ({ id: MAT_HERB[RECIPES[id].g], n: RECIPES[id].n });
 // 爐費：坊市價的三成靈石（藥引、丹火），免得自己煉比買便宜太多
 const brewFee = id => Math.round(itemPrice(id) * .3);
-const brewSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrLv('danshi', s));
+const brewSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrEff('danshi', s));
 function tryBrew(id, s = L()) {
   const r = RECIPES[id], nd = brewNeed(id);
   if (s.furnace || !r || !knowRecipe(id) || count(nd.id) < nd.n || s.stone < brewFee(id)) return false;
@@ -2040,12 +2041,12 @@ function brewDone(f, s) {
 }
 // ---------- 百藝・煉器 ----------
 const forgeLv = (s = L()) => ALCH_NEED.filter(n => (s.forge || 0) >= n).length - 1;
-const forgeChance = (g, s = L()) => Math.min(.95, BREW_RATE[g] + .1 * forgeLv(s) + .05 * arrLv('dihuo', s));
+const forgeChance = (g, s = L()) => Math.min(.95, BREW_RATE[g] + .1 * forgeLv(s) + .05 * arrEff('dihuo', s));
 const forgeFee = g => Math.round(ART_PRICE[g] * .3);
 // 這個部位、品階還有沒拿過的法寶（頭目專屬、宗門賞賜不算）
 const forgePool = (slot, g, s = L()) => Object.keys(ARTS).filter(id => ARTS[id].slot === slot && ARTS[id].grade === g && !ARTS[id].boss && !ARTS[id].sect && !ARTS[id].only && !ARTS[id].path && !ARTS[id].char);
 const forgeGrades = (s = L()) => [1, 2, 3, 4].filter(g => s.stage >= ART_REALM[g]);   // 驅使得動的品階才煉得出來
-const forgeSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrLv('dihuo', s));
+const forgeSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrEff('dihuo', s));
 function startForge(slot, g) { if (tryForge(slot, g)) { log(`開爐煉製${GRADES[g]}${slot}。`); save(); render(); } }
 function tryForge(slot, g, s = L()) {
   const ore = MAT_ORE[g];
@@ -2097,19 +2098,30 @@ function renderForge() {
 }
 // ---------- 百藝・陣法 ----------
 const arrLv = (id, s = L()) => (s.arrays && s.arrays[id]) || 0;
-const arraySlots = (s = L()) => ARRAY_SLOT_CAVE.filter(c => s.cave >= c).length;
-const arrayUsed = (s = L()) => Object.keys(s.arrays || {}).length;
+const arraySlots = (s = L()) => ARRAY_SLOT_CAVE.filter(c => s.cave >= c).length;   // 最多能同時啟用幾座（跟洞府等級一樣，最高 4）
+const arrayUsed = (s = L()) => Object.keys(s.arrays || {}).length;   // 已經蓋了幾座（蓋多少座不受陣位限制）
+const arrayOnCount = (s = L()) => Object.values(s.arrOn || {}).filter(Boolean).length;
+// 陣法的實際效果：蓋了但沒啟用就是 0
+const arrEff = (id, s = L()) => (s.arrOn && s.arrOn[id]) ? arrLv(id, s) : 0;
 const arrayCost = (l, id) => ({ ore: (id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[l], n: 5, stone: ARRAY_STONE[l] });
 function buildArray(id) {
-  const s = L(), l = arrLv(id) + 1, c = arrayCost(l, id); s.arrays = s.arrays || {};
-  if (l > 4 || (l === 1 && arrayUsed() >= arraySlots()) || count(c.ore) < c.n || s.stone < c.stone) return;
+  const s = L(), l = arrLv(id) + 1, c = arrayCost(l, id); s.arrays = s.arrays || {}; s.arrOn = s.arrOn || {};
+  if (l > 4 || count(c.ore) < c.n || s.stone < c.stone) return;
   s.items[c.ore] -= c.n; s.stone -= c.stone; s.arrays[id] = l;
-  log(l === 1 ? `你在洞府佈下${ARRAYS[id].name}。` : `${ARRAYS[id].name}升到第 ${l} 級。`); save(); render();
+  if (l === 1 && arrayOnCount(s) < arraySlots(s)) s.arrOn[id] = true;
+  log(l === 1 ? `你在洞府佈下${ARRAYS[id].name}${s.arrOn[id] ? '' : '，但陣位已滿，還沒啟用'}。` : `${ARRAYS[id].name}升到第 ${l} 級。`); save(); render();
+}
+// 啟用／停用：陣位有限，最多同時啟用 arraySlots() 座
+function toggleArrOn(id) {
+  const s = L(); s.arrOn = s.arrOn || {};
+  if (s.arrOn[id]) delete s.arrOn[id];
+  else if (arrLv(id, s) && arrayOnCount(s) < arraySlots(s)) s.arrOn[id] = true;
+  save(); render();
 }
 function breakArray(id) {
   const s = L(); if (!arrLv(id)) return;
   if (armed !== 'arr:' + id) { armed = 'arr:' + id; render(); return; }
-  armed = ''; delete s.arrays[id]; log(`你撤掉了${ARRAYS[id].name}。`); save(); render();
+  armed = ''; delete s.arrays[id]; if (s.arrOn) delete s.arrOn[id]; log(`你撤掉了${ARRAYS[id].name}。`); save(); render();
 }
 // 藥園、礦脈長哪一階：沒選（0）就跟著當前境界，選了比當前境界高的也照當前境界
 // 藥園、礦脈長哪一階：最高到陣法等級那一階；沒選（0）就長最高的
@@ -2119,25 +2131,25 @@ function setArrGrade(id, g) { const s = L(); (s.arrG = s.arrG || {})[id] = +g; s
 function arrayTick(dt, s = L()) {
   s.arrT = s.arrT || {};
   for (const [id, type] of [['yaoyuan', 'herb'], ['kuangmai', 'ore']]) {
-    const l = arrLv(id, s); if (!l) continue;
+    const l = arrEff(id, s); if (!l) continue;
     s.arrT[id] = (s.arrT[id] || 0) + dt;
     const n = Math.floor(s.arrT[id] / ARRAY_GROW[l]); if (n > 0) { s.arrT[id] -= n * ARRAY_GROW[l]; addMat(arrGrade(id, s), type, n); }
   }
 }
 function renderArrays() {
-  const s = L(), slots = arraySlots(), used = arrayUsed(), next = ARRAY_SLOT_CAVE[slots];
+  const s = L(), slots = arraySlots(), on = arrayOnCount(s), next = ARRAY_SLOT_CAVE[slots];
   const ores = [...MAT_HERB.slice(1), ...MAT_ORE.slice(1)].map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
-    const a = ARRAYS[id], l = arrLv(id), c = l < 4 ? arrayCost(l + 1, id) : null;
-    const can = c && count(c.ore) >= c.n && s.stone >= c.stone && (l || used < slots);
-    const btn = !c ? '<span class="same">已滿級</span>' : !l && used >= slots ? '<span class="muted">陣位已滿</span>'
-      : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${ITEMS[c.ore].name} ×${c.n}＋${fmt(c.stone)} 靈石</button>`;
-    return `<div class="item"><div class="row"><b>${a.name}</b>${l ? ` <span class="same">第 ${l} 級</span>` : ''}</div>
-      <div class="small muted">${l ? '目前：' + a.desc(l) : '佈下後：' + a.desc(1)}${l && l < 4 ? `；升級後：${a.desc(l + 1)}` : ''}</div>
+    const a = ARRAYS[id], l = arrLv(id), c = l < 4 ? arrayCost(l + 1, id) : null, isOn = !!(s.arrOn && s.arrOn[id]);
+    const can = c && count(c.ore) >= c.n && s.stone >= c.stone;
+    const buildBtn = !c ? '<span class="same">已滿級</span>' : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${ITEMS[c.ore].name} ×${c.n}＋${fmt(c.stone)} 靈石</button>`;
+    const onBtn = l ? `<button class="mini ${isOn ? 'on' : ''}" ${!isOn && on >= slots ? 'disabled' : ''} onclick="toggleArrOn('${id}')">${isOn ? '停用' : '啟用'}</button>` : '';
+    return `<div class="item"><div class="row"><b>${a.name}</b>${l ? ` <span class="same">第 ${l} 級${isOn ? '' : '・未啟用'}</span>` : ''}</div>
+      <div class="small muted">${!l ? '佈下後：' + a.desc(1) : isOn ? '目前：' + a.desc(l) : '已蓋好，但沒有啟用，沒有效果'}${l && l < 4 ? `；升級後：${a.desc(l + 1)}` : ''}</div>
       ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[l]}）</option>${[1, 2, 3, 4].filter(g => g <= l).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}
-      <div class="btnrow">${btn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</div></div>`;
+      <div class="btnrow">${buildBtn}${onBtn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</div></div>`;
   };
-  return `<h3>陣位 ${used}/${slots}</h3><p class="small muted">${next !== undefined ? `洞府升到 ${next} 級多一座陣位。` : '陣位已全開。'}每座陣最多 4 級，佈陣、升級要材料和靈石（第 N 級用 N 階材料 5 份，藥園陣用靈草，其他用礦材），撤陣材料不退。藥園、礦脈能長到陣法等級那一階。</p>
+  return `<h3>啟用中 ${on}/${slots}</h3><p class="small muted">六座陣法都能蓋，但同時間只能啟用 ${slots} 座（${next !== undefined ? `洞府升到 ${next} 級多一座，最高 4 座` : '已經是上限'}），沒啟用的不算效果。每座陣最多 4 級，佈陣、升級要材料和靈石（第 N 級用 N 階材料 5 份，藥園陣用靈草，其他用礦材），撤陣材料不退。藥園、礦脈能長到陣法等級那一階。</p>
     <p class="small">材料：${ores}</p>${Object.keys(ARRAYS).map(row).join('')}`;
 }
 let craftTab = 'dan';
