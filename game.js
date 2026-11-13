@@ -635,8 +635,13 @@ const QUAL_NAMES = {
   1: ['下品道基', '中品道基', '上品道基', '無瑕道基'],
   2: ['下品金丹', '中品金丹', '上品金丹', '九竅金丹'],
   3: ['無異象', '霞光滿天', '紫氣東來', '萬象來朝'],
+  4: ['虛影法相', '凝實法相', '通明法相', '不滅法相'],
+  5: ['煉虛初成', '形神漸虛', '虛實相生', '形神俱妙'],
+  6: ['形神初合', '形神相融', '天人感應', '形神合一'],
+  7: ['一葉乘風', '萬法歸一', '大乘圓覺', '大乘無漏'],
+  8: ['引雷入體', '劫雲加身', '九轉淬體', '道心通天'],
 };
-const qualName = (major, q) => (QUAL_NAMES[major] || ['虛影法相', '凝實法相', '通明法相', '不滅法相'])[q];
+const qualName = (major, q) => (QUAL_NAMES[major] || QUAL_NAMES[4])[q];
 const qualBonus = (s = L()) => Object.values(s.qual || {}).reduce((a, q) => a + QUAL_BONUS[q], 0);
 // 品質分數：根基、靈根、突破丹、全力一搏、天材地寶，再加一點運氣；沒有天材地寶最多上品
 function rollQual(s, found, used, mode, tc) {
@@ -1272,7 +1277,9 @@ function breakthrough() {
 const hasShen = (id, s = L()) => (s.shen || []).includes(id);
 // 神通欄位：覺醒的神通都算學會（輪迴錄、宿世神通都看這個），但只有裝備進欄位的才會在戰鬥裡生效
 const maxShen = () => 3 + tl('shenwei');
-const randShen = (s = L()) => { const ids = Object.keys(SHENS).filter(id => !SHENS[id].tech && !hasShen(id, s)); return ids.length ? pick(ids) : null; };
+// 體質專屬神通（PHYS_SHEN 對應的）不進一般隨機池，功法專屬（.tech）也不進
+const PHYS_SHEN_IDS = Object.values(PHYS_SHEN);
+const randShen = (s = L()) => { const ids = Object.keys(SHENS).filter(id => !SHENS[id].tech && !PHYS_SHEN_IDS.includes(id) && !hasShen(id, s)); return ids.length ? pick(ids) : null; };
 // 身上神通某個欄位的總和（機緣類：loot、dropUp、winXiu）
 const shenSum = (key, s = L()) => (s.shenEquip || []).reduce((a, id) => a + (SHENS[id][key] || 0), 0);
 const benmingShen = (s = L()) => s.root.type === 'void' ? 'guixu' : Object.keys(SHENS).find(id => SHENS[id].elem === s.root.elems[0]);
