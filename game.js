@@ -15,7 +15,7 @@ let deathView = 'sum';      // 坐化後：'sum' 總結 / 'tree' 悟道
 // ---------- 存檔 ----------
 // guo 道果（可花）、talents 悟道樹級數、auto 化身天賦開關、autoMajor 自動突破大境界的成功率門檻
 // wins/pills/best 跨世累計：擊敗數、服丹數、到過的最高境界（解鎖頂端天賦用）
-function newMeta() { return { lives: 0, dao: 0, guo: 0, talents: {}, auto: {}, autoMajor: .5, wins: 0, pills: 0, best: 0, keepTech: null, arcDone: {}, arcLife: {}, memSeen: {}, recipes: {}, history: [] }; }
+function newMeta() { return { lives: 0, dao: 0, guo: 0, talents: {}, auto: {}, autoMajor: .5, wins: 0, pills: 0, best: 0, keepTech: null, arcDone: {}, arcLife: {}, memSeen: {}, recipes: {}, tips: {}, history: [] }; }
 function newLife(meta) {
   meta.lives++;
   const t = id => meta.talents[id] || 0;
@@ -71,6 +71,7 @@ function load() {
   s.shen = s.shen || []; s.flags = s.flags || {};
   if (!s.paths && !s.mortal) { s.paths = ['fa']; s.flags.pathFree = 1; }   // 修行路線上線前的存檔
   if (m.arcDone && m.arcDone.bei) { m.story = m.story || {}; m.story.n4 = 1; (m.codex.m = m.codex.m || {}).n4 = 1; }
+  if (!m.tips) { m.tips = {}; if (m.lives > 1) TIPS.forEach(x => m.tips[x.id] = 1); else if (!s.mortal && s.root) TIPS.forEach(x => { try { if (['rudao', 'tupo', 'fight', 'event'].includes(x.id) || x.when(s)) m.tips[x.id] = 1; } catch (e) {} }); }
   m.recipes = m.recipes || {}; s.alch = s.alch || 0; s.forge = s.forge || 0; s.arrays = s.arrays || {};
   codexSync(s);   // 輪迴錄
   if (s.root) pathSkillCheck(s);
@@ -1032,6 +1033,7 @@ function renderSect() {
 }
 // lv：敵人相當於第幾個小境界（1 起算），mult：強度倍率，elem：敵人屬性
 function battle(name, lv, mult = 1, loot = false, elem = '無') {
+  L().flags.fought = 1;
   const s = L(), i = lv - 1, k = 1 + .5 * i, rr = (.85 + Math.random() * .3) * mult;
   const res = fight({ hp: 115 * k * rr, atk: 11.5 * k * rr, def: 4.5 * k * mult, spd: 10 + 2 * i, elem });
   s.hpNow = res.hp; s.mpNow = res.mp;
@@ -1102,6 +1104,7 @@ function tick(dt) {
     }
   }
   autoActs();
+  tipCheck(s);
   if (s.age >= lifespan()) {
     if (tl('jiuzhuan') && !s.revived) {   // 九轉還魂：每一世一次
       s.revived = 1; s.lifeBonus += lifespan() * .2 / (1 + eff('lifePct'));
@@ -1613,7 +1616,8 @@ function render() {
     ${showSect ? renderSect() : ''}
     ${showSecret ? renderSecret() : ''}
     ${s.ev ? renderEvent() : ''}
-    <nav>${TABS.map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('')}</nav>
+    ${curTip() ? renderTip() : ''}
+    <nav>${TABS.map(([k, n]) => `<button class="${tab === k ? 'on' : ''} ${curTip() && curTip().tab === k ? 'glow' : ''}" onclick="setTab('${k}')">${n}</button>`).join('')}</nav>
     <section class="panel">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, craft: renderCraft, shop: renderShop, log: renderLog, dao: renderDao })[tab]()}</section>`;
   updateDyn();
 }
@@ -1668,6 +1672,7 @@ function renderOffline() {
   const o = L().offline;
   return `<section class="panel card"><b>閉關歸來</b>
     <p>你離開了 ${dur(o.sec)}${o.off < o.sec ? `（洞府只撐得住 ${dur(o.off)}）` : ''}。這段時間修為 +${fmt(o.xiu)}${o.up ? `，突破到了${o.up}` : ''}${o.stones ? `，遊歷所得靈石 ${fmt(o.stones)}` : ''}。</p>
+    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園礦脈也照常運轉。</p>
     <div class="choices"><button onclick="closeOffline()">知道了</button></div></section>`;
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
@@ -2047,15 +2052,55 @@ function renderCraft() {
     ${[1, 2, 3, 4].map(g => { const ids = known.filter(id => RECIPES[id].g === g); return ids.length ? `<h4 class="g${g}">${GRADES[g]}</h4>${ids.map(row).join('')}` : ''; }).join('')}
     <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的靈石當爐費。失敗靈草會燒掉，地階以上的丹還可能炸爐受傷。黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。</p>`;
 }
+// ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
+const TIPS = [
+  { id: 'rudao', title: '踏上仙途', when: s => true, text: '上面的修為條滿了就能突破。「閉關」修煉最快；「遊歷」修煉減半，但會遇到妖獸、撿到靈石和寶物，也比較常碰到奇遇。' },
+  { id: 'tupo', title: '突破', when: s => s.xiu >= stg(s).need && !isMajorNext(s), text: '修為滿了，按右邊的「突破」。小境界幾乎都會成功；每過一個大境界（築基、金丹⋯⋯）壽元會大幅增加。' },
+  { id: 'fight', title: '戰鬥', when: s => !!s.flags.fought, text: '戰鬥是自動打的：會照「術法」分頁的出招順序放招，資源不夠就普通攻擊。氣血、法力打完不會馬上回滿，連戰會越打越虛。' },
+  { id: 'injury', title: '負傷', when: s => s.injury > 0, text: '負傷時修煉減半，遊歷時也會避開妖獸。可以服療傷丹，或乾脆閉關，閉關養傷快一倍。' },
+  { id: 'tech', title: '功法', tab: 'cult', when: s => Object.keys(s.techs).length > 1, text: '你學到了新功法。「修行」→「功法」可以換主修（主修決定修煉速度，換掉要散功，修為減半），或拿來輔修疊加效果。用不到的可以參悟或賣掉。' },
+  { id: 'skill', title: '術法', tab: 'skill', when: s => Object.keys(s.skills).length > 1, text: '你學到了新術法。到「術法」分頁裝上並排好出招順序。法術、體術、神魂術三種路數，自己這條路的最划算，別條路的威力打折、耗費變多。' },
+  { id: 'art', title: '法寶', tab: 'art', when: s => Object.keys(s.arts).length > 0, text: '你得到了法寶。到「法寶」分頁裝備；花靈石祭煉，每重效果 +15%。高階法寶要到一定境界才驅使得動。' },
+  { id: 'event', title: '奇遇', when: s => !!(s.ev && (s.ev.ev || s.ev.arc)), text: '遇到事情了，選一個選項。不同的選擇收穫不同，有些有風險。有名字的人物會跟你結下羈絆，前世的緣分還會延續到之後的輪迴。' },
+  { id: 'mat', title: '材料與百藝', tab: 'craft', when: s => Object.keys(s.items).some(id => ITEMS[id] && ITEMS[id].kind === 'mat' && s.items[id] > 0), text: '你採到了材料。靈草可以到「百藝」照丹方煉丹，礦材可以煉器或祭煉法寶。煉得越多越熟練，成功率越高。' },
+  { id: 'shop', title: '坊市', tab: 'shop', when: s => s.stone >= 200, text: '靈石攢了一些。「坊市」櫃台賣療傷丹、修為丹、材料，也能升級洞府；貨架上的功法、術法、法寶、丹藥定時換一批。' },
+  { id: 'major', title: '大境界', when: s => isMajorNext(s) && s.xiu >= stg(s).need * .5, text: '下一步是大境界，成功率低很多，失敗會損修為甚至折壽。突破丹會自動服用；閉關時修為滿了會化為根基，根基越厚越穩、突破品質也越好。可以選「穩紮穩打」或「全力一搏」，有天材地寶才可能出極品。' },
+  { id: 'secret', title: '秘境', when: s => stg(s).major >= 1, text: '築基了，上方的「秘境」可以闖了：三層連戰打頭目，必得天材地寶和高階寶物。戰敗會重傷退出，不會身死，每座秘境要隔一陣子才能再闖。' },
+  { id: 'sect', title: '宗門', when: s => !!(s.ev && s.ev.recruit), text: '有宗門來招收你。入宗門有俸祿、藏經閣、晉升，但要定期做宗門任務；當散修比較自由，遊歷收穫也比較多。拒絕了之後還有機會再來。' },
+  { id: 'array', title: '陣法', tab: 'craft', when: s => s.cave >= 1, text: '洞府升級了。「百藝」→「陣法」可以在洞府佈陣：聚靈陣加快修煉，藥園、礦脈會自己長出材料。洞府等級越高，陣位越多。' },
+  { id: 'death', title: '壽元將盡', when: s => s.age / lifespan(s) > .8, text: '壽元快到了。坐化不是結束：這一世的成就會化為道心和道果，帶進下一世。想再拚一把，可以吃延壽丹或衝下一個大境界。' },
+  { id: 'rebirth', title: '輪迴', tab: 'dao', when: s => S.meta.lives >= 2, text: '這是你的第二世。「道途」→「悟道」用道果點天賦，越點越強，化身天賦還能替你自動處理雜事；「輪迴錄」記下歷世見過的一切，收錄越多道果越多。' },
+];
+let tipNow = null;
+const curTip = () => tipNow ? TIPS.find(x => x.id === tipNow) : null;
+function tipCheck(s = L()) {
+  const m = S.meta; if (m.tipsOff || tipNow || !m.tips) return;
+  const x = TIPS.find(x => !m.tips[x.id] && x.when(s));
+  if (x) { tipNow = x.id; dirty = true; }
+}
+function closeTip(off) { if (tipNow) S.meta.tips[tipNow] = 1; tipNow = null; if (off) S.meta.tipsOff = 1; save(); render(); }
+function renderTip() {
+  const x = curTip();
+  return `<section class="panel card tip"><div class="row"><b>${x.title}</b><span class="who">提示</span></div><p>${x.text}</p>
+    <div class="choices"><button onclick="closeTip()">知道了</button><button class="mini" onclick="closeTip(1)">不再顯示提示</button></div></section>`;
+}
+function toggleTips() { S.meta.tipsOff = !S.meta.tipsOff; save(); render(); }
+function renderGuide() {
+  const m = S.meta, seen = TIPS.filter(x => m.tips && m.tips[x.id]);
+  return `<div class="row"><h3>修仙指南（${seen.length}/${TIPS.length}）</h3><button class="mini ${m.tipsOff ? '' : 'on'}" onclick="toggleTips()">${m.tipsOff ? '提示已關閉，點此打開' : '提示開啟中'}</button></div>
+    ${seen.map(x => `<div class="item"><b>${x.title}</b><div class="small">${x.text}</div></div>`).join('') || '<p class="muted">還沒有看過任何提示。</p>'}
+    <p class="muted small">碰到新系統時會跳出提示，看過的都收在這裡。</p>`;
+}
 function renderLog() { return `<ul class="log">${L().log.map(l => `<li><span class="muted">${l.age} 歲</span> ${l.text}</li>`).join('')}</ul>`; }
 // 道途分頁：道心與悟道樹／輪迴錄／羈絆、前世、其他
 let daoTab = 'tree';
 function setDaoTab(k) { daoTab = k; armed = ''; render(); }
 function renderDao() {
   const m = S.meta;
-  const nav = `<nav>${[['tree', '悟道'], ['lun', '輪迴錄'], ['misc', '羈絆前世']].map(([k, n]) => `<button class="${daoTab === k ? 'on' : ''}" onclick="setDaoTab('${k}')">${n}</button>`).join('')}</nav>`;
+  const nav = `<nav>${[['tree', '悟道'], ['lun', '輪迴錄'], ['guide', '指南'], ['misc', '羈絆前世']].map(([k, n]) => `<button class="${daoTab === k ? 'on' : ''}" onclick="setDaoTab('${k}')">${n}</button>`).join('')}</nav>`;
   if (daoTab === 'tree') return nav + `<h3>道心 ${m.dao}</h3><p class="small">每點道心讓修煉 +3%，也更容易抽到好根骨，每 15 點多一次重抽。</p>${renderTree()}`;
   if (daoTab === 'lun') return nav + '<h3>輪迴錄</h3>' + renderCodex();
+  if (daoTab === 'guide') return nav + renderGuide();
   const bonds = Object.entries(m.arcDone).map(([id, end]) => `<li><b>${ARCS[id].name}</b>：${ARC_END_LABEL[end]}（第 ${m.arcLife[id]} 世）</li>`).join('');
   return nav + `<h3>羈絆</h3><ul class="log">${bonds || '<li class="muted">還沒有。</li>'}</ul>
     <h3>前世</h3><ul class="log">${m.history.map(h => `<li>第 ${h.life} 世：${h.root ? h.root + '，' : ''}${h.stageName}，${h.age} 歲坐化</li>`).join('') || '<li class="muted">這是你的第一世。</li>'}</ul>

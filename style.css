@@ -76,3 +76,8 @@ textarea { width: 100%; font: inherit; font-size: .8rem; color: var(--ink); back
 nav.wrap { flex-wrap: wrap; }
 nav.wrap button { flex: 0 0 auto; padding: 4px 10px; }
 .codex { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px 8px; font-size: .85rem; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+
+/* 新手提示：相關分頁發亮 */
+nav button.glow { box-shadow: 0 0 0 2px var(--accent); animation: glow 1.2s ease-in-out infinite alternate; }
+@keyframes glow { from { box-shadow: 0 0 0 1px var(--accent); } to { box-shadow: 0 0 6px 2px var(--accent); } }
+.tip { border-style: dashed; }
