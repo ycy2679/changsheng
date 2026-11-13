@@ -963,7 +963,8 @@ function renderSecret() {
     <p class="small muted">三層連戰，中間氣血、法力不回滿。前兩層是精英，第三層是頭目；打敗頭目必得高階寶物（闖的是當前境界的秘境，還會得到天材地寶），第一次通關還有頭目專屬掉落。戰敗會重傷退出，不會身死。每座秘境闖完要等 ${SECRET_CD} 年。</p>
     ${SECRETS.map(x => { const open = secretOpen(x), w = open ? secretWait(x) : 0;
       return `<div class="item"><div class="row"><b>${x.name}</b><span class="small muted">${MAJORS[x.mj].name}以上 · 頭目：${x.boss}${s.flags['sjc_' + x.id] ? ' · 已通關' : ''}</span></div>
-        <div class="row small"><span class="muted">${x.desc}</span><span>${!open ? `<span class="muted">需${MAJORS[x.mj].name}</span>` : w ? `<span class="muted">還要 ${w} 年</span>` : s.injury > 0 ? '<span class="hurt">傷勢未癒</span>' : `<button class="mini" onclick="enterSecret('${x.id}')">闖秘境</button>`}</span></div></div>`; }).join('')}</section>`;
+        <div class="small muted">${x.desc}</div>
+        <div class="btnrow">${!open ? `<span class="muted">需${MAJORS[x.mj].name}</span>` : w ? `<span class="muted">還要 ${w} 年</span>` : s.injury > 0 ? '<span class="hurt">傷勢未癒</span>' : `<button class="mini" onclick="enterSecret('${x.id}')">闖秘境</button>`}</div></div>`; }).join('')}</section>`;
 }
 // ---------- 宗門：每個大境界最多兩次招收；任務換貢獻，貢獻換功法丹藥，累積貢獻晉升；定期大比 ----------
 // eff：每升一階身分多一份的被動加成；types：藏經閣能換的功法類型
@@ -1064,10 +1065,10 @@ function renderSect() {
   return `<section class="panel card"><div class="row"><b>${x.name}・${SECT_RANK[r]}</b><span><button class="mini ${armed === 'leaveSect' ? 'danger' : ''}" onclick="leaveSect()">${armed === 'leaveSect' ? '確定退出？貢獻會清空' : '退出宗門'}</button><button class="mini" onclick="toggleSect()">收起</button></span></div>
     <p class="small muted">${x.desc} 身分加成：${effText(Object.fromEntries(Object.entries(x.eff).map(([k, v]) => [k, v * (r + 1)])))}。每 ${SECT_PAY} 年發俸祿；${SECT_DUTY} 年沒做任務會被降級。</p>
     <div class="row small"><span>貢獻 <b class="same">${s.sect.contrib}</b></span><span class="muted">${nx}</span></div>
-    <h3>宗門任務</h3>${s.injury > 0 ? '<p class="small hurt">傷勢未癒，先養傷。</p>' : tw ? `<p class="small muted">剛做完任務，${tw} 年後可以再接。</p>` : SECT_TASKS.map(k => `<div class="item row small"><span><b>${k.name}</b>　<span class="muted">${k.desc}</span></span><button class="mini" onclick="doSectTask('${k.id}')">接下（貢獻約 ${sectTaskGain(s)}）</button></div>`).join('')}
-    <h3>宗門大比</h3><div class="item row small"><span class="muted">三場連戰，贏越多場貢獻越多，奪魁還有宗主賞賜。</span>${bw || s.injury > 0 ? `<span class="muted">${s.injury > 0 ? '傷勢未癒' : `${bw} 年後舉辦`}</span>` : '<button class="mini" onclick="sectBigbi()">參加</button>'}</div>
+    <h3>宗門任務</h3>${s.injury > 0 ? '<p class="small hurt">傷勢未癒，先養傷。</p>' : tw ? `<p class="small muted">剛做完任務，${tw} 年後可以再接。</p>` : SECT_TASKS.map(k => `<div class="item"><div class="row"><b>${k.name}</b></div><div class="small">${k.desc}</div><div class="btnrow"><button class="mini" onclick="doSectTask('${k.id}')">接下（貢獻約 ${sectTaskGain(s)}）</button></div></div>`).join('')}
+    <h3>宗門大比</h3><div class="item"><div class="small muted">三場連戰，贏越多場貢獻越多，奪魁還有宗主賞賜。</div><div class="btnrow">${bw || s.injury > 0 ? `<span class="muted">${s.injury > 0 ? '傷勢未癒' : `${bw} 年後舉辦`}</span>` : '<button class="mini" onclick="sectBigbi()">參加</button>'}</div></div>
     <h3>藏經閣</h3>${sh.map((o, i) => { const nm = o.k === 'tech' ? `《${TECHS[o.id].name}》` : o.k === 'recipe' ? `丹方・${ITEMS[o.id].name}` : ITEMS[o.id].name, sub = o.k === 'tech' ? gradeTag(TECHS[o.id].grade, TECHS[o.id].type + (TECHS[o.id].sect ? ' · 宗門專屬' : '')) : '';
-      return `<div class="item row small"><span><b>${nm}</b> ${sub}${o.k === 'tech' ? `<br><span class="muted">${effText(TECHS[o.id])}</span>` : ''}</span>${o.need && r < o.need ? `<span class="muted">需${SECT_RANK[o.need]}</span>` : `<button class="mini" ${s.sect.contrib >= o.cost ? '' : 'disabled'} onclick="sectBuy(${i})">${o.cost} 貢獻</button>`}</div>`; }).join('') || '<p class="muted small">能換的都換過了。</p>'}</section>`;
+      return `<div class="item"><div class="row"><b>${nm}</b> ${sub}</div>${o.k === 'tech' ? `<div class="small muted">${effText(TECHS[o.id])}</div>` : ''}<div class="btnrow">${o.need && r < o.need ? `<span class="muted">需${SECT_RANK[o.need]}</span>` : `<button class="mini" ${s.sect.contrib >= o.cost ? '' : 'disabled'} onclick="sectBuy(${i})">${o.cost} 貢獻</button>`}</div></div>`; }).join('') || '<p class="muted small">能換的都換過了。</p>'}</section>`;
 }
 // lv：敵人相當於第幾個小境界（1 起算），mult：強度倍率，elem：敵人屬性
 function battle(name, lv, mult = 1, loot = false, elem = '無') {
@@ -1768,7 +1769,8 @@ function renderShenTab() {
   const s = L(), shen = s.shen || [];
   return `<h3>神通欄（${(s.shenEquip || []).length}/${maxShen()}）</h3>${shen.length ? shen.map(id => { const x = SHENS[id], on = (s.shenEquip || []).includes(id);
       return `<div class="item"><div class="row"><b class="g4">${x.name}</b><span class="small muted">${x.type} · ${{ open: '開場發動', field: '整場生效', lethal: '危急時發動' }[x.trig]}</span></div>
-        <div class="row small"><span>${x.desc}</span><span><button class="mini ${on ? 'on' : ''}" ${!on && (s.shenEquip || []).length >= maxShen() ? 'disabled' : ''} onclick="toggleShen('${id}')">${on ? '卸下' : '裝備'}</button></span></div></div>`; }).join('')
+        <div class="small">${x.desc}</div>
+        <div class="btnrow"><button class="mini ${on ? 'on' : ''}" ${!on && (s.shenEquip || []).length >= maxShen() ? 'disabled' : ''} onclick="toggleShen('${id}')">${on ? '卸下' : '裝備'}</button></div></div>`; }).join('')
     : '<p class="muted small">還沒有神通。踏入化神時會依靈根覺醒本命神通；大境界突破出極品、稀有體質、天階功法圓滿（覺醒該功法專屬的神通）、天階法寶祭煉圓滿，也都會覺醒神通。每門神通一場戰鬥發動一次，不耗法力；只有裝備進神通欄的才會生效，欄位有限，學會的都會留在輪迴錄裡。</p>'}`;
 }
 // 已學功法的篩選：類型分頁、排序、只看修得了的
@@ -1913,10 +1915,11 @@ function renderArt() {
   const card = id => {
     const a = ARTS[id], lv = s.arts[id], on = isOn(id), full = lv >= ART_MAX_REFINE, p = refinePrice(id);
     return `<div class="item"><div class="row"><b>${a.name}</b>${gradeTag(a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
-      <div class="row small"><span>${effText(a, null, artMul(id))}${a.path ? ` · <span class="same">${PATHS[a.path].name}專屬</span>` : ''}</span><span>
+      <div class="small">${effText(a, null, artMul(id))}${a.path ? ` · <span class="same">${PATHS[a.path].name}專屬</span>` : ''}</div>
+      <div class="btnrow">
         <button class="mini" ${full || s.stone < p || (refineOre(id) && !count(refineOre(id))) ? 'disabled' : ''} onclick="refineArt('${id}')">${full ? '已祭煉圓滿' : `祭煉 ${fmt(p)} 靈石${refineOre(id) ? `＋${ITEMS[refineOre(id)].name}（有 ${count(refineOre(id))}）` : ''}`}</button>
         ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">${artBlock(id)}</span>` : '<span class="muted">欄位已滿</span>'}
-        ${on ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</span></div></div>`;
+        ${on ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</div></div>`;
   };
   const owned = Object.keys(s.arts);
   return ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
@@ -1949,7 +1952,9 @@ function renderBag() {
   const head = tb[0] === 'dan' ? `<h3>丹毒 ${Math.ceil(s.tox)}%</h3>${bar('tox', s.tox / 100)}
     <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。用不到的丹藥可以按原價七成賣給坊市。</p>` : '';
   const empty = { dan: '沒有丹藥。', bao: '沒有天材地寶或五行之精。秘境、遊歷和奇遇有機會得到。', mat: '沒有材料。遊歷打怪、宗門採藥、秘境、坊市櫃台和藥園礦脈都能得到。' }[tb[0]];
-  return nav + head + (ids.map(id => `<div class="item row"><span><b>${ITEMS[id].name}</b> ×${count(id)}${ITEMS[id].grade ? ' ' + gradeTag(ITEMS[id].grade) : ''} <span class="muted small">${ITEMS[id].desc}</span></span><span>${btn(id)}${sell(id)}</span></div>`).join('') || `<p class="muted">${empty}</p>`);
+  return nav + head + (ids.map(id => `<div class="item"><div class="row"><b>${ITEMS[id].name}</b> ×${count(id)}${ITEMS[id].grade ? ' ' + gradeTag(ITEMS[id].grade) : ''}</div>
+    <div class="small">${ITEMS[id].desc}</div>
+    <div class="btnrow">${btn(id)}${sell(id)}</div></div>`).join('') || `<p class="muted">${empty}</p>`);
 }
 function renderShop() {
   const s = L(), btn = (price, call, ok = true) => `<button class="mini" ${s.stone >= price && ok ? '' : 'disabled'} onclick="${call}">${fmt(price)} 靈石</button>`;
@@ -1957,17 +1962,17 @@ function renderShop() {
   const slot = (o, i) => {
     if (o.sold) return `<div class="item row muted"><span>（已售出）</span></div>`;
     const deal = o.deal ? '<span class="deal">奇貨</span> ' : '';
-    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><span>${deal}<b>《${t.name}》</b> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</span>${btn(o.price, `buySlot(${i})`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? ' · <span class="muted">你只能輔修</span>' : ` · <span class="hurt">${mainBlock(o.id)}</span>`) : ''}</div></div>`; }
-    if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row"><span>${deal}<b>${k.name}</b> ${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</span>${btn(o.price, `buySlot(${i})`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div></div>`; }
-    if (o.k === 'art') { const a = ARTS[o.id]; return `<div class="item"><div class="row"><span>${deal}<b>${a.name}</b> ${gradeTag(a.grade, `法寶 · ${a.slot}`)}</span>${btn(o.price, `buySlot(${i})`)}</div><div class="small">${effText(a)}</div></div>`; }
+    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row">${deal}<b>《${t.name}》</b> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? ' · <span class="muted">你只能輔修</span>' : ` · <span class="hurt">${mainBlock(o.id)}</span>`) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
+    if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row">${deal}<b>${k.name}</b> ${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
+    if (o.k === 'art') { const a = ARTS[o.id]; return `<div class="item"><div class="row">${deal}<b>${a.name}</b> ${gradeTag(a.grade, `法寶 · ${a.slot}`)}</div><div class="small">${effText(a)}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     const it = ITEMS[o.id];
-    return `<div class="item row"><span>${deal}<b>${it.name}</b> <span class="muted small">${it.desc}</span></span>${btn(o.price, `buySlot(${i})`)}</div>`;
+    return `<div class="item"><div class="row">${deal}<b>${it.name}</b></div><div class="small">${it.desc}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`;
   };
   return `<h3>櫃台</h3>
-    <div class="item row"><span><b>療傷丹</b> <span class="muted small">立刻治好傷勢</span></span>${btn(healPrice(), "buy('heal')")}</div>
-    <div class="item row"><span><b>回氣丹</b> <span class="muted small">戰鬥中法力不夠又受傷時自動服用</span></span>${btn(mpPillPrice(), "buy('mp')")}</div>
-    ${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => `<div class="item row"><span><b>${ITEMS[MAT_HERB[g]].name}</b>／<b>${ITEMS[MAT_ORE[g]].name}</b> <span class="muted small">${GRADES[g]}靈草／礦材</span></span><span>${btn(herbPrice(g), `buy('herb', ${g})`).replace('</button>', ' 買靈草</button>')}${btn(herbPrice(g), `buy('ore', ${g})`).replace('</button>', ' 買礦材</button>')}</span></div>`).join('')}
-    <div class="item row"><span><b>${xp.name}</b> <span class="muted small">${xp.desc}服用後修為增加</span></span>${btn(xiuPillPrice(), "buy('xiu')")}</div>
+    <div class="item"><div class="row"><b>療傷丹</b></div><div class="small">立刻治好傷勢</div><div class="btnrow">${btn(healPrice(), "buy('heal')")}</div></div>
+    <div class="item"><div class="row"><b>回氣丹</b></div><div class="small">戰鬥中法力不夠又受傷時自動服用</div><div class="btnrow">${btn(mpPillPrice(), "buy('mp')")}</div></div>
+    ${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => `<div class="item"><div class="row"><b>${ITEMS[MAT_HERB[g]].name}</b>／<b>${ITEMS[MAT_ORE[g]].name}</b></div><div class="small">${GRADES[g]}靈草／礦材</div><div class="btnrow">${btn(herbPrice(g), `buy('herb', ${g})`).replace('</button>', ' 買靈草</button>')}${btn(herbPrice(g), `buy('ore', ${g})`).replace('</button>', ' 買礦材</button>')}</div></div>`).join('')}
+    <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
     <div class="item row"><span><b>洞府 ${s.cave} 級</b> <span class="muted small">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</span></span>${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
@@ -2069,8 +2074,9 @@ function renderForge() {
   const ores = MAT_ORE.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const cell = (slot, g) => {
     const n = forgePool(slot, g).length, ok = !f && n && count(MAT_ORE[g]) >= FORGE_ORE[g] && s.stone >= forgeFee(g);
-    return `<div class="item row small"><span><b>${GRADES[g]}${slot}</b> <span class="muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g]}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g))} · ${Math.round(forgeSec(g))} 秒 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '這類都有了'}</span></span>
-      <button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g})">開爐</button></div>`;
+    return `<div class="item"><div class="row"><b>${GRADES[g]}${slot}</b></div>
+      <div class="small muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g]}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g))} · ${Math.round(forgeSec(g))} 秒 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '這類都有了'}</div>
+      <div class="btnrow"><button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g})">開爐</button></div></div>`;
   };
   return `<h3>煉器術・${FORGE_RANK[lv]}</h3>
     ${lv < 3 ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : '<p class="small same">已是宗師。</p>'}
@@ -2116,9 +2122,10 @@ function renderArrays() {
     const can = c && count(c.ore) >= c.n && s.stone >= c.stone && (l || used < slots);
     const btn = !c ? '<span class="same">已滿級</span>' : !l && used >= slots ? '<span class="muted">陣位已滿</span>'
       : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${ITEMS[c.ore].name} ×${c.n}＋${fmt(c.stone)} 靈石</button>`;
-    return `<div class="item"><div class="row small"><span><b>${a.name}</b>${l ? ` <span class="same">第 ${l} 級</span>` : ''}</span><span>${btn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</span></div>
+    return `<div class="item"><div class="row"><b>${a.name}</b>${l ? ` <span class="same">第 ${l} 級</span>` : ''}</div>
       <div class="small muted">${l ? '目前：' + a.desc(l) : '佈下後：' + a.desc(1)}${l && l < 4 ? `；升級後：${a.desc(l + 1)}` : ''}</div>
-      ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[l]}）</option>${[1, 2, 3, 4].filter(g => g <= l).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}</div>`;
+      ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[l]}）</option>${[1, 2, 3, 4].filter(g => g <= l).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}
+      <div class="btnrow">${btn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</div></div>`;
   };
   return `<h3>陣位 ${used}/${slots}</h3><p class="small muted">${next !== undefined ? `洞府升到 ${next} 級多一座陣位。` : '陣位已全開。'}每座陣最多 4 級，佈陣、升級要材料和靈石（第 N 級用 N 階材料 5 份，藥園陣用靈草，其他用礦材），撤陣材料不退。藥園、礦脈能長到陣法等級那一階。</p>
     <p class="small">材料：${ores}</p>${Object.keys(ARRAYS).map(row).join('')}`;
@@ -2137,9 +2144,10 @@ function renderCraft() {
   const herbs = MAT_HERB.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
     const r = RECIPES[id], nd = brewNeed(id), ok = !f && count(nd.id) >= nd.n && s.stone >= brewFee(id);
-    return `<div class="item"><div class="row small"><span><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}　${ITEMS[id].desc}</span></div>
-      <div class="row small"><span class="muted">${ITEMS[nd.id].name} ×${nd.n}（有 ${count(nd.id)}）＋靈石 ${fmt(brewFee(id))} · ${Math.round(brewSec(r.g))} 秒 · 成功 ${Math.round(brewChance(id) * 100)}%</span>
-      <button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}')">開爐</button></div></div>`;
+    return `<div class="item"><div class="row"><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}</div>
+      <div class="small">${ITEMS[id].desc}</div>
+      <div class="small muted">${ITEMS[nd.id].name} ×${nd.n}（有 ${count(nd.id)}）＋靈石 ${fmt(brewFee(id))} · ${Math.round(brewSec(r.g))} 秒 · 成功 ${Math.round(brewChance(id) * 100)}%</div>
+      <div class="btnrow"><button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}')">開爐</button></div></div>`;
   };
   if (craftTab === 'qi') return craftNav() + renderForge();
   if (craftTab === 'zhen') return craftNav() + renderArrays();
