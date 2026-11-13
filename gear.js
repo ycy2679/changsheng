@@ -8,7 +8,9 @@
 const K = (name, grade, elem, kind, pow, cd, ex = {}) => ({ name, grade, elem, kind, pow, cd, ...ex });
 const SKILLS = {
   // 無
-  qijin:    K('氣勁', 1, '無', 'dmg', 1.4, 3),
+  qijin:    K('氣勁', 1, '無', 'dmg', 1.4, 3, { sch: 'fa' }),
+  bengshan: K('崩山拳', 1, '無', 'multi', .75, 3, { hits: 2, sch: 'ti' }),
+  shennian: K('神念刺', 1, '無', 'dmg', 1.1, 3, { stun: .25, sch: 'hun' }),
   kaibei:   K('開碑掌', 1, '無', 'dmg', 1.8, 3, { brk: .15 }),
   lianhuan: K('連環拳', 1, '無', 'multi', .6, 3, { hits: 3 }),
   guiyuan:  K('歸元護體', 2, '無', 'shield', 1.4, 5),
@@ -236,6 +238,23 @@ Object.assign(SKILLS, {
   dianqian: K('殿前雷印', 4, '雷', 'dmg', 5, 5, { stun: .4, boss: 1 }),
   longxi:   K('龍息冰封', 4, '冰', 'dmg', 4.5, 5, { freeze: .6, boss: 1 }),
 });
+// 路線專屬大招（only：只有走這條路的人能領悟、能用；金丹、化神時自動領悟）
+Object.assign(SKILLS, {
+  fatian:  K('法天象地', 3, '無', 'buff', 2, 8, { fa: [1.6, 1.5, 4], shieldX: .3, sch: 'ti', only: 'ti' }),
+  santou:  K('三頭六臂', 4, '無', 'multi', 1.1, 6, { hits: 6, sch: 'ti', only: 'ti' }),
+  shenhun: K('神魂衝擊', 3, '無', 'dmg', 3, 5, { pierce: 1, stun: .6, sch: 'hun', only: 'hun' }),
+  wannian: K('萬念鎮魂', 4, '無', 'dmg', 4.5, 7, { pierce: 1, stun: 1, stunT: 2, sch: 'hun', only: 'hun' }),
+});
+// 術法路數：法術耗法力、體術耗血氣、神魂術耗神識；沒標 sch 的依效果自動歸類
+const SCHOOL_NAME = { fa: '法術', ti: '體術', hun: '神魂術' };
+const RES_NAME = { fa: '法力', ti: '血氣', hun: '神識' };
+function skillSchool(k) {
+  if (k.sch) return k.sch;
+  if (k.stun || k.freeze) return 'hun';
+  if (['multi', 'dodge', 'charge'].includes(k.kind) || (k.elem === '無' && k.kind === 'dmg') || (k.kind === 'shield' && k.reflect)) return 'ti';
+  if (k.kind === 'shield' && k.elem === '無') return 'hun';
+  return 'fa';
+}
 const KIND_LABEL = { dmg: '攻擊', multi: '連擊', heal: '回復', shield: '護盾', dodge: '身法', charge: '蓄力', buff: '增益', mana: '回法' };
 const MASTERY = ['入門', '小成', '大成', '圓滿'];
 const MASTERY_USES = [0, 40, 150, 400];
@@ -247,11 +266,12 @@ function skillDesc(k) {
   if (k.kind === 'heal') p.push('回血');
   if (k.kind === 'shield') p.push('護盾');
   if (k.kind === 'dodge') p.push('3 回合閃避大增');
-  if (k.kind === 'buff') p.push('3 回合攻擊提升');
+  if (k.kind === 'buff') p.push(k.fa ? `${k.fa[2]} 回合攻擊 ×${k.fa[0]}、防禦 ×${k.fa[1]}${k.shieldX ? `，並得到 ${k.shieldX * 100}% 氣血的護盾` : ''}` : '3 回合攻擊提升');
   if (k.kind === 'mana') p.push('回復法力，不耗法力');
+  if (k.pierce) p.push('無視防禦');
   if (k.burn) p.push(`灼燒 ${Math.round(k.burn * 100)}%`);
   if (k.freeze) p.push(`冰凍 ${Math.round(k.freeze * 100)}%`);
-  if (k.stun) p.push(`麻痺 ${Math.round(k.stun * 100)}%`);
+  if (k.stun) p.push(`麻痺 ${Math.round(k.stun * 100)}%${k.stunT ? `（${k.stunT} 回合）` : ''}`);
   if (k.brk) p.push(`破防 ${Math.round(k.brk * 100)}%`);
   if (k.drain) p.push(`吸血 ${Math.round(k.drain * 100)}%`);
   if (k.reflect) p.push(`反震 ${Math.round(k.reflect * 100)}%`);
@@ -432,5 +452,11 @@ Object.assign(SHENS, {
   jubaosg: SH('聚寶神光', '機緣', '無', 'field', '打贏後拿到的靈石翻倍', { loot: 1, tech: 'jubao' }),
   tianfukk: SH('天府開庫', '機緣', '無', 'field', '打贏後靈石 +50%、掉落機率 +50%', { loot: .5, dropUp: .5, tech: 'tianfu' }),
   jixinghm: SH('吉星護命', '機緣', '無', 'field', '整場閃避 +15%，打贏後靈石 +50%', { dodge: .15, loot: .5, tech: 'jixing' }),
+});
+Object.assign(SHENS, {
+  buzhantq: SH('不滅戰體', '反彈', '無', 'field', '肉身如混沌不壞：整場敵人攻擊 -25%，反彈 25% 傷害', { foeAtk: .75, reflect: .25, tech: 'd_wu4' }),
+  shenmofx: SH('神魔法相', '法相', '無', 'open', '顯化太古神魔：8 回合攻擊 ×1.8、防禦 ×1.3', { fa: [1.8, 1.3, 8], tech: 'd_huo4' }),
+  wannianyg: SH('萬念歸一', '禁錮', '無', 'open', '萬念合一刺出：攻擊力 ×6 無視防禦，敵人失神 2 回合', { nuke: 6, pierce: 1, stun: 2, tech: 'g_wu4' }),
+  shenyoutx: SH('神遊太虛', '洞察', '無', 'field', '元神神遊太虛：整場閃避 +25%、暴擊 +15%', { dodge: .25, crit: .15, tech: 'g_feng4' }),
 });
 const TECH_SHEN = Object.fromEntries(Object.entries(SHENS).filter(([, x]) => x.tech).map(([id, x]) => [x.tech, id]));

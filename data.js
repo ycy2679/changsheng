@@ -39,7 +39,7 @@ const ROOT_TYPES = [
 ];
 
 // ---------- 功法 ----------
-// type：吐納 = 主修（決定修煉速度和屬性），其他都是輔修
+// type：吐納（法修）、鍛體（體修）、觀想（魂修）= 主修（決定修煉速度和屬性），其他都是輔修；鍛體也能輔修（不算修煉速度）
 // 數值會隨層數放大（life、brk、offline 除外）：
 //   rate 修煉 hp/atk/def 氣血攻防% spd 身法 crit 暴擊率 critDmg 暴擊傷害 dodge 閃避 regen 每回合回血%
 //   lifesteal 吸血 life 壽元 brk 突破率 stone 遊歷靈石% drop 掉落% evRate 奇遇頻率% offline 離線小時
@@ -86,12 +86,40 @@ const TECHS = {
   bing4:   { name: '永夜冰河經', grade: 4, type: '吐納', elem: '冰', rate: 2.8, dodge: .1 },
   feng4:   { name: '無垠天風錄', grade: 4, type: '吐納', elem: '風', rate: 2.8, spd: 15 },
   hunyuan: { name: '混元歸一經', grade: 4, type: '吐納', elem: '無', rate: 2.6, hp: .5, atk: .5, def: .5, life: 150, brk: .1 },
-  // 輔修・煉體
-  tongpi:  { name: '銅皮功', grade: 1, type: '煉體', elem: '無', hp: .15, def: .1 },
-  panshi:  { name: '磐石功', grade: 1, type: '煉體', elem: '無', hp: .25, def: .15, spd: -2 },
-  longxiang: { name: '龍象鍛骨訣', grade: 2, type: '煉體', elem: '無', hp: .35, atk: .1 },
-  buhuai:  { name: '不壞金身', grade: 3, type: '煉體', elem: '無', hp: .6, def: .4 },
-  wanjie:  { name: '萬劫不滅體', grade: 4, type: '煉體', elem: '無', hp: 1, def: .6, regen: .03 },
+  // 鍛體（體修主修）・黃玄地天
+  duangu:  { name: '鍛骨訣', grade: 1, type: '鍛體', elem: '無' },
+  d_jin1:  { name: '鐵衣訣', grade: 1, type: '鍛體', elem: '金', rate: .15, def: .08 },
+  d_tu1:   { name: '搬山勁', grade: 1, type: '鍛體', elem: '土', rate: .12, hp: .12 },
+  d_huo1:  { name: '熬血功', grade: 1, type: '鍛體', elem: '火', rate: .22, normalAtk: .1 },
+  d_wu2:   { name: '龍象般若功', grade: 2, type: '鍛體', elem: '無', rate: .4, hp: .2, normalAtk: .15 },
+  d_jin2:  { name: '金鐘罩', grade: 2, type: '鍛體', elem: '金', rate: .45, def: .25 },
+  d_huo2:  { name: '赤血鍛身訣', grade: 2, type: '鍛體', elem: '火', rate: .6, atk: .1, regen: .01 },
+  d_tu2:   { name: '磐岳功', grade: 2, type: '鍛體', elem: '土', rate: .45, hp: .3 },
+  d_wu3:   { name: '九轉煉體訣', grade: 3, type: '鍛體', elem: '無', rate: 1.2, hp: .4, normalAtk: .3 },
+  d_tu3:   { name: '不動明王身', grade: 3, type: '鍛體', elem: '土', rate: 1.2, hp: .3, def: .4 },
+  d_lei3:  { name: '玄雷鍛骨經', grade: 3, type: '鍛體', elem: '雷', rate: 1.7, atk: .25, crit: .06 },
+  d_wu4:   { name: '混沌不滅體', grade: 4, type: '鍛體', elem: '無', rate: 2.6, hp: .8, def: .5, normalAtk: .5 },
+  d_huo4:  { name: '太古神魔煉體訣', grade: 4, type: '鍛體', elem: '火', rate: 3, atk: .5, normalAtk: .6 },
+  // 觀想（魂修主修）・黃玄地天
+  ningshen: { name: '凝神觀想法', grade: 1, type: '觀想', elem: '無' },
+  g_shui1: { name: '觀水訣', grade: 1, type: '觀想', elem: '水', rate: .15, techXp: .05 },
+  g_feng1: { name: '聽松觀想法', grade: 1, type: '觀想', elem: '風', rate: .15, crit: .02 },
+  g_bing1: { name: '寒月觀想', grade: 1, type: '觀想', elem: '冰', rate: .15, shenUp: .05 },
+  g_wu2:   { name: '明心見性經', grade: 2, type: '觀想', elem: '無', rate: .45, techXp: .15 },
+  g_bing2: { name: '太陰觀想法', grade: 2, type: '觀想', elem: '冰', rate: .5, crit: .04, shenUp: .1 },
+  g_lei2:  { name: '雷音觀想', grade: 2, type: '觀想', elem: '雷', rate: .6, crit: .05 },
+  g_mu2:   { name: '青燈照影訣', grade: 2, type: '觀想', elem: '木', rate: .5, evRate: .1 },
+  g_wu3:   { name: '大衍神念經', grade: 3, type: '觀想', elem: '無', rate: 1.2, shenUp: .25, crit: .06 },
+  g_shui3: { name: '九幽鎮魂錄', grade: 3, type: '觀想', elem: '水', rate: 1.3, techXp: .25 },
+  g_feng3: { name: '紫府觀星訣', grade: 3, type: '觀想', elem: '風', rate: 1.4, crit: .1 },
+  g_wu4:   { name: '萬念歸一經', grade: 4, type: '觀想', elem: '無', rate: 2.6, shenUp: .5, crit: .15, techXp: .3 },
+  g_feng4: { name: '太虛神遊經', grade: 4, type: '觀想', elem: '風', rate: 2.8, evRate: .3, crit: .12, shenUp: .3 },
+  // 鍛體（原煉體，體修可主修，人人可輔修；輔修時不算修煉速度）
+  tongpi:  { name: '銅皮功', grade: 1, type: '鍛體', elem: '無', rate: .12, hp: .15, def: .1 },
+  panshi:  { name: '磐石功', grade: 1, type: '鍛體', elem: '無', rate: .12, hp: .25, def: .15, spd: -2 },
+  longxiang: { name: '龍象鍛骨訣', grade: 2, type: '鍛體', elem: '無', rate: .4, hp: .35, atk: .1 },
+  buhuai:  { name: '不壞金身', grade: 3, type: '鍛體', elem: '無', rate: 1.2, hp: .6, def: .4 },
+  wanjie:  { name: '萬劫不滅體', grade: 4, type: '鍛體', elem: '無', rate: 2.6, hp: 1, def: .6, regen: .03 },
   // 輔修・身法
   tacao:   { name: '踏草無痕', grade: 1, type: '身法', elem: '無', spd: 3, dodge: .03 },
   liuyun:  { name: '流雲步', grade: 2, type: '身法', elem: '無', spd: 6, dodge: .06 },
@@ -124,14 +152,20 @@ const TECHS = {
   hongyun: { name: '鴻運當頭', grade: 2, type: '尋寶', elem: '無', stone: .35, drop: .4, evRate: .2 },
   dongtian: { name: '洞天福地記', grade: 3, type: '尋寶', elem: '無', offline: 3, stone: .3 },
   jubao:   { name: '聚寶錄', grade: 4, type: '尋寶', elem: '無', stone: .8, drop: .8 },
+  // ---------- 宗門專屬功法（只能用宗門貢獻換） ----------
+  lingxiaojue: { name: '凌霄劍訣', grade: 3, type: '劍修', elem: '無', sect: 1, atk: .45, crit: .15, critDmg: .5 },
+  baicaogy: { name: '百草歸元經', grade: 3, type: '丹道', elem: '無', sect: 1, pillEff: .7, toxRes: .6, regen: .02 },
+  jingangbh: { name: '金剛不壞經', grade: 3, type: '鍛體', elem: '無', sect: 1, rate: 1.2, hp: .8, def: .5 },
+  guanshenlu: { name: '觀神秘錄', grade: 3, type: '悟性', elem: '無', sect: 1, techXp: .9, shenUp: .2 },
+  taiqingxy: { name: '太清玄元功', grade: 3, type: '吐納', elem: '無', sect: 1, rate: 1.5, mp: .3 },
   // ---------- 輔修擴充（每類每階至少 3 部） ----------
-  tiegu: { name: '鐵骨功', grade: 1, type: '煉體', elem: '無', hp: .1, def: .15, regen: .005 },
-  lianxue: { name: '煉血功', grade: 2, type: '煉體', elem: '無', hp: .3, regen: .01 },
-  huxiao: { name: '虎嘯鍛身訣', grade: 2, type: '煉體', elem: '無', hp: .25, atk: .12 },
-  longlin: { name: '龍鱗寶體', grade: 3, type: '煉體', elem: '無', hp: .5, def: .5 },
-  jiuxue: { name: '九血淬體訣', grade: 3, type: '煉體', elem: '無', hp: .7, regen: .02, spd: -3 },
-  xingdou: { name: '星斗鍛體經', grade: 4, type: '煉體', elem: '無', hp: .8, def: .8 },
-  taichu: { name: '太初聖體訣', grade: 4, type: '煉體', elem: '無', hp: 1.2, atk: .2, def: .4 },
+  tiegu: { name: '鐵骨功', grade: 1, type: '鍛體', elem: '無', rate: .12, hp: .1, def: .15, regen: .005 },
+  lianxue: { name: '煉血功', grade: 2, type: '鍛體', elem: '無', rate: .4, hp: .3, regen: .01 },
+  huxiao: { name: '虎嘯鍛身訣', grade: 2, type: '鍛體', elem: '無', rate: .4, hp: .25, atk: .12 },
+  longlin: { name: '龍鱗寶體', grade: 3, type: '鍛體', elem: '無', rate: 1.2, hp: .5, def: .5 },
+  jiuxue: { name: '九血淬體訣', grade: 3, type: '鍛體', elem: '無', rate: 1.2, hp: .7, regen: .02, spd: -3 },
+  xingdou: { name: '星斗鍛體經', grade: 4, type: '鍛體', elem: '無', rate: 2.6, hp: .8, def: .8 },
+  taichu: { name: '太初聖體訣', grade: 4, type: '鍛體', elem: '無', rate: 2.6, hp: 1.2, atk: .2, def: .4 },
   qingyan: { name: '輕煙步', grade: 1, type: '身法', elem: '無', spd: 4, dodge: .02 },
   yanzi: { name: '燕歸巢', grade: 1, type: '身法', elem: '無', spd: 2, dodge: .04 },
   mizong: { name: '迷蹤幻影', grade: 2, type: '身法', elem: '無', spd: 5, dodge: .08 },
@@ -193,7 +227,7 @@ const TECHS = {
   jixing: { name: '吉星高照錄', grade: 4, type: '尋寶', elem: '無', drop: 1.2, stone: .5 },
 };
 const NO_SCALE = ['life', 'brk', 'offline', 'risk'];
-const EFF_LABEL = { rate: '修煉', hp: '氣血', mp: '法力', skillUp: '術法威力', shenUp: '神通威力', normalAtk: '普通攻擊', atk: '攻擊', def: '防禦', spd: '身法', crit: '暴擊', critDmg: '暴傷', dodge: '閃避', regen: '每回合回血', lifesteal: '吸血', life: '壽元', brk: '突破率', stone: '遊歷靈石', drop: '掉落', evRate: '奇遇', offline: '離線上限', pillEff: '丹藥效果', toxRes: '丹毒抗性', killXiu: '擊殺得修為', techXp: '功法精進', lateRate: '壽元將盡時修煉', lifePct: '壽元', risk: '突破失敗損失加倍' };
+const EFF_LABEL = { rate: '修煉', hp: '氣血', mp: '法力', skillUp: '術法威力', faUp: '法術威力', hunUp: '神魂術威力', shenUp: '神通威力', normalAtk: '普通攻擊', atk: '攻擊', def: '防禦', spd: '身法', crit: '暴擊', critDmg: '暴傷', dodge: '閃避', regen: '每回合回血', lifesteal: '吸血', life: '壽元', brk: '突破率', stone: '遊歷靈石', drop: '掉落', evRate: '奇遇', offline: '離線上限', pillEff: '丹藥效果', toxRes: '丹毒抗性', killXiu: '擊殺得修為', techXp: '功法精進', lateRate: '壽元將盡時修煉', lifePct: '壽元', risk: '突破失敗損失加倍' };
 const FLAT_EFF = ['spd', 'life', 'offline'];   // 這些顯示成數字，其他顯示成百分比
 
 // ---------- 丹藥 ----------
