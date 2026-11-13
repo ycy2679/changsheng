@@ -2,14 +2,15 @@
 // 每個事件都是不同的情境，不做換名字的重複事件。沒標 repeat 的一世只發生一次。
 
 // 小工具：給一件沒拿過的法寶／功法／術法，回傳文字（拿不到就給靈石）
-function giftArt(grades) { const id = randomUnowned('art', grades); if (id) { gainArt(id); return `「${ARTS[id].name}」`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
+function giftArt(grades, slot) { const id = randomUnowned('art', grades, slot ? x => x.slot === slot : null); if (id) { gainArt(id); return `「${ARTS[id].name}」`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
+function gainArtNamed(id) { gainArt(id); return `「${ARTS[id].name}」`; }
 function giftTech(grades) { const id = randomUnowned('tech', grades); if (id) { learnTech(id); return `《${TECHS[id].name}》`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
-function giftSkill(grades) { const id = randomUnowned('skill', grades); if (id) { learnSkill(id); return `《${SKILLS[id].name}》`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
+function giftSkill(grades, elem) { const id = randomUnowned('skill', grades, elem ? x => x.elem === elem : null); if (id) { learnSkill(id); return `《${SKILLS[id].name}》`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
 
 EVENTS.push(
   // ---------- 練氣期 ----------
   { id: 'rustsword', title: '河床鏽劍', text: '乾涸的河床上插著一柄鏽劍，劍脊上刻著一個看不清的名字。', choices: [
-    { t: '拔出來磨一磨', run() { return `鏽層底下竟是好鋼。你得到${giftArt([1])}。`; } },
+    { t: '拔出來磨一磨', run() { return `鏽層底下竟是好鋼。你得到${giftArt([1], '武器')}。`; } },
     { t: '讓它留在原地', run(s) { s.brkBonus += .03; return '你朝劍拜了一拜。不知哪來的一縷劍意落進心裡，下次突破成功率 +3%。'; } }] },
   { id: 'beggar', min: 1, title: '討麵的老道', text: '麵攤前蹲著一個邋遢老道，眼巴巴地看著你碗裡的麵。', choices: [
     { t: '請他吃一碗', run() { if (pct(.35)) return `老道吃完一抹嘴，扔給你一本破冊子：${giftTech([1, 2])}。`; return '他吃完就走，連聲謝都沒說。'; } },
@@ -88,7 +89,7 @@ EVENTS.push(
     { t: '給他一顆延壽丹', cond: () => count('yanshou') > 0, run(s) { s.items.yanshou--; return `皇帝多活了十五年。國庫裡的靈石都歸你：${addStone(stoneUnit() * 20)}。`; } },
     { t: '告訴他長生的代價', run(s) { s.brkBonus += .05; return '你講了很久。皇帝沉默半晌，讓人送你出宮。下次突破成功率 +5%。'; } }] },
   { id: 'phoenixfeather', min: 16, title: '天降火羽', text: '一根燃燒的羽毛從雲端飄落，落地處草木成灰，羽毛卻一點都沒有變小。', choices: [
-    { t: '伸手去接', run(s) { if (s.root.elems.includes('火') || pct(.3)) return `火羽化作一道火紋烙進掌心，你學會了${giftSkill([3, 4])}。`; injure(200); return '你的手燒得只剩骨頭，養了好久才長回來。'; } },
+    { t: '伸手去接', run(s) { if (s.root.elems.includes('火') || pct(.3)) return `火羽化作一道火紋烙進掌心，你學會了${giftSkill([3, 4], '火')}。`; injure(200); return '你的手燒得只剩骨頭，養了好久才長回來。'; } },
     { t: '等它燒完', run() { return `羽毛燒了七天才熄。灰燼裡有一塊火晶，賣得靈石 ${addStone(stoneUnit() * 6)}。`; } }] },
   // ---------- 元嬰、化神期 ----------
   { id: 'disciple', min: 18, title: '洞府外跪著的人', text: '一個少女在你洞府外跪了三天三夜，說非你不拜。', choices: [
@@ -206,7 +207,7 @@ Object.assign(ARCS, {
 
 MEMORIES.push(
   { id: 'ye_z', bond: 'ye', end: 'zhiji', min: 4, title: '刻著名字的劍', text: '練劍時，一道劍光從天外落下，插在你面前。劍身上刻著兩個字：疏桐。', choices: [
-    { t: '拔起那柄劍', run() { return `劍在你手裡輕輕震了一下，像是認出了你。你得到${giftArt([2, 3])}，劍柄上纏著一卷劍譜：${giftSkill([2, 3])}。`; } }] },
+    { t: '拔起那柄劍', run() { return `劍在你手裡輕輕震了一下，像是認出了你。你得到${gainArtNamed('shutongjian')}，劍柄上纏著一卷劍譜：${giftSkill([2, 3])}。`; } }] },
   { id: 'ye_r', bond: 'ye', end: 'rival', min: 6, title: '上輩子的戰書', text: '一個青衣女劍修攔住你，手裡捏著一封發黃的戰書：「上輩子沒分出勝負。拔劍。」', choices: [
     { t: '應戰', run(s) { if (battle('葉疏桐', s.stage + 2, 1.1)) return `這一次你贏了。她收劍時終於笑了：「認了。」臨走前教了你一招：${giftSkill([2, 3])}。`; return '又輸了半招。她說：「下輩子再來。」語氣卻很高興。'; } }] },
   { id: 'ye_g', bond: 'ye', end: 'grudge', min: 8, title: '斷劍尋仇', text: '一個提著斷劍的女人找上門，你從沒見過她，她卻說：「這把劍斷的時候，你在旁邊看著。」', choices: [
@@ -218,7 +219,7 @@ MEMORIES.push(
   { id: 'xie_r', bond: 'xie', end: 'redeemed', min: 10, title: '雲遊僧', text: '山道上遇見一個白衣雲遊僧，他替你指了一條近路，眼神熟悉得讓你心頭一震。', choices: [
     { t: '「我們見過嗎？」', run() { return `僧人笑而不答，只送你一句偈語。你參悟了很久，對《${addTechXp(2000)}》的理解更深了，還學會了${giftSkill([3])}。`; } }] },
   { id: 'xie_s', bond: 'xie', end: 'slain', min: 12, title: '劍中殘魂', text: '你撿到一柄白玉劍，劍裡附著一縷殘魂，對你說：「上輩子你殺了我。這輩子，換我來試試。」', choices: [
-    { t: '鎮壓殘魂', run(s) { if (battle('謝無咎殘魂', s.stage + 2, 1.2)) return `殘魂散去，你得到那柄劍：${giftArt([3, 4])}。`; injure(200); return '殘魂帶著劍消失了，你受了不輕的傷。'; } }] },
+    { t: '鎮壓殘魂', run(s) { if (battle('謝無咎殘魂', s.stage + 2, 1.2)) return `殘魂散去，你得到那柄劍：${gainArtNamed('baiyujian')}。`; injure(200); return '殘魂帶著劍消失了，你受了不輕的傷。'; } }] },
   { id: 'xie_d', bond: 'xie', end: 'demon', min: 16, title: '天上來的信', text: '一隻燃著黑火的紙鶴落在你掌心，上面只有一行字：「我在上面等你。——謝」', choices: [
     { t: '收起來', run(s) { s.brkBonus += .1; return '你把信收進懷裡。這輩子你修得格外拚命。下次突破成功率 +10%。'; } }] },
   { id: 'bei_v', bond: 'bei', end: 'vow', min: 20, title: '碑前的燈', text: '虛空裡那塊無字碑還在。碑前多了一盞燈，燈下壓著一張字條：「你答應過的。」', choices: [
@@ -489,7 +490,7 @@ Object.assign(ARCS, {
       { t: '叫住她', cond: () => !arc('shen').defy, run() { const a = arc('shen'); a.aff += 1; return '她停下腳步，沒有回頭：「我已經回不去了。」'; } },
       { t: '不插手', run() { return '你關上了洞府的門。'; } }] },
     { min: 16, title: '清禾', text() { const a = arc('shen'); return a.saved ? '很多年後，沈清禾在一座小山上開了自己的宗門，只收無家可歸的孩子。她寫信邀你去看看。' : a.defy ? '你聽說沈清禾逃出了玄霄宗，從此下落不明。有人說在海外見過她。' : '沈清禾當上了玄霄宗的長老。她來見你一面，穿著你第一次見她時那種顏色的衣服。'; }, choices: [
-      { t: '去看她', run() { const a = arc('shen'); if (a.saved) { arcEnd('shen', 'founded'); return `她的宗門很小，孩子們都叫她師父。臨走時她把當年那把劍送給你：${giftArt([3])}。`; } if (a.defy) { arcEnd('shen', 'free'); return '你沒找到她。但海邊的礁石上刻著一行字：「我自由了。」'; } arcEnd('shen', 'elder'); return '她說：「我現在也在下命令了。」你不知道該說什麼。'; } }] },
+      { t: '去看她', run() { const a = arc('shen'); if (a.saved) { arcEnd('shen', 'founded'); return `她的宗門很小，孩子們都叫她師父。臨走時她把當年那把劍送給你：${gainArtNamed('qinghejian')}。`; } if (a.defy) { arcEnd('shen', 'free'); return '你沒找到她。但海邊的礁石上刻著一行字：「我自由了。」'; } arcEnd('shen', 'elder'); return '她說：「我現在也在下命令了。」你不知道該說什麼。'; } }] },
   ] },
   // 殷九娘：開黑市、賣情報、也賣毒，亦正亦邪
   yin: { name: '殷九娘', steps: [
@@ -526,7 +527,7 @@ Object.assign(ARCS, {
       { t: '「我們見過？」', run() { arc('gu').aff += 2; return '「很多世以前，你是我師父。」她說，「那時候我叫顧長歌，現在也是。」'; } },
       { t: '戒備地退開', run() { arc('gu').aff += 1; return '她笑了：「上一世你也是這樣。」'; } }] },
     { min: 28, title: '師父的劍', text: '顧長歌拿出一柄舊劍：「這是你當年的劍。你走的時候，什麼都沒帶。」', choices: [
-      { t: '握住劍', run() { const a = arc('gu'); a.aff += 2; a.sword = 1; return `劍在你手裡輕輕震了一下。你想不起任何事，眼眶卻熱了。你得到${giftArt([4])}。`; } },
+      { t: '握住劍', run() { const a = arc('gu'); a.aff += 2; a.sword = 1; return `劍在你手裡輕輕震了一下。你想不起任何事，眼眶卻熱了。你得到${gainArtNamed('guichenjian')}。`; } },
       { t: '「那不是我。」', run() { arc('gu').deny = 1; return '她收回了劍：「也是。人總會變的。」'; } }] },
     { min: 29, title: '渡劫之前', text: '顧長歌說她要渡劫了。三千年前你沒撐過去的那道雷，她想替你撐一次。', choices: [
       { t: '替她護法', run(s) { const a = arc('gu'); if (battle('劫雷的餘波', s.stage + 1, 1.2)) { a.aff += 3; a.guard = 1; return '你擋下了劫雷的餘波。她渡過了前八道。'; } injure(300); a.aff += 2; return '你被餘波震傷了，但她說，有你在旁邊就夠了。'; } },

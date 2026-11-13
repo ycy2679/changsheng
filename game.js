@@ -31,6 +31,7 @@ function newLife(meta) {
   if (t('qianshi') && meta.keepTech && TECHS[meta.keepTech.id]) s.techs[meta.keepTech.id] = meta.keepTech.xp;
   // 宿世神通：帶上上一世的一門神通（報通）
   s.shen = t('baotong') && meta.lastShen && meta.lastShen.length ? [pick(meta.lastShen)] : [];
+  s.shenEquip = s.shen.slice();
   return s;
 }
 const tl = id => S.meta.talents[id] || 0;
@@ -68,7 +69,7 @@ function load() {
   if (s.draw && !s.draw.rr) { s.draw.rr = { r: s.draw.rerolls, p: s.draw.rerolls }; delete s.draw.rerolls; }
   for (const k in s.gear) if (s.gear[k] && !artOk(s.gear[k], s)) s.gear[k] = null;   // 境界不夠的法寶先卸下
   // 神通上線前的存檔：稀有體質補天賦神通，已過化神的補本命神通
-  s.shen = s.shen || []; s.flags = s.flags || {};
+  s.shen = s.shen || []; s.shenEquip = s.shenEquip || s.shen.slice(0, maxShen(s)); s.flags = s.flags || {};
   if (!s.paths && !s.mortal) { s.paths = ['fa']; s.flags.pathFree = 1; }   // 修行路線上線前的存檔
   if (m.arcDone && m.arcDone.bei) { m.story = m.story || {}; m.story.n4 = 1; (m.codex.m = m.codex.m || {}).n4 = 1; }
   if (!m.tips) { m.tips = {}; if (m.lives > 1) TIPS.forEach(x => m.tips[x.id] = 1); else if (!s.mortal && s.root) TIPS.forEach(x => { try { if (['rudao', 'tupo', 'fight', 'event'].includes(x.id) || x.when(s)) m.tips[x.id] = 1; } catch (e) {} }); }
@@ -77,6 +78,7 @@ function load() {
   if (s.root) pathSkillCheck(s);
   if (s.phys && PHYS_SHEN[s.phys] && !s.flags.physShen) { s.flags.physShen = 1; gainShen(PHYS_SHEN[s.phys], `${PHYSIQUES[s.phys].name}血脈甦醒`, s); }
   if (s.root && s.stage >= 18 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
+  pathArtCheck(s);
 }
 
 // ---------- 開局抽根骨 ----------
@@ -247,6 +249,14 @@ function starterSwap(s = L()) {
   const st = STARTER[s.paths[0]]; if (!st) return;
   if (s.tech === 'yinqi' && !s.techs.yinqi) { delete s.techs.yinqi; s.techs[st[0]] = 0; s.tech = st[0]; }
   if ('qijin' in s.skills && !s.skills.qijin) { delete s.skills.qijin; s.skills[st[1]] = 0; s.equip = s.equip.map(k => k === 'qijin' ? st[1] : k); }
+}
+// 路線專屬法寶：化神時，依主修路線自動悟出（PATH_ARTS 從 ARTS 的 path 欄位算出）
+const PATH_ARTS = Object.fromEntries(Object.entries(ARTS).filter(([, x]) => x.path).map(([id, x]) => [x.path, id]));
+function pathArtCheck(s = L()) {
+  if (!s.paths || s.stage < 18 || s.flags.pathArt) return;
+  s.flags.pathArt = 1;
+  const id = PATH_ARTS[myPaths(s)[0]];
+  if (id) { gainArt(id); log(`踏入化神，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」。`); }
 }
 // 路線專屬大招：金丹、化神時領悟（兼修的路線也算）
 const PATH_SKILLS = { ti: [['fatian', 2], ['santou', 4]], hun: [['shenhun', 2], ['wannian', 4]] };
@@ -739,9 +749,9 @@ function renderCodex() {
   return `<p class="small">已收錄 ${n} 項。每收錄 ${CODEX_STEP} 項悟得道果 ${CODEX_GUO}，下一次在 ${next} 項。</p>
     ${nav(LUN_TABS.map(([k, name]) => [k, name]), codexTab, 'tab')}${body}`;
 }
-function randomUnowned(kind, grades) {
+function randomUnowned(kind, grades, filter) {
   const s = L(), pool = { tech: TECHS, skill: SKILLS, art: ARTS }[kind], owned = { tech: s.techs, skill: s.skills, art: s.arts }[kind];
-  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].sect && !pool[id].only);
+  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && (!filter || filter(pool[id])));
   return ids.length ? (kind === 'tech' ? pickTech(ids, s) : pick(ids)) : null;
 }
 // 抽功法：三成五機會從自己路線修得了的主修類功法裡抽（鍛體、觀想功法比吐納少，免得一直撿不到）
@@ -758,7 +768,9 @@ function tryDrop(p) {
 // 法寶：得到時如果那一格空著就直接裝上
 // 法寶境界門檻（依品階）：玄階築基、地階金丹、天階元嬰
 const ART_REALM = [0, 0, 9, 12, 15], ART_REALM_NAME = ['', '', '築基', '金丹', '元嬰'];
-const artOk = (id, s = L()) => s.stage >= ART_REALM[ARTS[id].grade];
+const artOk = (id, s = L()) => s.stage >= ART_REALM[ARTS[id].grade] && (!ARTS[id].path || myPaths(s).includes(ARTS[id].path));
+// 法寶穿不上的原因：境界不夠，或路線專屬不是自己這條路
+const artBlock = (id, s = L()) => s.stage < ART_REALM[ARTS[id].grade] ? `需${ART_REALM_NAME[ARTS[id].grade]}` : `需走${PATHS[ARTS[id].path].name}`;
 // 身上的欄位：武器、護甲各一格，飾品格數看「萬寶隨身」
 const accKeys = () => ['飾品', '飾品2', '飾品3'].slice(0, 1 + tl('wanbao'));
 const gearKeys = () => ['武器', '護甲', ...accKeys()];
@@ -797,7 +809,7 @@ function fight(foe) {
   const RB = { fa: .08, ti: 0, hun: .04 }, mainR = R[myPaths(s)[0]];
   const pool = k => R[skillRes(k, s)], addR = (k, f) => { const x = R[k]; if (x) x.v = Math.min(x.m, x.v + x.m * f); };
   // 神通：領域類整場生效，其他記下來等時機
-  const shens = (s.shen || []).map(id => SHENS[id]), shUsed = [], clones = [];
+  const shens = (s.shenEquip || []).map(id => SHENS[id]), shUsed = [], clones = [];
   const twice = !!s.flags.xingshen; if (twice) s.flags.xingshen = 0;   // 醒神丹
   let faAtk = 1, faDef = 1, faT = 0, reflAll = 0, mpRegen = eff('mpRegen', s), skillUp = 0, fled = false;
   const sm = 1 + eff('shenUp', s), na = 1 + eff('normalAtk', s);   // 魂修神通、體修普攻
@@ -1243,16 +1255,27 @@ function breakthrough() {
 // ---------- 神通的取得 ----------
 // 本命（化神，依靈根）、極品突破、天賦（稀有體質）、功法圓滿、法寶器靈、宿世（前世帶來）
 const hasShen = (id, s = L()) => (s.shen || []).includes(id);
+// 神通欄位：覺醒的神通都算學會（輪迴錄、宿世神通都看這個），但只有裝備進欄位的才會在戰鬥裡生效
+const maxShen = () => 3 + tl('shenwei');
 const randShen = (s = L()) => { const ids = Object.keys(SHENS).filter(id => !SHENS[id].tech && !hasShen(id, s)); return ids.length ? pick(ids) : null; };
 // 身上神通某個欄位的總和（機緣類：loot、dropUp、winXiu）
-const shenSum = (key, s = L()) => (s.shen || []).reduce((a, id) => a + (SHENS[id][key] || 0), 0);
+const shenSum = (key, s = L()) => (s.shenEquip || []).reduce((a, id) => a + (SHENS[id][key] || 0), 0);
 const benmingShen = (s = L()) => s.root.type === 'void' ? 'guixu' : Object.keys(SHENS).find(id => SHENS[id].elem === s.root.elems[0]);
 // 指定的那門已經有了，就改給一門隨機的
 function gainShen(id, why, s = L()) {
   if (id && hasShen(id, s)) id = randShen(s);
   if (!id) return;
   (s.shen = s.shen || []).push(id); codexAdd('s', id);
-  log(`${why}，覺醒神通「${SHENS[id].name}」：${SHENS[id].desc}。`);
+  s.shenEquip = s.shenEquip || [];
+  const fit = s.shenEquip.length < maxShen(s);
+  if (fit) s.shenEquip.push(id);
+  log(`${why}，覺醒神通「${SHENS[id].name}」：${SHENS[id].desc}。${fit ? '' : '神通欄位已滿，先收進輪迴錄，之後再裝備。'}`);
+}
+// 裝備／卸下神通（只有裝備的才會在戰鬥裡生效）
+function toggleShen(id) {
+  const s = L(); s.shenEquip = s.shenEquip || []; const i = s.shenEquip.indexOf(id);
+  if (i >= 0) s.shenEquip.splice(i, 1); else if (s.shenEquip.length < maxShen(s)) s.shenEquip.push(id);
+  save(); render();
 }
 function setBrkMode(v) { L().brkMode = v; save(); updateDyn(); }
 // offline：離線自動突破一律穩紮穩打
@@ -1281,6 +1304,7 @@ function tryBreak(offline = false) {
       const pm = s.paths && s.paths[0]; if (PATH_FLAVOR[pm] && mj <= 8) ql += `你突破到${PATH_REALM[pm][mj]}境，${PATH_FLAVOR[pm][mj]}。`;
       if (mj === 4 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '踏入化神，元神與天地相合'); }
       pathSkillCheck(s);
+      pathArtCheck(s);
     }
     return { ok: true, major, msg: `突破成功${used ? `（服下${pill} ${used} 顆）` : ''}，晉入${stg().name}！` + (major ? `${ql}壽元增至 ${Math.floor(lifespan())} 年。` : '') };
   } else {
@@ -1389,7 +1413,7 @@ function restock() {
   const kinds = { tech: [TECHS, s.techs, TECH_PRICE], skill: [SKILLS, s.skills, SKILL_PRICE], art: [ARTS, s.arts, ART_PRICE] };
   for (const k in kinds) {
     const [pool, owned, prices] = kinds[k];
-    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].sect && !pool[id].only && !slots.some(x => x.id === id));
+    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
     for (let i = 0; i < per; i++) {
       // 第一格保證玄階以上（玄階還沒解鎖就照常抽）
       const low = tj && grades.some(g => g >= 3) ? 3 : 2;   // 天機丹：保證地階以上
@@ -1723,8 +1747,10 @@ function renderGen() {
     <h3>身體</h3>
     <div class="stats"><span>氣血 ${fmt(st.hp)}</span><span>法力 ${fmt(st.mp)}</span><span>攻擊 ${fmt(st.atk)}</span><span>防禦 ${fmt(st.def)}</span><span>身法 ${st.spd}</span>
       <span>暴擊 ${Math.round(st.crit * 100)}%</span><span>暴傷 ${Math.round(st.critDmg * 100)}%</span><span>閃避 ${Math.round(st.dodge * 100)}%</span><span>屬性 ${TECHS[s.tech].elem}</span></div>
-    <h3>神通（${shen.length}）</h3>${shen.map(id => { const x = SHENS[id]; return `<div class="item"><div class="row"><b class="g4">${x.name}</b><span class="small muted">${x.type} · ${{ open: '開場發動', field: '整場生效', lethal: '危急時發動' }[x.trig]}</span></div><div class="small">${x.desc}</div></div>`; }).join('')
-    || '<p class="muted small">還沒有神通。踏入化神時會依靈根覺醒本命神通；大境界突破出極品、稀有體質、天階功法圓滿（覺醒該功法專屬的神通）、天階法寶祭煉圓滿，也都會覺醒神通。每門神通一場戰鬥發動一次，不耗法力。</p>'}`;
+    <h3>神通欄（${(s.shenEquip || []).length}/${maxShen()}）</h3>${shen.length ? shen.map(id => { const x = SHENS[id], on = (s.shenEquip || []).includes(id);
+      return `<div class="item"><div class="row"><b class="g4">${x.name}</b><span class="small muted">${x.type} · ${{ open: '開場發動', field: '整場生效', lethal: '危急時發動' }[x.trig]}</span></div>
+        <div class="row small"><span>${x.desc}</span><span><button class="mini ${on ? 'on' : ''}" ${!on && (s.shenEquip || []).length >= maxShen() ? 'disabled' : ''} onclick="toggleShen('${id}')">${on ? '卸下' : '裝備'}</button></span></div></div>`; }).join('')
+    : '<p class="muted small">還沒有神通。踏入化神時會依靈根覺醒本命神通；大境界突破出極品、稀有體質、天階功法圓滿（覺醒該功法專屬的神通）、天階法寶祭煉圓滿，也都會覺醒神通。每門神通一場戰鬥發動一次，不耗法力；只有裝備進神通欄的才會生效，欄位有限，學會的都會留在輪迴錄裡。</p>'}`;
 }
 // 已學功法的篩選：類型分頁、排序、只看修得了的
 let techTab = '全部', techSort = 'grade', techUsable = false;
@@ -1861,14 +1887,14 @@ function renderArt() {
   const card = id => {
     const a = ARTS[id], lv = s.arts[id], on = isOn(id), full = lv >= ART_MAX_REFINE, p = refinePrice(id);
     return `<div class="item"><div class="row"><b>${a.name}</b>${gradeTag(a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
-      <div class="row small"><span>${effText(a, null, artMul(id))}</span><span>
+      <div class="row small"><span>${effText(a, null, artMul(id))}${a.path ? ` · <span class="same">${PATHS[a.path].name}專屬</span>` : ''}</span><span>
         <button class="mini" ${full || s.stone < p || (refineOre(id) && !count(refineOre(id))) ? 'disabled' : ''} onclick="refineArt('${id}')">${full ? '已祭煉圓滿' : `祭煉 ${fmt(p)} 靈石${refineOre(id) ? `＋${ITEMS[refineOre(id)].name}（有 ${count(refineOre(id))}）` : ''}`}</button>
-        ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">需${ART_REALM_NAME[a.grade]}</span>` : '<span class="muted">欄位已滿</span>'}
+        ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">${artBlock(id)}</span>` : '<span class="muted">欄位已滿</span>'}
         ${on ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</span></div></div>`;
   };
   const owned = Object.keys(s.arts);
   return ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
-    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。</p>';
+    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，只有那條路線能裝備。</p>';
 }
 // 行囊小分頁：丹藥、寶物（天材地寶、五行之精）、材料
 let bagTab = 'dan';
@@ -1979,7 +2005,7 @@ const forgeLv = (s = L()) => ALCH_NEED.filter(n => (s.forge || 0) >= n).length -
 const forgeChance = (g, s = L()) => Math.min(.95, BREW_RATE[g] + .1 * forgeLv(s) + .05 * arrLv('dihuo', s));
 const forgeFee = g => Math.round(ART_PRICE[g] * .3);
 // 這個部位、品階還有沒拿過的法寶（頭目專屬、宗門賞賜不算）
-const forgePool = (slot, g, s = L()) => Object.keys(ARTS).filter(id => ARTS[id].slot === slot && ARTS[id].grade === g && !(id in s.arts) && !ARTS[id].boss && !ARTS[id].sect && !ARTS[id].only);
+const forgePool = (slot, g, s = L()) => Object.keys(ARTS).filter(id => ARTS[id].slot === slot && ARTS[id].grade === g && !(id in s.arts) && !ARTS[id].boss && !ARTS[id].sect && !ARTS[id].only && !ARTS[id].path && !ARTS[id].char);
 const forgeGrades = (s = L()) => [1, 2, 3, 4].filter(g => s.stage >= ART_REALM[g]);   // 驅使得動的品階才煉得出來
 const forgeSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrLv('dihuo', s));
 function startForge(slot, g) { if (tryForge(slot, g)) { log(`開爐煉製${GRADES[g]}${slot}。`); save(); render(); } }

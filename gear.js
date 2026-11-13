@@ -323,6 +323,19 @@ const ARTS = {
   jieyin:    { name: '接引燈', slot: '飾品', grade: 3, brk: .04, mp: .3, rate: .1 },
   hunyuanzhu: { name: '混元珠', slot: '飾品', grade: 4, atk: .2, hp: .2, mp: .3, def: .2 },
 };
+// 重要人物專屬法寶：劇情裡明確給了特定東西，就不再隨機抽（char 標記，不進隨機池）
+Object.assign(ARTS, {
+  shutongjian: { name: '疏桐劍', slot: '武器', grade: 3, char: 1, atk: .38, crit: .08, spd: 3 },
+  baiyujian:  { name: '白玉劍', slot: '武器', grade: 4, char: 1, atk: .65, crit: .12, critDmg: .3 },
+  qinghejian: { name: '清禾劍', slot: '武器', grade: 3, char: 1, atk: .4, crit: .1 },
+  guichenjian: { name: '歸塵劍', slot: '武器', grade: 4, char: 1, atk: .5, crit: .08, techXp: .3 },
+});
+// 路線專屬法寶：化神時，走哪條路主修就悟出哪一件（path 標記，不進隨機池、只能自己這條路裝備）
+Object.assign(ARTS, {
+  daoxinxi:  { name: '道心玄璽', slot: '飾品', grade: 4, path: 'fa', mp: .5, skillUp: .3, rate: .15 },
+  buxiuhun:  { name: '不朽戰魂', slot: '飾品', grade: 4, path: 'ti', hp: .4, def: .25, normalAtk: .3 },
+  jiuyoutong: { name: '九幽神瞳', slot: '飾品', grade: 4, path: 'hun', shenUp: .4, crit: .12, techXp: .2, evRate: .15 },
+});
 // 秘境頭目專屬法寶（boss 標記：只有打敗那個頭目才會掉）
 Object.assign(ARTS, {
   tengxin:   { name: '藤心環', slot: '飾品', grade: 2, boss: 1, regen: .02, hp: .1 },
