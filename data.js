@@ -291,12 +291,56 @@ Object.assign(ITEMS, {
   xingshen:   { name: '醒神丹', kind: 'dan', fx: 'xingshen', rare: 1, base: 300, tox: 0, desc: '下一場戰鬥，每門神通可以發動兩次。' },
   tianjidan:  { name: '天機丹', kind: 'dan', fx: 'tianji', rare: 1, base: 250, tox: 0, desc: '下一次坊市換貨，功法、術法、法寶的第一格都保證地階以上（築基中期起）。' },
 });
+// 材料（kind 'mat'）：靈草煉丹、礦材煉器，黃玄地天四階
+Object.assign(ITEMS, {
+  qingling:  { name: '青靈草', kind: 'mat', mat: 'herb', grade: 1, desc: '山野常見的靈草，煉黃階丹藥用。' },
+  ziyunzhi:  { name: '紫雲芝', kind: 'mat', mat: 'herb', grade: 2, desc: '長在雲霧裡的靈芝，煉玄階丹藥用。' },
+  xueyushen: { name: '血玉參', kind: 'mat', mat: 'herb', grade: 3, desc: '通體血紅的老參，煉地階丹藥用。' },
+  jiuyezhi:  { name: '九葉龍芝', kind: 'mat', mat: 'herb', grade: 4, desc: '九片葉子、形如盤龍的仙芝，煉天階丹藥用。' },
+  tiejing:   { name: '鐵精', kind: 'mat', mat: 'ore', grade: 1, desc: '百煉之後剩下的一點精鐵，煉黃階法寶用。' },
+  xuanbingtie: { name: '玄冰鐵', kind: 'mat', mat: 'ore', grade: 2, desc: '寒潭底下撈出來的鐵，摸上去會冒白氣，煉玄階法寶用。' },
+  chijinsha: { name: '赤金砂', kind: 'mat', mat: 'ore', grade: 3, desc: '地火燒了千年的金砂，煉地階法寶用。' },
+  xingchengang: { name: '星辰鋼', kind: 'mat', mat: 'ore', grade: 4, desc: '天外隕星裡的鋼，煉天階法寶用。' },
+});
+const MAT_HERB = [null, 'qingling', 'ziyunzhi', 'xueyushen', 'jiuyezhi'];
+const MAT_ORE = [null, 'tiejing', 'xuanbingtie', 'chijinsha', 'xingchengang'];
+const MAT_PRICE = [0, 30, 300, 3000, 20000];
+// 丹方：g 品階（決定用哪階靈草、出爐時間、基礎成功率），n 要幾份靈草；黃階丹方生來就會，其他要找
+const RECIPES = {
+  heal: { g: 1, n: 2 }, huiqi: { g: 1, n: 2 }, julingdan: { g: 1, n: 3 }, qizhidan: { g: 1, n: 3 }, kuangxue: { g: 1, n: 3 }, jingangdan: { g: 1, n: 3 },
+  ningshendan: { g: 1, n: 3 }, huichundan: { g: 1, n: 2 }, qingxindan: { g: 1, n: 3 },
+  guben: { g: 2, n: 3 }, yinyuan: { g: 2, n: 3 }, xunbaodan: { g: 2, n: 3 }, yanshou: { g: 2, n: 4 }, wudao: { g: 2, n: 3 },
+  xisui: { g: 3, n: 4 }, pozhang: { g: 3, n: 4 }, humai: { g: 3, n: 5 }, xingshen: { g: 3, n: 4 }, tianjidan: { g: 3, n: 4 }, zhuyan: { g: 4, n: 5 },
+};
+// 修為丹、突破丹：品階跟著大境界（練氣黃、築基金丹玄、元嬰化神地、煉虛以上天）
+const majorGrade = mj => mj === 0 ? 1 : mj <= 2 ? 2 : mj <= 4 ? 3 : 4;
 const DAN_COMMON = ['yanshou', 'xisui', 'wudao', 'guben', 'julingdan', 'qizhidan', 'kuangxue', 'jingangdan', 'ningshendan', 'huichundan', 'qingxindan', 'yinyuan', 'xunbaodan'];
 const DAN_RARE = ['pozhang', 'humai', 'zhuyan', 'xingshen', 'tianjidan'];
 const ROOT_ITEMS = ['gengjing', 'yimujing', 'guishuijing', 'binghuojing', 'wutujing'];
 const TC_ITEMS = ['xuanhuang', 'chiyang', 'ninghun', 'shenmu', 'xukong', 'liangyi', 'jiujie', 'tianxin'];
 const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due'];
 const BRK_PILLS = ['zhuji', 'ningyuan', 'huaying', 'tongxuan', 'poxu', 'heyuan', 'dacheng', 'yinjie'];
+for (let i = 0; i < XIU_PILLS.length; i++) RECIPES[XIU_PILLS[i]] = { g: majorGrade(i), n: 3 };
+for (let i = 0; i < BRK_PILLS.length; i++) RECIPES[BRK_PILLS[i]] = { g: majorGrade(i), n: 6 };
+const BREW_SEC = [0, 10, 20, 40, 60];          // 出爐時間（秒）
+const BREW_RATE = [0, .8, .65, .5, .35];       // 基礎成功率
+const ALCH_RANK = ['學徒', '丹師', '大師', '宗師'], ALCH_NEED = [0, 20, 100, 400];   // 煉丹術等級與經驗門檻
+const BREW_XP = [0, 1, 3, 8, 20];
+// 煉器：選部位和品階，出爐隨機得到一件還沒有的法寶；品質決定出爐時的祭煉重數
+const FORGE_ORE = [0, 3, 4, 5, 6];             // 要幾份同階礦材
+const FORGE_RANK = ['學徒', '器師', '大師', '宗師'];
+// 陣法：佈在洞府裡，洞府 0／3／5／8 級各開一座陣位；每座最多 3 級，第 N 級要 N 階礦材 5 份和靈石
+const ARRAYS = {
+  juling:   { name: '聚靈陣', desc: l => `修煉速度 +${8 * l}%` },
+  yaoyuan:  { name: '藥園陣', desc: l => `每 ${ARRAY_GROW[l]} 秒長出一份當前境界的靈草` },
+  kuangmai: { name: '礦脈陣', desc: l => `每 ${ARRAY_GROW[l]} 秒採出一份當前境界的礦材` },
+  danshi:   { name: '丹室陣', desc: l => `煉丹成功率 +${5 * l}%，出爐快 ${15 * l}%` },
+  dihuo:    { name: '地火陣', desc: l => `煉器成功率 +${5 * l}%，出爐快 ${15 * l}%` },
+  hushan:   { name: '護山陣', desc: l => `離線修煉效率 +${10 * l}%` },
+};
+const ARRAY_SLOT_CAVE = [0, 3, 5, 8];
+const ARRAY_GROW = [0, 90, 60, 40];
+const ARRAY_STONE = [0, 250, 3000, 30000];
 const BRK_PILL_PRICE = [600, 6000, 40000, 120000, 400000, 1.2e6, 4e6, 1.2e7];
 const BRK_PILL_BONUS = [.15, .1, .05, .05];   // 第 1～4 顆的效果（第 4 顆要悟道樹「海量」）
 
