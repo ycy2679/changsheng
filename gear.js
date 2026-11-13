@@ -325,10 +325,10 @@ const ARTS = {
 };
 // 重要人物專屬法寶：劇情裡明確給了特定東西，就不再隨機抽（char 標記，不進隨機池）
 Object.assign(ARTS, {
-  shutongjian: { name: '疏桐劍', slot: '武器', grade: 3, char: 1, atk: .38, crit: .08, spd: 3 },
-  baiyujian:  { name: '白玉劍', slot: '武器', grade: 4, char: 1, atk: .65, crit: .12, critDmg: .3 },
-  qinghejian: { name: '清禾劍', slot: '武器', grade: 3, char: 1, atk: .4, crit: .1 },
-  guichenjian: { name: '歸塵劍', slot: '武器', grade: 4, char: 1, atk: .5, crit: .08, techXp: .3 },
+  shutongjian: { name: '疏桐劍', slot: '武器', grade: 3, char: 1, legend: 1, atk: .38, crit: .08, spd: 3 },
+  baiyujian:  { name: '白玉劍', slot: '武器', grade: 4, char: 1, legend: 1, atk: .65, crit: .12, critDmg: .3 },
+  qinghejian: { name: '清禾劍', slot: '武器', grade: 3, char: 1, legend: 1, atk: .4, crit: .1 },
+  guichenjian: { name: '歸塵劍', slot: '武器', grade: 4, char: 1, legend: 1, atk: .5, crit: .08, techXp: .3 },
 });
 // 路線專屬法寶：化神時，走哪條路主修就悟出哪一件（path 標記，不進隨機池、只能自己這條路裝備）
 Object.assign(ARTS, {

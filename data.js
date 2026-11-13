@@ -18,7 +18,7 @@ const STAGES = [];
 MAJORS.forEach((m, mi) => m.subs.forEach(sub => STAGES.push({ major: mi, name: m.name + sub })));
 STAGES.forEach((s, i) => { s.need = Math.round(80 * Math.pow(1.72, i)); });
 
-const GRADES = ['', '黃階', '玄階', '地階', '天階'];
+const GRADES = ['', '黃階', '玄階', '地階', '天階', '傳說'];
 
 // ---------- 屬性 ----------
 const FIVE = ['金', '木', '水', '火', '土'];
