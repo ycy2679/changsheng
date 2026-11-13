@@ -1144,8 +1144,9 @@ function autoActs() {
   const xp = XIU_PILLS[stg().major];
   if (autoOn('a_xiu') && s.tox < 30 && s.xiu < need && count(xp)) usePill(xp);
   if (autoOn('a_main')) {
-    const best = Object.keys(s.techs).filter(id => canMain(id)).sort((a, b) => (TECHS[b].rate || 0) - (TECHS[a].rate || 0))[0];
-    if (best && (TECHS[best].rate || 0) > (TECHS[s.tech].rate || 0)) switchTech(best, true);
+    // 比算上層數之後的修煉加成，免得換到一部還沒練過、其實比較慢的功法
+    const best = Object.keys(s.techs).filter(id => canMain(id)).sort((a, b) => effOf(b, 'rate', s) - effOf(a, 'rate', s))[0];
+    if (best && effOf(best, 'rate', s) > effOf(s.tech, 'rate', s)) switchTech(best, true);
   }
   // 隨緣應變：普通事件 30 秒沒選就自動選（人物劇情、前世羈絆不算）
   if (autoOn('a_event') && s.ev && s.ev.ev && (s.ev.w = (s.ev.w || 0) + 1) >= 30) autoChoose();
@@ -1694,7 +1695,8 @@ const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem
 function techCard(id, btns = '', hint = '') {
   const s = L(), t = TECHS[id], l = techLayer(id);
   return `<div class="item"><div class="row"><b>《${t.name}》</b>${gradeTag(t.grade, `${t.custom ? '自創 · ' : ''}${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
-    <div class="small">${effText(t, id) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${hint ? ' · ' + hint : ''}</div>
+    <div class="small">${effText(t, id) || '<span class="muted">沒有特別加成</span>'}</div>
+    ${techAff(t) || hint ? `<div class="small">${[techAff(t).replace(/^ · /, ''), hint].filter(Boolean).join(' · ')}</div>` : ''}
     ${l < 9 ? bar('xiu thin', ((s.techs[id] || 0) - techNeed(id, l)) / (techNeed(id, l + 1) - techNeed(id, l))) : ''}
     ${btns ? `<div class="btnrow">${btns}</div>` : ''}</div>`;   // 按鈕一律放在卡片右下
 }
@@ -1731,7 +1733,12 @@ function setTechView(k, v) { if (k === 'tab') techTab = v; else if (k === 'sort'
 // 好壞標示：吐納比主修快、輔修有空位、比同類輔修高階
 function techHint(id) {
   const s = L(), t = TECHS[id];
-  if (isMainType(t.type) && (t.type !== '鍛體' || canMain(id))) return canMain(id) && (t.rate || 0) > (TECHS[s.tech].rate || 0) ? '<span class="same">比主修快</span>' : '';
+  // 比的是算上層數之後的修煉加成：現在就比主修快，或練到圓滿才會比主修快
+  if (isMainType(t.type) && (t.type !== '鍛體' || canMain(id))) {
+    if (!canMain(id)) return '';
+    const cur = effOf(s.tech, 'rate', s), now = effOf(id, 'rate', s), full = (t.rate || 0) * 2;
+    return now > cur ? '<span class="same">比主修快</span>' : full > cur ? '<span class="muted">練到圓滿後比主修快</span>' : '';
+  }
   if (s.subs.length < maxSubs()) return '<span class="same">輔修有空位</span>';
   const low = s.subs.filter(x => TECHS[x].type === t.type && TECHS[x].grade < t.grade)[0];
   return low ? `<span class="same">比輔修《${TECHS[low].name}》高階</span>` : '';
@@ -2010,7 +2017,7 @@ function renderForge() {
   const ores = MAT_ORE.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const cell = (slot, g) => {
     const n = forgePool(slot, g).length, ok = !f && n && count(MAT_ORE[g]) >= FORGE_ORE[g] && s.stone >= forgeFee(g);
-    return `<div class="item row small"><span><b>${GRADES[g]}${slot}</b> <span class="muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g]}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g))} · ${Math.round(forgeSec(g))} 秒 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `還有 ${n} 種沒拿過` : '這類都有了'}</span></span>
+    return `<div class="item row small"><span><b>${GRADES[g]}${slot}</b> <span class="muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g]}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g))} · ${Math.round(forgeSec(g))} 秒 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '這類都有了'}</span></span>
       <button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g})">開爐</button></div>`;
   };
   return `<h3>煉器術・${FORGE_RANK[lv]}</h3>
@@ -2018,7 +2025,7 @@ function renderForge() {
     <h3>器爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b>${GRADES[f.g]}${f.slot}</b></span><span>還要 <span id="forT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'forB')}</div>` : '<p class="small muted">爐火已熄。選部位和品階開爐，關掉網頁也會照煉。</p>'}
     <p class="small">礦材：${ores}</p>
     ${gradeNav('qi', gs)}${ART_SLOTS.map(slot => cell(slot, craftG('qi', gs))).join('')}
-    <p class="muted small">出爐隨機得到一件這個部位、品階、你還沒有的法寶；品質決定一出爐就有幾重祭煉：下品 0、中品 1、上品 2、極品 3。玄階法寶要築基、地階要金丹、天階要元嬰才煉得出來。失敗礦材會燒掉，地階以上還可能受傷。礦材從遊歷打怪、秘境、坊市櫃台取得。</p>`;
+    <p class="muted small">出爐隨機得到一件這個部位、品階、你這一世身上沒有的法寶；品質決定一出爐就有幾重祭煉：下品 0、中品 1、上品 2、極品 3。玄階法寶要築基、地階要金丹、天階要元嬰才煉得出來。失敗礦材會燒掉，地階以上還可能受傷。礦材從遊歷打怪、秘境、坊市櫃台取得。</p>`;
 }
 // ---------- 百藝・陣法 ----------
 const arrLv = (id, s = L()) => (s.arrays && s.arrays[id]) || 0;
