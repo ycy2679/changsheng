@@ -75,6 +75,8 @@ function load() {
   if (m.arcDone && m.arcDone.bei) { m.story = m.story || {}; m.story.n4 = 1; (m.codex.m = m.codex.m || {}).n4 = 1; }
   if (!m.tips) { m.tips = {}; if (m.lives > 1) TIPS.forEach(x => m.tips[x.id] = 1); else if (!s.mortal && s.root) TIPS.forEach(x => { try { if (['rudao', 'tupo', 'fight', 'event'].includes(x.id) || x.when(s)) m.tips[x.id] = 1; } catch (e) {} }); }
   m.recipes = m.recipes || {}; s.alch = s.alch || 0; s.forge = s.forge || 0; s.arrays = s.arrays || {};
+  if (s.furnace && !s.furnace.qty) s.furnace.qty = 1;   // 開爐數量上線前的存檔：正在煉的那爐當成 1
+  if (s.anvil && !s.anvil.qty) s.anvil.qty = 1;
   if (!s.arrOn) s.arrOn = Object.fromEntries(Object.keys(s.arrays).map(id => [id, true]));   // 舊存檔：原本蓋的都沒超過陣位上限，照常全部算啟用
   codexSync(s);   // 輪迴錄
   if (s.root) pathSkillCheck(s);
@@ -2009,24 +2011,27 @@ const brewNeed = id => ({ id: MAT_HERB[RECIPES[id].g], n: RECIPES[id].n });
 // 爐費：坊市價的三成靈石（藥引、丹火），免得自己煉比買便宜太多
 const brewFee = id => Math.round(itemPrice(id) * .3);
 const brewSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrEff('danshi', s));
-function tryBrew(id, s = L()) {
+const brewMax = (id, s = L()) => s.furnace ? 0 : Math.min(Math.floor(count(brewNeed(id).id) / brewNeed(id).n) || 0, Math.floor(s.stone / brewFee(id)) || 0);
+function tryBrew(id, qty = 1, s = L()) {
   const r = RECIPES[id], nd = brewNeed(id);
-  if (s.furnace || !r || !knowRecipe(id) || count(nd.id) < nd.n || s.stone < brewFee(id)) return false;
-  s.items[nd.id] -= nd.n; s.stone -= brewFee(id);
-  s.furnace = { id, t: brewSec(r.g, s), total: brewSec(r.g, s) };
+  if (s.furnace || !r || !knowRecipe(id) || qty < 1 || count(nd.id) < nd.n * qty || s.stone < brewFee(id) * qty) return false;
+  s.items[nd.id] -= nd.n * qty; s.stone -= brewFee(id) * qty;
+  s.furnace = { id, qty, t: brewSec(r.g, s), total: brewSec(r.g, s) };
   return true;
 }
-function startBrew(id) { if (tryBrew(id)) { log(`開爐煉製${ITEMS[id].name}。`); save(); render(); } }
+function startBrew(id, qty = 1) { if (tryBrew(id, qty)) { log(`開爐煉製${ITEMS[id].name}${qty > 1 ? ` ×${qty} 爐` : ''}。`); save(); render(); } }
 // 出爐：成功看機率；品質決定顆數（下品 1、中品 2、上品 3、極品 4）；失敗材料燒掉，地階以上可能炸爐受傷
 function brewTick(dt, s = L()) {
   for (let n = 0; n < 500 && s.furnace; n++) {   // 爐火不熄：一次長時間（離線）可以連煉好幾爐
     const f = s.furnace; f.t -= dt; if (f.t > 0) return;
     dt = -f.t; brewDone(f, s);
-    if (!(autoOn('a_lu') && tryBrew(f.id, s))) return;
+    f.qty--;
+    if (f.qty > 0) { f.t = f.total; continue; }
+    s.furnace = null;
+    if (!(autoOn('a_lu') && tryBrew(f.id, 1, s))) return;
   }
 }
 function brewDone(f, s) {
-  s.furnace = null;
   const g = RECIPES[f.id].g, nm = ITEMS[f.id].name;
   if (pct(brewChance(f.id, s))) {
     const sc = .5 * alchLv(s) + .5 * eff('pillEff', s) + Math.random() * 2, q = sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0;
@@ -2047,12 +2052,13 @@ const forgeFee = g => Math.round(ART_PRICE[g] * .3);
 const forgePool = (slot, g, s = L()) => Object.keys(ARTS).filter(id => ARTS[id].slot === slot && ARTS[id].grade === g && !ARTS[id].boss && !ARTS[id].sect && !ARTS[id].only && !ARTS[id].path && !ARTS[id].char);
 const forgeGrades = (s = L()) => [1, 2, 3, 4].filter(g => s.stage >= ART_REALM[g]);   // 驅使得動的品階才煉得出來
 const forgeSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrEff('dihuo', s));
-function startForge(slot, g) { if (tryForge(slot, g)) { log(`開爐煉製${GRADES[g]}${slot}。`); save(); render(); } }
-function tryForge(slot, g, s = L()) {
+const forgeMax = (slot, g, s = L()) => s.anvil ? 0 : Math.min(Math.floor(count(MAT_ORE[g]) / FORGE_ORE[g]) || 0, Math.floor(s.stone / forgeFee(g)) || 0);
+function startForge(slot, g, qty = 1) { if (tryForge(slot, g, qty)) { log(`開爐煉製${GRADES[g]}${slot}${qty > 1 ? ` ×${qty} 爐` : ''}。`); save(); render(); } }
+function tryForge(slot, g, qty = 1, s = L()) {
   const ore = MAT_ORE[g];
-  if (s.anvil || !forgeGrades(s).includes(g) || !forgePool(slot, g, s).length || count(ore) < FORGE_ORE[g] || s.stone < forgeFee(g)) return false;
-  s.items[ore] -= FORGE_ORE[g]; s.stone -= forgeFee(g);
-  s.anvil = { slot, g, t: forgeSec(g, s), total: forgeSec(g, s) };
+  if (s.anvil || !forgeGrades(s).includes(g) || !forgePool(slot, g, s).length || qty < 1 || count(ore) < FORGE_ORE[g] * qty || s.stone < forgeFee(g) * qty) return false;
+  s.items[ore] -= FORGE_ORE[g] * qty; s.stone -= forgeFee(g) * qty;
+  s.anvil = { slot, g, qty, t: forgeSec(g, s), total: forgeSec(g, s) };
   return true;
 }
 // 出爐：成功隨機得到一件；品質決定祭煉重數（下品 0、中品 1、上品 2、極品 3）
@@ -2060,11 +2066,13 @@ function forgeTick(dt, s = L()) {
   for (let n = 0; n < 500 && s.anvil; n++) {
     const f = s.anvil; f.t -= dt; if (f.t > 0) return;
     dt = -f.t; forgeDone(f, s);
-    if (!(autoOn('a_lu') && tryForge(f.slot, f.g, s))) return;
+    f.qty--;
+    if (f.qty > 0) { f.t = f.total; continue; }
+    s.anvil = null;
+    if (!(autoOn('a_lu') && tryForge(f.slot, f.g, 1, s))) return;
   }
 }
 function forgeDone(f, s) {
-  s.anvil = null;
   const pool = forgePool(f.slot, f.g, s);
   if (pool.length && pct(forgeChance(f.g, s))) {
     const id = pick(pool), q = (sc => sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0)(.5 * forgeLv(s) + Math.random() * 2);
@@ -2084,10 +2092,10 @@ function renderForge() {
   const s = L(), lv = forgeLv(), xp = s.forge || 0, f = s.anvil, gs = forgeGrades();
   const ores = MAT_ORE.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const cell = (slot, g) => {
-    const n = forgePool(slot, g).filter(id => !(id in s.arts)).length, ok = !f && forgePool(slot, g).length && count(MAT_ORE[g]) >= FORGE_ORE[g] && s.stone >= forgeFee(g);
+    const n = forgePool(slot, g).filter(id => !(id in s.arts)).length, max = forgeMax(slot, g, s), key = 'qi:' + slot + ':' + g, q = getQty(key, Math.max(max, 1)), ok = max >= 1 && forgePool(slot, g).length;
     return `<div class="item"><div class="row"><b>${GRADES[g]}${slot}</b></div>
-      <div class="small muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g]}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g))} · ${Math.round(forgeSec(g))} 秒 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '身上都有了，可以再煉重複的賭品質'}</div>
-      <div class="btnrow"><button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g})">開爐</button></div></div>`;
+      <div class="small muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g] * q}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g) * q)} · ${Math.round(forgeSec(g))} 秒/爐 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '身上都有了，可以再煉重複的賭品質'}</div>
+      <div class="btnrow">${ok ? qtyPicker(key, max) : ''}<button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g}, ${q})">開爐${q > 1 ? `×${q}` : ''}</button></div></div>`;
   };
   return `<h3>煉器術・${FORGE_RANK[lv]}</h3>
     ${lv < 3 ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : '<p class="small same">已是宗師。</p>'}
@@ -2153,6 +2161,13 @@ function renderArrays() {
     <p class="small">材料：${ores}</p>${Object.keys(ARRAYS).map(row).join('')}`;
 }
 let craftTab = 'dan';
+// 開爐數量：+/- 或直接輸入，記住每張丹方／部位品階上次選的數量，上限看材料和靈石夠不夠
+const craftQty = {};
+function getQty(key, max) { const q = Math.max(1, Math.min(max, craftQty[key] || 1)); craftQty[key] = q; return q; }
+function adjQty(key, max, d) { craftQty[key] = Math.max(1, Math.min(max, (craftQty[key] || 1) + d)); render(); }
+function setQty(key, max, v) { craftQty[key] = Math.max(1, Math.min(max, Math.round(+v) || 1)); render(); }
+const qtyPicker = (key, max) => { const q = getQty(key, max);
+  return `<span class="qtyrow"><button class="mini" ${q <= 1 ? 'disabled' : ''} onclick="adjQty('${key}', ${max}, -1)">－</button><input class="qtyinput" type="number" min="1" max="${max}" value="${q}" onchange="setQty('${key}', ${max}, this.value)">×<button class="mini" ${q >= max ? 'disabled' : ''} onclick="adjQty('${key}', ${max}, 1)">＋</button></span>`; };
 // 煉丹、煉器的品階小分頁：沒選過就停在當前境界那一階（沒有就取最高的）
 const craftGrade = {};
 function craftG(k, gs) { if (!gs.includes(craftGrade[k])) craftGrade[k] = gs.includes(matGrade()) ? matGrade() : gs[gs.length - 1]; return craftGrade[k]; }
@@ -2165,11 +2180,11 @@ function renderCraft() {
   const known = Object.keys(RECIPES).filter(knowRecipe), total = Object.keys(RECIPES).length;
   const herbs = MAT_HERB.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
-    const r = RECIPES[id], nd = brewNeed(id), ok = !f && count(nd.id) >= nd.n && s.stone >= brewFee(id);
+    const r = RECIPES[id], nd = brewNeed(id), max = brewMax(id, s), key = 'dan:' + id, q = getQty(key, Math.max(max, 1)), ok = max >= 1;
     return `<div class="item"><div class="row"><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}</div>
       <div class="small">${ITEMS[id].desc}</div>
-      <div class="small muted">${ITEMS[nd.id].name} ×${nd.n}（有 ${count(nd.id)}）＋靈石 ${fmt(brewFee(id))} · ${Math.round(brewSec(r.g))} 秒 · 成功 ${Math.round(brewChance(id) * 100)}%</div>
-      <div class="btnrow"><button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}')">開爐</button></div></div>`;
+      <div class="small muted">${ITEMS[nd.id].name} ×${nd.n * q}（有 ${count(nd.id)}）＋靈石 ${fmt(brewFee(id) * q)} · ${Math.round(brewSec(r.g))} 秒/爐 · 成功 ${Math.round(brewChance(id) * 100)}%</div>
+      <div class="btnrow">${max >= 1 ? qtyPicker(key, max) : ''}<button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}', ${q})">開爐${q > 1 ? `×${q}` : ''}</button></div></div>`;
   };
   if (craftTab === 'qi') return craftNav() + renderForge();
   if (craftTab === 'zhen') return craftNav() + renderArrays();
