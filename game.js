@@ -667,7 +667,15 @@ function addPill(n) { const m = stg().major, id = BRK_PILLS[m] || XIU_PILLS[m]; 
 function addHeal(n) { addItem('heal', n); }
 function addXiuPill(n) { const id = XIU_PILLS[stg().major]; addItem(id, n); return ITEMS[id].name; }
 // 主修功法精進，sec 相當於修煉幾秒的進度
-function addTechXp(sec) { const s = L(); s.techs[s.tech] += sec; return TECHS[s.tech].name; }
+// 增加功法進度（事件、悟道丹）：主修沒圓滿就給主修；圓滿了就平分給還沒圓滿的輔修。回傳得到進度的功法名（給事件文字用）
+function addTechXp(sec) {
+  const s = L();
+  if (techLayer(s.tech, s) < 9) { s.techs[s.tech] += sec; return TECHS[s.tech].name; }
+  const subs = s.subs.filter(x => techLayer(x, s) < 9);
+  if (!subs.length) return TECHS[s.tech].name;
+  for (const x of subs) s.techs[x] += sec / subs.length;
+  return subs.map(x => TECHS[x].name).join('》《');
+}
 function addLife(n) { L().lifeBonus += n; }
 function injure(sec) { const s = L(); s.injury = Math.max(s.injury, sec * (1 - .25 * tl('liaoshang'))); }
 function learnTech(id) { const s = L(); if (!(id in s.techs)) s.techs[id] = 0; codexAdd('t', id); }
@@ -1346,7 +1354,7 @@ function usePill(id) {
   } else if (it.kind === 'life') { const n = Math.round(15 * pe * tf); s.lifeBonus += n; addTox(30); msg = `服下延壽丹，壽元 +${n}。`; }
   else if (it.kind === 'body') { s.body += .03 * tf; if (!tl('xisuiwudu')) addTox(30); msg = '服下洗髓丹，筋骨一陣劇痛，氣血、攻擊、防禦永久提升。'; }
   else if (it.kind === 'dan') { msg = useDan(id, it, addTox); if (!msg) return; }
-  else if (it.kind === 'tech') { s.techs[s.tech] += 600 * pe; msg = `服下悟道丹，對《${TECHS[s.tech].name}》的領悟更深一層。`; }
+  else if (it.kind === 'tech') { msg = `服下悟道丹，對《${addTechXp(600 * pe)}》的領悟更深一層。`; }
   else return;
   s.items[id]--; S.meta.pills++; log(msg); save(); render();
 }
@@ -1686,8 +1694,9 @@ const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem
 function techCard(id, btns = '', hint = '') {
   const s = L(), t = TECHS[id], l = techLayer(id);
   return `<div class="item"><div class="row"><b>《${t.name}》</b>${gradeTag(t.grade, `${t.custom ? '自創 · ' : ''}${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
-    <div class="row small"><span>${effText(t, id) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${hint ? ' · ' + hint : ''}</span><span>${btns}</span></div>
-    ${l < 9 ? bar('xiu thin', ((s.techs[id] || 0) - techNeed(id, l)) / (techNeed(id, l + 1) - techNeed(id, l))) : ''}</div>`;
+    <div class="small">${effText(t, id) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${hint ? ' · ' + hint : ''}</div>
+    ${l < 9 ? bar('xiu thin', ((s.techs[id] || 0) - techNeed(id, l)) / (techNeed(id, l + 1) - techNeed(id, l))) : ''}
+    ${btns ? `<div class="btnrow">${btns}</div>` : ''}</div>`;   // 按鈕一律放在卡片右下
 }
 // ---------- 修行分頁：底下分「根骨」「功法」兩頁 ----------
 let cultTab = 'gong';

@@ -41,7 +41,7 @@ const EVENTS = [
     { t: '應戰', run(s) { if (battle('宗門弟子', s.stage + 1, 1.05)) { for (const id of s.equip) s.skills[id] += 5; return '他捂著胸口認輸。這一戰讓你的術法熟練了不少。'; } return '你輸了。他扔下一句「散修不過如此」便走了。'; } },
     { t: '不接', run() { return '他嗤笑一聲。'; } }] },
   { id: 'elder', once: true, min: 1, title: '溪邊老者', text: '溪邊一個釣魚的老人叫住你，說你的吐納「有三處不對」。', choices: [
-    { t: '恭敬請教', run(s) { s.techs[s.tech] += 900; return `老人講了一個下午，你對《${TECHS[s.tech].name}》的領悟大進。回頭再看，溪邊已經沒有人。`; } },
+    { t: '恭敬請教', run(s) { return `老人講了一個下午，你對《${addTechXp(900)}》的領悟大進。回頭再看，溪邊已經沒有人。`; } },
     { t: '不以為然', run() { return '老人搖搖頭，繼續釣他的魚。'; } }] },
   { id: 'lingzhi', repeat: true, title: '妖獸守藥', text: '崖下長著一株年份極老的靈芝，旁邊盤著一頭正在打盹的妖獸。', choices: [
     { t: '搶', run() { if (battle('守藥妖獸', placeLv() + 1, 1.1)) { return `你採下靈芝，煉成兩顆${addPill(2)}。`; } return '妖獸醒了。你空手而回，還添了一身傷。'; } },

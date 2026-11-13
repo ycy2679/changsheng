@@ -254,7 +254,7 @@ const ITEMS = {
   yinjie:   { name: '引劫丹', kind: 'brk', major: 7, desc: '大乘後期突破渡劫時自動服用。' },
   yanshou:  { name: '延壽丹', kind: 'life', desc: '壽元 +15 年，有丹毒。' },
   xisui:    { name: '洗髓丹', kind: 'body', desc: '這一世氣血、攻擊、防禦永久 +3%，有丹毒。' },
-  wudao:    { name: '悟道丹', kind: 'tech', desc: '主修功法立刻精進 10 分鐘的進度。' },
+  wudao:    { name: '悟道丹', kind: 'tech', desc: '主修功法立刻精進 10 分鐘的進度（主修圓滿了就平分給輔修）。' },
   // 天材地寶（major 是從哪個大境界往上衝時用）：衝大境界時自動使用，沒有它品質最多上品
   xuanhuang: { name: '玄黃地乳', kind: 'tc', major: 0, desc: '地脈深處凝出的靈乳。突破築基時自動使用，才有機會成就無瑕道基。' },
   chiyang:   { name: '赤陽丹砂', kind: 'tc', major: 1, desc: '至陽之地千年才結一粒。突破金丹時自動使用，才有機會結成九竅金丹。' },
