@@ -230,6 +230,12 @@ const SKILLS = {
   bingxin:  K('冰心返照', 3, '冰', 'mana', 2, 5),
   guiyi:    K('萬氣歸一', 4, '無', 'mana', 2.6, 5),
 };
+// 秘境頭目專屬術法
+Object.assign(SKILLS, {
+  huoxitu:  K('火蜥吐焰', 3, '火', 'dmg', 3, 4, { burn: .5, boss: 1 }),
+  dianqian: K('殿前雷印', 4, '雷', 'dmg', 5, 5, { stun: .4, boss: 1 }),
+  longxi:   K('龍息冰封', 4, '冰', 'dmg', 4.5, 5, { freeze: .6, boss: 1 }),
+});
 const KIND_LABEL = { dmg: '攻擊', multi: '連擊', heal: '回復', shield: '護盾', dodge: '身法', charge: '蓄力', buff: '增益', mana: '回法' };
 const MASTERY = ['入門', '小成', '大成', '圓滿'];
 const MASTERY_USES = [0, 40, 150, 400];
@@ -297,6 +303,14 @@ const ARTS = {
   jieyin:    { name: '接引燈', slot: '飾品', grade: 3, brk: .04, mp: .3, rate: .1 },
   hunyuanzhu: { name: '混元珠', slot: '飾品', grade: 4, atk: .2, hp: .2, mp: .3, def: .2 },
 };
+// 秘境頭目專屬法寶（boss 標記：只有打敗那個頭目才會掉）
+Object.assign(ARTS, {
+  tengxin:   { name: '藤心環', slot: '飾品', grade: 2, boss: 1, regen: .02, hp: .1 },
+  jiaolin:   { name: '蛟鱗甲', slot: '護甲', grade: 3, boss: 1, def: .4, hp: .25, regen: .015 },
+  michengyao: { name: '迷城鑰', slot: '飾品', grade: 4, boss: 1, rate: .2, drop: .4, stone: .3, evRate: .2 },
+  wanjianxia: { name: '萬劍匣', slot: '武器', grade: 4, boss: 1, atk: .75, crit: .15, critDmg: .4 },
+  jiehuoxin: { name: '劫火心', slot: '飾品', grade: 4, boss: 1, hp: .3, atk: .3, def: .2, brk: .08 },
+});
 const ART_PRICE = [0, 250, 3000, 30000, 180000];
 const ART_MAX_REFINE = 9;
 

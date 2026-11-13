@@ -642,7 +642,8 @@ function codexSync(s = L()) {
   for (const id of s.shen || []) codexAdd('s', id);
   if (s.phys) codexAdd('p', s.phys);
   if (s.root) { codexAdd('r', s.root.type); s.root.elems.forEach(e => codexAdd('el', e)); }
-  for (const k in s.flags || {}) if (k.startsWith('ev_')) codexAdd('v', k.slice(3));
+  const sn = S.meta.evSeen = S.meta.evSeen || {};
+  for (const k in s.flags || {}) if (k.startsWith('ev_')) { codexAdd('v', k.slice(3)); if (!sn[k.slice(3)]) sn[k.slice(3)] = S.meta.lives; }
   codexPay();
 }
 // 輪迴錄分頁：第一排選類別，功法、術法、法寶再分第二排；有品階的照天地玄黃分段排成格子
@@ -681,7 +682,7 @@ function renderCodex() {
 }
 function randomUnowned(kind, grades) {
   const s = L(), pool = { tech: TECHS, skill: SKILLS, art: ARTS }[kind], owned = { tech: s.techs, skill: s.skills, art: s.arts }[kind];
-  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying');
+  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss);
   return ids.length ? pick(ids) : null;
 }
 function tryDrop(p) {
@@ -810,6 +811,63 @@ function fight(foe) {
     mp = Math.min(p.mp, mp + p.mp * mpRegen);
   }
   return { win: ehp <= 0, fled, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), shen: shUsed.join('、'), pill, hp: Math.max(0, php) / p.hp, mp: mp / p.mp };
+}
+// ---------- 秘境：每個大境界一座，三層（兩層精英、一層頭目），連戰不回血；有冷卻，戰敗重傷退出 ----------
+const SECRETS = [
+  { id: 'yaogu',   mj: 1, name: '荒古藥谷', elem: '木', elites: ['毒藤傀儡', '藥谷守衛'], boss: '千年藤妖', uniq: ['art', 'tengxin'], desc: '谷裡的藥草長了一萬年，守谷的藤妖也活了一萬年。' },
+  { id: 'huoku',   mj: 2, name: '赤焰火窟', elem: '火', elites: ['熔岩蟲群', '火窟獄卒'], boss: '焰甲火蜥', uniq: ['skill', 'huoxitu'], desc: '地火從石縫裡噴出來，空氣燙得能烤熟人。' },
+  { id: 'shuifu',  mj: 3, name: '沉淵水府', elem: '水', elites: ['水府蝦兵', '沉淵巡海夜叉'], boss: '沉淵蛟王', uniq: ['art', 'jiaolin'], desc: '一座沉在深淵裡的古水府，蛟王在裡面睡了三千年。' },
+  { id: 'leidian', mj: 4, name: '雷鳴古殿', elem: '雷', elites: ['雷殿傀儡', '持戟雷將'], boss: '雷殿守將', uniq: ['skill', 'dianqian'], desc: '殿裡沒有人，雷聲卻從來沒停過。' },
+  { id: 'micheng', mj: 5, name: '虛空迷城', elem: '無', elites: ['迷城幻影', '無面守衛'], boss: '迷城之主', uniq: ['art', 'michengyao'], desc: '一座漂在虛空裡的城，進去的人很少走得出來。' },
+  { id: 'jianfen', mj: 6, name: '萬劍墳', elem: '金', elites: ['殘劍劍靈', '斷劍劍奴'], boss: '劍塚老魔', uniq: ['art', 'wanjianxia'], desc: '上萬把劍插在地上，每一把都曾經有主人。' },
+  { id: 'bingyuan', mj: 7, name: '寒天冰淵', elem: '冰', elites: ['冰魄行屍', '寒淵冰魔'], boss: '冰淵古龍', uniq: ['skill', 'longxi'], desc: '冰淵底下封著一條龍，龍還沒死。' },
+  { id: 'jiexu',   mj: 8, name: '劫火天墟', elem: '火', elites: ['劫灰', '劫火遊魂'], boss: '劫火化身', uniq: ['art', 'jiehuoxin'], desc: '歷代渡劫失敗的修士，劫火都燒到了這裡。' },
+];
+const SECRET_CD = 30;   // 冷卻（遊戲年）
+// 各秘境的難度倍率：前期角色弱、後期角色強，所以前低後高
+const SECRET_SCALE = [0, .8, .85, .9, 1.2, 1.4, 1.6, 1.85, 2.1];
+const secretOpen = (x, s = L()) => stg(s).major >= x.mj;
+const secretWait = (x, s = L()) => { const t = s.flags['sj_' + x.id]; return t === undefined ? 0 : Math.max(0, Math.ceil(t + SECRET_CD - s.age)); };
+// 第 floor 層（0、1 精英，2 頭目）的強度
+function secretFoe(x, floor, s = L()) {
+  const lv = s.stage + 1 + floor, mult = [1.1, 1.2, 1.4][floor] * SECRET_SCALE[x.mj], k = 1 + .5 * (lv - 1), hpX = floor === 2 ? 1.8 : 1;
+  return { hp: 115 * k * mult * hpX, atk: 11.5 * k * mult, def: 4.5 * k * mult, spd: 10 + 2 * (lv - 1), elem: x.elem };
+}
+let showSecret = false;
+function toggleSecret() { showSecret = !showSecret; render(); }
+function enterSecret(id) {
+  const s = L(), x = SECRETS.find(q => q.id === id);
+  if (!x || !secretOpen(x) || secretWait(x) || s.injury > 0) return;
+  s.flags['sj_' + id] = s.age;
+  const names = [...x.elites, x.boss];
+  for (let f = 0; f < 3; f++) {
+    const res = fight(secretFoe(x, f));
+    s.hpNow = res.hp; s.mpNow = res.mp;
+    if (!res.win) {
+      injure(res.fled ? 200 : 600);
+      log(`【${x.name}】${f === 2 ? '頭目' : `第 ${f + 1} 層的`}${names[f]}太強，你${res.fled ? '遁走' : '重傷'}退出了秘境（${res.rounds} 回合）。`);
+      save(); render(); return;
+    }
+    log(`【${x.name}】擊敗${names[f]}（${res.rounds} 回合，剩氣血 ${Math.round(res.hp * 100)}%）。`);
+  }
+  // 頭目獎勵：天材地寶、高階寶物、靈石丹藥，第一次通關必掉專屬，之後四分之一
+  const lv = s.stage + 3, gr = x.mj >= 4 ? [4] : [3, 4], got = [];
+  const tc = x.mj === stg().major ? addTc() : ''; if (tc) got.push(tc);   // 天材地寶只有當前境界的秘境才給，免得低階秘境被反覆刷
+  got.push(pick([giftArt, giftTech, giftSkill])(gr));
+  got.push(`靈石 ${addStone(stoneUnit(lv) * 30)}`, `${addPill(2)} 2 顆`);
+  const first = !s.flags['sjc_' + id]; s.flags['sjc_' + id] = 1;
+  const [kind, uid] = x.uniq, owned = kind === 'art' ? uid in s.arts : uid in s.skills;
+  if (!owned && (first || Math.random() < .25)) { if (kind === 'art') gainArt(uid); else learnSkill(uid); got.push(`頭目專屬「${(kind === 'art' ? ARTS : SKILLS)[uid].name}」`); }
+  log(`【${x.name}】你斬了${x.boss}！得到：${got.join('、')}。`);
+  save(); render();
+}
+function renderSecret() {
+  const s = L();
+  return `<section class="panel card"><div class="row"><b>秘境</b><button class="mini" onclick="toggleSecret()">收起</button></div>
+    <p class="small muted">三層連戰，中間氣血、法力不回滿。前兩層是精英，第三層是頭目；打敗頭目必得高階寶物（闖的是當前境界的秘境，還會得到天材地寶），第一次通關還有頭目專屬掉落。戰敗會重傷退出，不會身死。每座秘境闖完要等 ${SECRET_CD} 年。</p>
+    ${SECRETS.map(x => { const open = secretOpen(x), w = open ? secretWait(x) : 0;
+      return `<div class="item"><div class="row"><b>${x.name}</b><span class="small muted">${MAJORS[x.mj].name}以上 · 頭目：${x.boss}${s.flags['sjc_' + x.id] ? ' · 已通關' : ''}</span></div>
+        <div class="row small"><span class="muted">${x.desc}</span><span>${!open ? `<span class="muted">需${MAJORS[x.mj].name}</span>` : w ? `<span class="muted">還要 ${w} 年</span>` : s.injury > 0 ? '<span class="hurt">傷勢未癒</span>' : `<button class="mini" onclick="enterSecret('${x.id}')">闖秘境</button>`}</span></div></div>`; }).join('')}</section>`;
 }
 // lv：敵人相當於第幾個小境界（1 起算），mult：強度倍率，elem：敵人屬性
 function battle(name, lv, mult = 1, loot = false, elem = '無') {
@@ -968,7 +1026,10 @@ function curEvent() {
   if (r.arc) return { ...ARCS[r.arc].steps[arc(r.arc).step], who: ARCS[r.arc].name };
   if (r.mem) { const e = MEMORIES.find(x => x.id === r.mem); return { ...e, who: ARCS[e.bond].name }; }
   if (r.story) return { ...STORY.find(x => x.id === r.story), who: '主線' };
-  return EVENTS.find(x => x.id === r.ev);
+  const e = EVENTS.find(x => x.id === r.ev);
+  // 前世遇過、這一世還沒遇過：換成第二個版本
+  const seen = (S.meta.evSeen || {})[r.ev];
+  return EVENT_ALTS[r.ev] && seen && seen < S.meta.lives ? { ...e, ...EVENT_ALTS[r.ev] } : e;
 }
 const val = (v, s) => typeof v === 'function' ? v(s) : v;
 const visible = e => e.choices.filter(c => !c.cond || c.cond(L()));
@@ -976,7 +1037,7 @@ function choose(i) {
   const s = L(), e = curEvent(); if (!e) return;
   const ch = visible(e)[i]; if (!ch) return;
   const ref = s.ev; s.ev = null;
-  if (ref.ev) codexAdd('v', ref.ev);
+  if (ref.ev) { codexAdd('v', ref.ev); const sn = S.meta.evSeen = S.meta.evSeen || {}; if (!sn[ref.ev]) sn[ref.ev] = S.meta.lives; }
   if (ref.ev === 'tiancai') s.flags['tc_' + stg().major] = 1;   // 天材地寶現世：這個大境界的機會用掉了
   if (ref.ev) { s.flags['ev_' + ref.ev] = s.age; s.flags['evn_' + ref.ev] = (s.flags['evn_' + ref.ev] || 0) + 1; }   // 年齡和次數，給重複冷卻用
   if (ref.mem) S.meta.memSeen[ref.mem] = 1;
@@ -1140,7 +1201,7 @@ function restock() {
   const kinds = { tech: [TECHS, s.techs, TECH_PRICE], skill: [SKILLS, s.skills, SKILL_PRICE], art: [ARTS, s.arts, ART_PRICE] };
   for (const k in kinds) {
     const [pool, owned, prices] = kinds[k];
-    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !slots.some(x => x.id === id));
+    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !slots.some(x => x.id === id));
     for (let i = 0; i < per; i++) {
       // 第一格保證玄階以上（玄階還沒解鎖就照常抽）
       const low = tj && grades.some(g => g >= 3) ? 3 : 2;   // 天機丹：保證地階以上
@@ -1366,6 +1427,7 @@ function render() {
       <div class="btns">
         <button class="${s.mode === 'closed' ? 'on' : ''}" onclick="setMode('closed')">閉關</button>
         <button class="${s.mode === 'travel' ? 'on' : ''}" onclick="setMode('travel')">遊歷</button>
+        <button class="${showSecret ? 'on' : ''}" onclick="toggleSecret()" ${stg().major >= 1 ? '' : 'disabled'}>秘境</button>
         <select onchange="setPlace(this.value)" ${s.mode === 'travel' ? '' : 'disabled'}>
           ${PLACES.filter(p => s.stage >= p.min).map(p => `<option value="${p.id}" ${p.id === s.place ? 'selected' : ''}>${p.name}</option>`).join('')}
         </select>
@@ -1375,6 +1437,7 @@ function render() {
       <ul class="recent" id="recent"></ul>
     </section>
     ${s.offline ? renderOffline() : ''}
+    ${showSecret ? renderSecret() : ''}
     ${s.ev ? renderEvent() : ''}
     <nav>${TABS.map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" onclick="setTab('${k}')">${n}</button>`).join('')}</nav>
     <section class="panel">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, shop: renderShop, log: renderLog, dao: renderDao })[tab]()}</section>`;
@@ -1735,11 +1798,13 @@ let treeTab = TALENT_BRANCHES[0];   // 悟道樹目前顯示的分類
 function setTreeTab(b) { treeTab = b; render(); }
 function toggleAuto(id) { S.meta.auto[id] = !autoOn(id); save(); render(); }
 function setAutoMajor(v) { S.meta.autoMajor = +v; save(); }
+// 天賦在樹上的深度：沒有前置是 0，否則是前置裡最深的 +1（顯示時由淺到深排）
+const talDepth = t => t.req.length ? 1 + Math.max(...t.req.map(r => talDepth(TAL[r]))) : 0;
 function renderTree() {
   const m = S.meta;
   const node = t => {
     const lv = tl(t.id), full = lv >= t.max, ok = reqOk(t), condOk = !t.cond || t.cond(m), cost = talentCost(t, lv);
-    const action = !ok ? `<span class="muted">需要：${t.req.map(r => TAL[r].name).join('、')}</span>`
+    const action = !ok ? '<span class="muted">先點前置</span>'
       : !condOk ? `<span class="muted">解鎖條件：${t.condText}</span>`
       : full ? '<span class="same">已點滿</span>'
       : `<button class="mini" ${m.guo >= cost ? '' : 'disabled'} onclick="buyTalent('${t.id}')">${cost} 道果</button>`;
@@ -1748,12 +1813,18 @@ function renderTree() {
     return `<div class="node ${lv ? 'got' : ''} ${ok && condOk ? '' : 'locked'}">
       <div class="row"><b>${t.name}</b><span class="small muted">${lv}/${t.max}</span></div>
       <div class="small">${t.d(Math.max(1, lv))}${lv && !full ? `<span class="muted"> → ${t.d(lv + 1)}</span>` : ''}</div>
+      ${t.req.length ? `<div class="small ${ok ? 'muted' : 'hurt'}">前置：${t.req.map(r => TAL[r].name).join('、')}</div>` : ''}
+      ${next(t).length ? `<div class="small muted">通往：${next(t).map(x => x.name).join('、')}</div>` : ''}
       <div class="row small">${action}<span>${thr}${auto}</span></div></div>`;
   };
+  // 這個天賦是哪些天賦的前置
+  const next = t => TALENTS.filter(x => x.req.includes(t.id));
+  const list = TALENTS.filter(t => t.branch === treeTab), maxD = Math.max(...list.map(talDepth));
+  const tiers = Array.from({ length: maxD + 1 }, (_, d) => list.filter(t => talDepth(t) === d));
   return `<div class="row"><h3>悟道樹</h3><span>道果 <b>${m.guo}</b></span></div>
     <p class="muted small">每一世結束時，依到過的最高境界得到道心和道果。道心自動生效，道果用來點天賦，天賦永久保留。</p>
     <nav>${TALENT_BRANCHES.map(b => `<button class="${treeTab === b ? 'on' : ''}" onclick="setTreeTab('${b}')">${b}</button>`).join('')}</nav>
-    <div class="tal">${TALENTS.filter(t => t.branch === treeTab).map(node).join('')}</div>`;
+    ${tiers.map((row, d) => `<div class="small muted" style="margin:10px 0 4px">第 ${d + 1} 層${d ? '' : '（不用前置）'}</div><div class="tal">${row.map(node).join('')}</div>`).join('')}`;
 }
 
 // ---------- 啟動 ----------

@@ -249,3 +249,311 @@ EVENTS.push(
     { t: () => `跟老修士換（靈石 ${fmt(ESSENCE_PRICE * .6)}）`, cond: s => s.stone >= ESSENCE_PRICE * .6, run(s) { s.stone -= ESSENCE_PRICE * .6; return `老修士收下靈石，替你取出了${addEssence()}。`; } },
     { t: '不碰地脈', run() { return '老修士朝你點了點頭。'; } }] },
 );
+
+// ---------- 第三批遊歷事件：補中後期（築基～渡劫），每個大境界至少 10 個 ----------
+// x 開頭的 id；min 是小境界編號：築基 9、金丹 12、元嬰 15、化神 18、煉虛 21、合體 24、大乘 27、渡劫 30
+const pay = n => Math.max(0, Math.min(L().stone, Math.round(n)));   // 付得起多少就付多少
+EVENTS.push(
+  // ---------- 築基 ----------
+  { id: 'x_lingtian', min: 9, title: '租靈田', text: '一個駝背的老修士說他年紀大了，想把半畝靈田租出去，租金只要一點靈石。', choices: [
+    { t: '租下來種一季', run(s) { s.stone -= pay(stoneUnit() * 3); return `你照著老人教的法子種了一季靈穀，吃下去修為 +${fmt(addXiu(.3))}。`; } },
+    { t: '婉拒', run() { return '老人點點頭，又去問下一個路人。'; } }] },
+  { id: 'x_shoumu', min: 9, title: '守墳的啞巴', text: '荒山上一座沒有碑的墳，旁邊坐著一個啞巴少年，看樣子守了很多年。', choices: [
+    { t: '幫他把墳修好', run(s) { s.brkBonus += .03; return '少年一句話也說不出，只是朝你磕了三個頭。你心裡平靜了許多，下次突破成功率 +3%。'; } },
+    { t: '比手畫腳問墳裡是誰', run() { return `少年從墳後挖出一個油布包，塞進你手裡。裡面是${giftTech([2])}。`; } }] },
+  { id: 'x_yaoshi', min: 9, title: '藥市爭草', text: '兩個藥商為了一株三百年的靈草吵得面紅耳赤，硬要你來評理。', choices: [
+    { t: '判給先看到的那個', run() { return `贏的人塞了一袋靈石給你，靈石 ${addStone(stoneUnit() * 3)}。`; } },
+    { t: '自己出錢買下', run(s) { s.stone -= pay(stoneUnit() * 4); return `兩人都閉了嘴。你把靈草煉成兩顆${addPill(2)}。`; } }] },
+  { id: 'x_lieyao', repeat: true, min: 9, title: '獵妖令', text: '坊市貼出獵妖令：有妖獸在附近傷人，賞金不少。', choices: [
+    { t: '揭令', run() { if (battle('傷人的妖獸', placeLv() + 1, 1.05)) return `你帶回妖獸的頭顱，領到賞金靈石 ${addStone(stoneUnit() * 5)}。`; return '妖獸比告示上寫的凶得多，你負傷而回。'; } },
+    { t: '不管', run() { return '幾天後，告示被撕了。'; } }] },
+
+  // ---------- 金丹 ----------
+  { id: 'x_jiedanyan', min: 12, title: '結丹宴', text: '一位舊識結丹成功，大擺宴席，派人送來請帖。', choices: [
+    { t: '帶份禮去赴宴', run(s) { s.stone -= pay(stoneUnit() * 3); return `宴上有人以術法助興，你看了一夜，學會了${giftSkill([2, 3])}。`; } },
+    { t: '託人送禮，人不去', run(s) { s.brkBonus += .03; return '你獨自閉關，聽著遠處的鼓樂聲，心境反而更穩了。下次突破成功率 +3%。'; } }] },
+  { id: 'x_keqing', min: 12, title: '客卿之請', text: '一個中等宗門的長老親自登門，想請你當宗門客卿，每年有一筆供奉。', choices: [
+    { t: '答應', run() { return `你掛了個客卿的名頭，宗門先送來一年的供奉：靈石 ${addStone(stoneUnit() * 12)}。`; } },
+    { t: '婉拒，散修自在', run() { return `長老惋惜地走了。你把省下的心思放在修煉上，對《${addTechXp(1500)}》的體悟更深了。`; } }] },
+  { id: 'x_danhen', min: 12, title: '金丹裂紋', text: '閉關內視時，你發現金丹表面多了一道細如髮絲的裂紋。', choices: [
+    { t: '花靈石慢慢溫養', run(s) { s.stone -= pay(stoneUnit() * 6); addFound(stg().need * .3); return '你用靈石布下聚靈陣溫養了三個月，裂紋不見了，金丹反而更凝實，根基 +10%。'; } },
+    { t: '硬壓下去', run(s) { injure(120); s.brkBonus += .06; return '你咬牙以法力強行彌合裂紋，痛得幾乎昏死。傷好之後，金丹堅固了不少，下次突破成功率 +6%。'; } }] },
+  { id: 'x_baishi', min: 12, title: '跪在洞府外的孩子', text: '一個孩子在你洞府外跪了三天三夜，說要拜你為師。', choices: [
+    { t: '收下他', run() { return `教人也是修行。你把所學從頭梳理了一遍，對《${addTechXp(1200)}》的理解更透徹了。`; } },
+    { t: '指點他去別的宗門', run() { return `你寫了封薦書。孩子走前留下家傳的一卷殘譜：${giftSkill([2])}。`; } }] },
+  { id: 'x_heishi', min: 12, title: '地下黑市', text: '有人引你進了一處地下黑市，攤子上擺著來路不明的功法玉簡。', choices: [
+    { t: '買一卷', run(s) { s.stone -= pay(stoneUnit() * 8); return `你挑了一卷看起來最正經的：${giftTech([2, 3])}。`; } },
+    { t: '轉身向執法堂舉報', run() { return `黑市被抄了，執法堂發給你一筆賞金：靈石 ${addStone(stoneUnit() * 6)}。`; } }] },
+  { id: 'x_huaxing', min: 12, title: '求護法的妖狐', text: '一隻快要化形的妖狐攔住你，求你在牠化形時替牠護法，說會報答你。', choices: [
+    { t: '替牠護法', run() { if (battle('趁機來搶的妖修', placeLv() + 2, 1.1)) return `妖狐化成了人形，送你一件從古墓裡叼出來的寶物：${giftArt([2, 3])}。`; return '來搶的妖修太多，你和妖狐都受了傷，化形失敗了。'; } },
+    { t: '趁牠虛弱取走妖丹', run(s) { s.brkBonus -= .05; return `妖丹賣了靈石 ${addStone(stoneUnit() * 15)}。但那雙眼睛一直在你夢裡，下次突破成功率 -5%。`; } }] },
+  { id: 'x_hushang', repeat: true, min: 12, title: '護送商隊', text: '一支商隊要穿過妖獸出沒的山谷，願意出高價請人護送。', choices: [
+    { t: '接下這單', run() { if (battle('劫道的妖群', placeLv() + 1, 1.05)) return `商隊平安出谷，掌櫃付了靈石 ${addStone(stoneUnit() * 6)}。`; return '妖群太多，商隊折了幾車貨，你也掛了彩。'; } },
+    { t: '不接', run() { return '商隊另請了別人。'; } }] },
+
+  // ---------- 元嬰 ----------
+  { id: 'x_chuqiao', min: 15, title: '元嬰出竅', text: '你第一次讓元嬰離體出竅，神遊天外，天地看起來和肉眼所見完全不同。', choices: [
+    { t: '遊遍千里', run() { return `元嬰在雲間看見一處隱秘的靈脈，回來後你取了一些：靈石 ${addStone(stoneUnit() * 8)}，修為 +${fmt(addXiu(.2))}。`; } },
+    { t: '只在洞府附近轉一圈', run(s) { s.brkBonus += .04; return '你謹慎地收回元嬰，對元神的掌控更熟練了。下次突破成功率 +4%。'; } }] },
+  { id: 'x_duoshe', min: 15, title: '奪舍的殘魂', text: '一縷不知活了多久的殘魂趁你打坐時鑽進識海，想要奪舍。', choices: [
+    { t: '在識海裡跟它拚了', run() { if (battle('奪舍的殘魂', L().stage + 2, 1.1)) return `你把殘魂煉化了，它的記憶碎片裡有一門術法：${giftSkill([3])}。`; injure(200); return '殘魂沒能得逞，但你的識海被攪得一團亂，很久才恢復。'; } },
+    { t: '用丹藥穩住心神，慢慢磨', run() { injure(90); return `你花了一個月才把它磨滅，對《${addTechXp(2000)}》的修煉卻因此精進了。`; } }] },
+  { id: 'x_guwang', min: 15, title: '古王墓', text: '凡間一座古王墓塌了一角，裡面隱隱有修士陪葬的法寶光芒。', choices: [
+    { t: '下去看看', run() { if (Math.random() < .7) return `墓裡機關早已失效，你取走了${giftArt([3])}。`; injure(150); return '墓道裡還有沒散的禁制，你被打了出來。'; } },
+    { t: '不擾亡者', run(s) { s.brkBonus += .03; return '你替古王把塌口封了回去。下次突破成功率 +3%。'; } }] },
+  { id: 'x_lunjian', min: 15, title: '論劍台', text: '幾位元嬰修士在山巔論劍，看見你，邀你上台過幾招。', choices: [
+    { t: '上台', run(s) { if (battle('論劍的元嬰修士', s.stage + 1, 1.05)) { for (const id of s.equip) s.skills[id] += 20; return '你贏了一場，台下一片喝彩。出招中的術法熟練度各 +20。'; } return '你輸了，但輸得心服口服。'; } },
+    { t: '在台下看', run() { return `你看了三天，對《${addTechXp(1500)}》多了幾分體悟。`; } }] },
+  { id: 'x_linglin', min: 15, title: '百年靈霖', text: '天上下起了一場帶著靈氣的雨，據說百年才有一次。', choices: [
+    { t: '在雨中打坐', run() { return `雨水洗過經脈，修為 +${fmt(addXiu(.5))}。`; } },
+    { t: '收集雨水煉丹', run() { return `你接了滿滿幾缸，煉出三顆${addXiuPill(3)}。`; } }] },
+  { id: 'x_jiuchou', min: 15, title: '舊仇', text: '一個早年被你壞了好事的修士，如今也修到元嬰，帶著人找上門來。', choices: [
+    { t: '一戰了結', run(s) { if (battle('尋仇的元嬰修士', s.stage + 1, 1.1)) return `你打退了他，他的儲物袋裡有靈石 ${addStone(stoneUnit() * 8)}。`; return '你負傷退走，這筆帳只能以後再算。'; } },
+    { t: '賠一筆靈石了事', run(s) { const n = pay(s.stone * .2); s.stone -= n; return `你賠了靈石 ${n}，對方冷哼一聲走了。`; } }] },
+
+  // ---------- 化神 ----------
+  { id: 'x_fazesui', min: 18, title: '法則碎片', text: '天邊裂開一道縫，掉下一縷閃著微光的東西，是天地法則的碎片。', choices: [
+    { t: '坐下來參悟', run() { return `你在裂縫下坐了三年，對《${addTechXp(4000)}》的領悟大進。`; } },
+    { t: '封進玉瓶賣掉', run() { return `識貨的老怪出了高價：靈石 ${addStone(stoneUnit() * 15)}。`; } }] },
+  { id: 'x_shenshi', min: 18, title: '神識交鋒', text: '兩位化神修士正以神識隔空交鋒，餘波把方圓百里的鳥獸都震暈了，你也被捲了進去。', choices: [
+    { t: '強行介入', run(s) { if (battle('化神修士的神識', s.stage + 2, 1.1)) return `兩人都停了手，其中一個認你做了朋友，送你${giftSkill([3, 4])}。`; injure(180); return '你的神識被震傷了，頭痛了好幾天。'; } },
+    { t: '封閉神識，退開', run() { return `你退到百里之外，旁觀了整場交鋒，修為 +${fmt(addXiu(.25))}。`; } }] },
+  { id: 'x_zuohua', min: 18, title: '坐化洞府', text: '一位化神前輩坐化在洞府裡，屍身不腐，膝上放著一個儲物戒。', choices: [
+    { t: '取走遺物', run() { return `你向前輩拜了三拜，取走了儲物戒。裡面有${giftArt([3, 4])}。`; } },
+    { t: '替他安葬', run(s) { s.brkBonus += .05; return '你把前輩葬在洞府後的山坡上。下次突破成功率 +5%。'; } }] },
+  { id: 'x_xinmojie', min: 18, title: '心魔具象', text: '化神之後，心魔不再只是念頭，它化成了一個跟你長得一模一樣的人，坐在你對面。', choices: [
+    { t: '拔劍斬了它', run(s) { if (battle('你的心魔', s.stage, 1.2)) { s.brkBonus += .08; return '心魔消散了，你從未覺得自己如此清醒。下次突破成功率 +8%。'; } injure(240); return '它比你想的更了解你，你敗了，元氣大傷。'; } },
+    { t: '跟它好好談一談', run() { addFound(stg().need * .3); return '你們談了很久。最後它點點頭，慢慢融回你的影子裡。根基 +10%。'; } }] },
+  { id: 'x_wannianyao', min: 18, title: '萬年靈藥', text: '一株萬年靈藥即將成熟，四周已經圍了十幾個修士，誰也不肯先動手。', choices: [
+    { t: '搶', run() { if (battle('爭奪靈藥的修士', placeLv() + 2, 1.15)) { addLife(60); return '你搶在眾人之前摘下靈藥服了，壽元 +60。'; } return '你被幾個人聯手打退了。'; } },
+    { t: '退出', run() { return '後來聽說，那株靈藥被搶的人都沒活過三天。'; } }] },
+  { id: 'x_xingtu', min: 18, title: '殘破星圖', text: '你在一家舊貨攤上翻到半張星圖，上面標著一處沒人知道的地方。', choices: [
+    { t: '照著星圖去找', run() { const e = addEssence(); return e ? `星圖指向一處地脈交會之地，你在那裡取到一團${e}。` : `星圖指向一處荒廢的洞府，你找到靈石 ${addStone(stoneUnit() * 12)}。`; } },
+    { t: '轉手賣掉', run() { return `有人一眼就看上了，出價靈石 ${addStone(stoneUnit() * 6)}。`; } }] },
+  { id: 'x_luanliu', repeat: true, min: 18, title: '虛空亂流', text: '前方的空間扭曲了，一道虛空亂流擋住去路，裡面偶爾閃過寶光。', choices: [
+    { t: '穿過去', run() { if (Math.random() < .6) return `你穿過亂流，順手撈到靈石 ${addStone(stoneUnit() * 8)}${tryDrop(.3)}。`; injure(150); return '亂流把你甩出百里，摔得不輕。'; } },
+    { t: '繞路', run() { return '你多走了三天。'; } }] },
+
+  // ---------- 煉虛 ----------
+  { id: 'x_xumi', min: 21, title: '芥子', text: '你在虛空裡撿到一粒芥子，裡面竟是一方小天地。', choices: [
+    { t: '煉化它', run() { return `芥子裡藏著前人留下的東西：${giftArt([3, 4])}。`; } },
+    { t: '放它回虛空', run(s) { s.brkBonus += .04; return '芥子飄遠了，像一顆星星。你忽然懂了一點什麼，下次突破成功率 +4%。'; } }] },
+  { id: 'x_xushou', min: 21, title: '裂縫裡的手', text: '一道空間裂縫裡伸出一隻蒼白的手，五指張開，像是在求救。', choices: [
+    { t: '把他拉出來', run() { if (battle('裂縫裡的東西', L().stage + 2, 1.1)) return `拉出來的不是人，是一頭虛空獸。你斬了牠，牠的晶核賣得靈石 ${addStone(stoneUnit() * 15)}。`; injure(200); return '那隻手的力氣大得嚇人，你差點被拖進去。'; } },
+    { t: '封住裂縫', run() { return `你用法力把裂縫封死了。手縮回去之前，掌心攤開，掉出一枚玉簡：${giftTech([3])}。`; } }] },
+  { id: 'x_xuyu', min: 21, title: '虛空魚群', text: '一群透明的魚在虛空中游過，每一條身上都帶著一點星光。', choices: [
+    { t: '撈幾條', run() { return `虛空魚入藥極好，你煉成兩顆${addPill(2)}。`; } },
+    { t: '跟著魚群走', run() { return `魚群帶你到了一處靈氣濃郁的虛空島，你在那裡修煉了一陣，修為 +${fmt(addXiu(.4))}。`; } }] },
+  { id: 'x_tongdao', min: 21, title: '同道之邀', text: '一位煉虛同道邀你一起深入虛空，說找到了一座上古遺府，但一個人進不去。', choices: [
+    { t: '同去', run() { if (battle('遺府的守護傀儡', L().stage + 2, 1.15)) return `你們破開了遺府，平分了寶物。你分到${giftArt([4])}。`; return '傀儡太強，你們狼狽地退了出來。'; } },
+    { t: '婉拒', run() { return '後來他一個人去了，再也沒回來。'; } }] },
+  { id: 'x_jiuyou', min: 21, title: '九幽之門', text: '虛空深處有一扇半開的門，門縫裡吹出的風冷得刺骨。', choices: [
+    { t: '往裡看一眼', run(s) { injure(150); s.brkBonus += .06; return '門裡是無盡的黑暗，你只看了一眼就退了出來，渾身發抖。但看過最深的黑，心境反而更穩了，下次突破成功率 +6%。'; } },
+    { t: '把門關上', run() { return `門很重。關上之後，門環上掉下一塊冰冷的鐵牌，牌上刻著一門術法：${giftSkill([3, 4])}。`; } }] },
+  { id: 'x_shiying', min: 21, title: '時光殘影', text: '虛空某處的時間是凝固的，你看見一位古修士保持著出劍的姿勢，一動也不動。', choices: [
+    { t: '看他的劍招', run() { return `你看了很久，總算看懂了那一劍。學會了${giftSkill([4])}。`; } },
+    { t: '輕輕繞過', run() { return `你沒有驚動他。走遠之後回頭看，那個身影已經不見了。修為 +${fmt(addXiu(.3))}。`; } }] },
+  { id: 'x_yuren', min: 21, title: '虛空漁人', text: '一個戴斗笠的老人坐在虛空中垂釣，魚線伸進看不見的地方。', choices: [
+    { t: '坐下陪他釣', run() { return `你們釣了三個月，什麼也沒釣到。臨走時老人說：「你急什麼。」你對《${addTechXp(3000)}》的心境卻沉了下來。`; } },
+    { t: '問他在釣什麼', run() { return '老人笑了：「釣一個名字。」你還想再問，他和魚竿都不見了。'; } }] },
+
+  // ---------- 合體 ----------
+  { id: 'x_faxiang', min: 24, title: '法相合一', text: '你的法相與肉身第一次真正合而為一，舉手之間，風雲都跟著動了。', choices: [
+    { t: '試著引動天地之力', run() { return `山河為之一震。你對《${addTechXp(4000)}》的掌握更進一步。`; } },
+    { t: '收斂氣息', run(s) { s.brkBonus += .05; return '你壓住了那股力量，不讓它驚動任何人。下次突破成功率 +5%。'; } }] },
+  { id: 'x_shenyi', min: 24, title: '神遺之地', text: '一塊大陸大小的古神屍骨漂在虛空中，骨縫裡長滿了靈草。', choices: [
+    { t: '採藥', run() { return `你採了一大包靈草，煉成三顆${addPill(3)}。`; } },
+    { t: '在骨上修煉', run() { return `古神殘留的力量灌進你的身體，修為 +${fmt(addXiu(.5))}。`; } }] },
+  { id: 'x_wenxin', min: 24, title: '天道問心', text: '冥冥之中有一個聲音問你：「你修道，是為了什麼？」', choices: [
+    { t: '「為了長生。」', run() { addLife(80); return '聲音沉默了一會兒：「也好。」壽元 +80。'; } },
+    { t: '「為了找回一個名字。」', run(s) { s.brkBonus += .08; return '聲音沒有再說話。但你覺得，有什麼東西記住了你的回答。下次突破成功率 +8%。'; } }] },
+  { id: 'x_laoguai', min: 24, title: '老怪的棋局', text: '一個活了不知多少年的老怪擺了一盤棋，說贏了他就送你一樣東西。', choices: [
+    { t: '坐下來下棋', run() { if (Math.random() < .5) return `你贏了。老怪大笑著拿出${giftTech([4])}。`; return `你輸了。老怪也不惱，說你下得不錯，送了你靈石 ${addStone(stoneUnit() * 10)}。`; } },
+    { t: '不下', run() { return '老怪嘆氣：「這年頭，連個陪我下棋的人都沒有。」'; } }] },
+  { id: 'x_wanjun', min: 24, title: '萬軍之戰', text: '兩大勢力在星海邊決戰，戰場上法寶亂飛，死傷無數。', choices: [
+    { t: '加入弱的一方', run(s) { if (battle('敵方大將', s.stage + 2, 1.2)) return `你斬了敵方大將，戰局逆轉。弱方送你${giftArt([4])}作為謝禮。`; injure(240); return '你被三位合體修士圍攻，重傷退走。'; } },
+    { t: '遠遠看著', run() { return `你在戰場邊撿到不少遺落的靈石：${addStone(stoneUnit() * 12)}。`; } }] },
+  { id: 'x_tianhuo', min: 24, title: '天火之山', text: '一座山燒了一萬年還沒燒完，火焰的顏色是從沒見過的白。', choices: [
+    { t: '取一縷天火淬體', run(s) { injure(180); s.body += .05; return '天火燒過全身，痛不欲生。傷好之後，你的肉身強了一截：氣血、攻擊、防禦永久 +5%。'; } },
+    { t: '借火煉丹', run() { return `你借天火煉了一爐丹，出爐兩顆${addPill(2)}。`; } }] },
+  { id: 'x_fengyin', min: 24, title: '封印鬆動', text: '一座上古封印鬆動了，裡面的東西正在往外擠。附近的人都逃光了。', choices: [
+    { t: '把封印補好', run(s) { if (battle('封印裡的東西', s.stage + 2, 1.2)) { s.brkBonus += .06; return '你把那東西打了回去，重新封好。下次突破成功率 +6%。'; } injure(240); return '你沒能壓住它，只好也逃了。'; } },
+    { t: '跟著大家逃', run() { return '你回頭看了一眼，封印的光芒還在。'; } }] },
+
+  // ---------- 大乘 ----------
+  { id: 'x_chuandao', min: 27, title: '開壇傳道', text: '有人請你開壇講道。消息傳出去，來了上萬個修士。', choices: [
+    { t: '講三天三夜', run() { return `講到最後，你自己也有了新的體悟，對《${addTechXp(5000)}》的理解更上一層。`; } },
+    { t: '只講一句話', run(s) { s.brkBonus += .05; return '你說完那句話就走了。有人說那是廢話，有人說那是大道。下次突破成功率 +5%。'; } }] },
+  { id: 'x_guren', min: 27, title: '故人之墓', text: '你在一座小鎮外看到一座墓，墓碑上的名字，是你年少時認識的一個凡人。', choices: [
+    { t: '上一炷香', run() { addFound(stg().need * .3); return '你在墓前坐了一整天，想起很多早就忘了的事。根基 +10%。'; } },
+    { t: '找他的後人', run() { return `他的曾孫是個小鎮郎中，聽說你是祖父的朋友，硬塞給你一包家傳的藥材。你煉成兩顆${addPill(2)}。`; } }] },
+  { id: 'x_fanren', min: 27, title: '凡人問道', text: '一個砍柴的凡人攔住你，問：「仙人，修道真的能長生嗎？」', choices: [
+    { t: '「能。」', run() { return '他高高興興地走了。你看著他的背影，想起自己也曾經這樣問過。'; } },
+    { t: '「我也還在找答案。」', run(s) { s.brkBonus += .05; return '他愣了一下，然後笑了：「那仙人也跟我們差不多嘛。」你也笑了。下次突破成功率 +5%。'; } }] },
+  { id: 'x_ganying', min: 27, title: '飛升感應', text: '你感應到了天上的某種東西，像是一扇門在很遠的地方輕輕開了一條縫。', choices: [
+    { t: '凝神去感應', run() { return `你看見門縫裡有光，光裡有字，但看不清。修為 +${fmt(addXiu(.5))}。`; } },
+    { t: '還不是時候', run(s) { s.brkBonus += .04; return '你收回了心神。門會等你的。下次突破成功率 +4%。'; } }] },
+  { id: 'x_jieling', min: 27, title: '劫靈', text: '上一次渡劫失敗的修士，殘留在天地間的劫靈纏上了你。', choices: [
+    { t: '超度它', run(s) { if (battle('劫靈', s.stage + 1, 1.2)) { s.brkBonus += .06; return '劫靈散去前，把它渡劫時的經驗留給了你。下次突破成功率 +6%。'; } injure(240); return '劫靈太強，你只能先避開。'; } },
+    { t: '避開它', run() { return '你繞了遠路。它在後面跟了很久，最後才散去。'; } }] },
+  { id: 'x_huixiang', min: 27, title: '回鄉', text: '你回到出生的那個地方。小鎮早就不在了，原地長成了一片樹林。', choices: [
+    { t: '在林子裡住幾天', run() { return `你在樹下打坐，聽了幾天鳥叫，修為 +${fmt(addXiu(.4))}。`; } },
+    { t: '種下一棵樹就走', run() { addLife(50); return '你種下一棵樹，在樹下埋了一顆靈種。等它長大，這裡會是一片靈林。壽元 +50。'; } }] },
+  { id: 'x_dixin', min: 27, title: '地心之火', text: '大地深處有一團燃燒了億萬年的火，是天地最初的熱。', choices: [
+    { t: '下去取火', run() { if (Math.random() < .6) return `你取到一縷地心火，用它重煉法寶，得到${giftArt([4])}。`; injure(240); return '下到一半，你就被熱浪逼了回來。'; } },
+    { t: '在火邊悟道', run() { return `你在火邊坐了十年，對《${addTechXp(5000)}》的領悟又深了一層。`; } }] },
+  { id: 'x_daxiu', repeat: true, min: 27, title: '大修士的試探', text: '一位不知名的大修士遠遠放出氣息試探你，像是在掂量你的斤兩。', choices: [
+    { t: '回敬他', run(s) { if (battle('不知名的大修士', s.stage + 1, 1.1)) return `對方收回氣息，丟過來一個儲物袋：靈石 ${addStone(stoneUnit() * 10)}。`; return '你落了下風，對方哼了一聲就走了。'; } },
+    { t: '收斂氣息', run() { return '對方似乎失了興趣，走了。'; } }] },
+
+  // ---------- 渡劫 ----------
+  { id: 'x_jieyun', min: 30, title: '劫雲初現', text: '你頭頂的天空開始聚起雲，每天都比前一天更厚一點。那是屬於你的劫雲。', choices: [
+    { t: '抬頭看著它', run(s) { s.brkBonus += .05; return '你天天抬頭看，慢慢地就不怕了。'; } },
+    { t: '加緊修煉', run() { return `你不再看天，只是修煉。修為 +${fmt(addXiu(.4))}。`; } }] },
+  { id: 'x_jiuxin', min: 30, title: '九重心魔', text: '渡劫前最後的心魔來了，一共九重，每一重都是你這一生最後悔的事。', choices: [
+    { t: '一重一重走過去', run(s) { if (battle('九重心魔', s.stage, 1.25)) { addFound(stg().need * .3); return '你走完了九重。最後一重裡，你看見一塊碑。根基 +10%。'; } injure(240); return '你在第七重停下了，醒來時滿臉是淚。'; } },
+    { t: '閉上眼睛', run() { return '你不看，它們就慢慢散了。但你知道它們還在。'; } }] },
+  { id: 'x_huiyi', min: 30, title: '一生回望', text: '某個傍晚，你忽然把這一生從頭到尾想了一遍，從那個凡人小鎮開始。', choices: [
+    { t: '想到天亮', run() { return `你想起了每一個人的名字。對《${addTechXp(5000)}》的體悟，在那一夜圓滿了許多。`; } },
+    { t: '不想了', run() { return '過去的就過去了。你起身繼續修煉。'; } }] },
+  { id: 'x_zuihou', min: 30, title: '最後的對手', text: '一位同樣修到渡劫的老對手找上門，說想在渡劫前跟你再打一次。', choices: [
+    { t: '奉陪', run(s) { if (battle('老對手', s.stage + 1, 1.15)) return `你贏了。他大笑著說：「這下可以安心渡劫了。」臨走時把他的法寶送給你：${giftArt([4])}。`; return '你輸了半招。他說：「下輩子再來。」'; } },
+    { t: '各自渡劫吧', run() { return '他點點頭，轉身走了。你們都知道，這可能是最後一面。'; } }] },
+  { id: 'x_jiaotuo', min: 30, title: '交託傳承', text: '你開始想，如果渡劫失敗，你這一身所學該留給誰。', choices: [
+    { t: '寫一卷心得留下', run() { return `你寫了三個月。寫完才發現，自己又多懂了一些。對《${addTechXp(4000)}》的體悟更深了。`; } },
+    { t: '不留了', run(s) { s.brkBonus += .05; return '你決定不給自己留退路。下次突破成功率 +5%。'; } }] },
+  { id: 'x_leichi', min: 30, title: '雷池', text: '一處上古雷池，池水裡全是雷，渡劫前在裡面泡一泡，據說能先嘗嘗天雷的滋味。', choices: [
+    { t: '跳進去', run(s) { injure(180); s.body += .05; return '你在雷池裡泡了七天，出來時渾身焦黑。但肉身強了一截：氣血、攻擊、防禦永久 +5%。'; } },
+    { t: '只泡腳', run() { return '雷電從腳底竄上來，麻得你直跳。旁邊的老修士笑得前仰後合。'; } }] },
+  { id: 'x_yuluo', min: 30, title: '人間雨落', text: '你在人間的屋簷下躲雨，聽著雨聲，忽然很想再當一回凡人。', choices: [
+    { t: '在凡間住一陣子', run() { addLife(40); return '你在鎮上開了間小茶館，住了半年。那半年過得很慢。壽元 +40。'; } },
+    { t: '雨停就走', run() { return `雨停了，你回到洞府，修為 +${fmt(addXiu(.3))}。`; } }] },
+  { id: 'x_beiying', min: 30, title: '碑影', text: '渡劫前夕，你又夢到了那塊碑。這一次，你站在碑前，伸手就能碰到。', choices: [
+    { t: '伸手去摸', run(s) { s.brkBonus += .06; return '碑是涼的。你的手指停在一個被劃掉的名字上，怎麼也拿不開。下次突破成功率 +6%。'; } },
+    { t: '轉身離開', run() { return '你走了幾步，聽見身後有人嘆氣。回頭，什麼都沒有。'; } }] },
+  { id: 'x_jieshou', min: 30, title: '渡劫的見證者', text: '一位正在渡劫的修士被天雷劈得半死，看見你，求你幫他擋最後一道雷。', choices: [
+    { t: '替他擋', run(s) { if (battle('天雷', s.stage + 1, 1.2)) return `你擋下了那道雷。他飛升前把一身寶物都留給了你：${giftArt([4])}，還有靈石 ${addStone(stoneUnit() * 15)}。`; injure(300); return '雷太強，你們兩個都被劈飛了。他沒能飛升。'; } },
+    { t: '天劫不能插手', run() { return '你看著他被最後一道雷吞沒。那一夜你沒有睡。'; } }] },
+  { id: 'x_jieqian', repeat: true, min: 30, title: '劫前試煉', text: '你找了一處荒山，引來一點點天雷，想先試試自己的斤兩。', choices: [
+    { t: '硬接', run(s) { if (battle('引來的天雷', s.stage, 1.1)) return `你接住了。散落的雷晶賣得靈石 ${addStone(stoneUnit() * 10)}。`; return '你被劈得滿身焦黑，看來還得再練。'; } },
+    { t: '算了', run() { return '還是別招惹天雷比較好。'; } }] },
+);
+
+// ---------- 練氣事件的第二個版本：前世遇過的，這一世換成另一個情境或後續 ----------
+const EVENT_ALTS = {
+  cave: { title: '山壁古洞・故地', text: '又是那面山壁。藤蔓後的洞口還在，洞口地上卻多了一行新刻的字：「後來者，留步。」', choices: [
+    { t: '照樣進去', run() { if (Math.random() < .5) return `洞底的遺骨不見了，原地放著一個包袱，像是專門留給誰的。裡面有靈石 ${addStone(stoneUnit() * 6)}${tryDrop(.4)}。`; injure(80); return '洞裡的禁制比上次更凶了。'; } },
+    { t: '在字旁邊也刻一行', run(s) { s.brkBonus += .03; return '你刻下「來過」兩個字。不知道為什麼，心裡踏實了很多。下次突破成功率 +3%。'; } }] },
+  scroll: { title: '殘破玉簡・另一半', text: '溪邊淤泥裡又露出一角玉簡，你一看就認出來——是上輩子那枚殘簡的另一半。', choices: [
+    { t: '把兩半拼起來參悟', run() { return `前後兩半合在一起，竟是一篇完整的心法，修為 +${fmt(addXiu(.45))}。`; } },
+    { t: '拿去賣', run() { return `識貨的人出了雙倍價錢：靈石 ${addStone(stoneUnit() * 4)}。`; } }] },
+  rogue: { title: '散修之徒', text: '一個年輕散修攔住你，問你是不是在某片林子裡救過一個被妖獸追的人。「那是我師父。他說，下輩子見到你也要報恩。」', choices: [
+    { t: '「我不記得了。」', run() { return `年輕人笑了笑，還是把師父留下的東西塞給你：${addPill(1)}，還有靈石 ${addStone(stoneUnit() * 3)}。`; } },
+    { t: '問他師父後來怎樣了', run() { return `「築基了，活到一百多歲，走得很安詳。」你點點頭，對《${addTechXp(600)}》的體悟忽然清晰了一些。`; } }] },
+  scam: { title: '路邊神丹・老頭的兒子', text: '山道邊還是那個攤子，只是擺攤的換成了一個中年人，長得跟賣假丹的老頭一模一樣。', choices: [
+    { t: '問他父親去哪了', run() { return `「走了。臨走說，有個客人不信他，結果那客人是對的。」他送你一顆真的${addXiuPill(1)}，說是賠罪。`; } },
+    { t: '不理他', run() { return '他在背後喊：「這次是真貨！」你沒有回頭。'; } }] },
+  spring: { title: '林中靈泉・乾涸', text: '你憑著前世的記憶找到那汪靈泉，泉眼卻已經乾了，只剩一圈白色的泉華。', choices: [
+    { t: '往下挖', run() { const e = addEssence(); return e ? `挖到三尺深，泉脈的源頭凝成了一團${e}。` : `挖到三尺深，挖出一塊泉髓，修為 +${fmt(addXiu(.4))}。`; } },
+    { t: '在泉邊打坐', run() { return `泉雖然乾了，地脈的靈氣還在。修為 +${fmt(addXiu(.3))}。`; } }] },
+  drought: { title: '旱村・祠堂', text: '那個旱村如今成了富庶的大鎮，鎮口祠堂裡供著一尊仙師像。村民說是很久以前替他們求過雨的人。', choices: [
+    { t: '進去看看', run(s) { s.brkBonus += .05; return '泥像的臉被香火燻得看不清。你站在像前，好像有什麼願力輕輕落在你身上。下次突破成功率 +5%。'; } },
+    { t: '不進去', run() { return `你在鎮上吃了碗麵。老闆聽你說是過路的修士，堅持不收錢，還塞給你靈石 ${addStone(stoneUnit() * 2)}。`; } }] },
+  elder: { title: '溪邊老者・空竿', text: '溪邊那根釣竿還插在石縫裡，人卻不見了。竿上綁著一張字條：「三處不對，改了沒有？」', choices: [
+    { t: '照字條上說的改', run(s) { s.techs[s.tech] += 1200; return `你把吐納的三處毛病一一改過，對《${TECHS[s.tech].name}》的修煉順暢了許多。`; } },
+    { t: '把釣竿帶走', run() { return `釣竿竟然是一件法寶：${giftArt([1, 2])}。`; } }] },
+  temple: { title: '破廟・神像', text: '你又躲進那座破廟避雨。供桌上的神像換了一張臉——看起來有點像你。', choices: [
+    { t: '仔細看', run() { return `越看越像。你在像前打坐到雨停，心裡有種說不出的感覺。修為 +${fmt(addXiu(.25))}。`; } },
+    { t: '把神像轉過去', run() { return '轉過去之後，神像背面刻著一個名字，被人用刀劃掉了。'; } }] },
+  rustsword: { title: '河床鏽劍・劍主', text: '乾涸的河床上，一個少女正在找什麼。她說她家祖傳的劍，很久以前被人撿走了。', choices: [
+    { t: '「我撿過一把。」', run() { return `她不要劍，只要劍柄上的穗子。拿到之後，她把一卷劍譜塞給你：${giftSkill([1, 2])}。`; } },
+    { t: '幫她一起找', run() { return `你們找了一整天，劍沒找到，倒挖出一袋舊靈石：${addStone(stoneUnit() * 4)}。`; } }] },
+  gamble: { title: '賭石攤・攤主', text: '賭石攤還在，攤主換成了個年輕人。他一眼認出你：「我爹說過，有個人從來不上當。」', choices: [
+    { t: '「賭一把。」', cond: s => s.stone >= 10, run(s) { const bet = Math.floor(s.stone * .2); s.stone -= bet; if (Math.random() < .45) { s.stone += bet * 3; return `切出一塊靈髓。年輕人苦笑：「爹沒說錯。」你賺了 ${bet * 3}。`; } return `一刀下去，什麼都沒有。年輕人鬆了口氣。你賠了 ${bet}。`; } },
+    { t: '「不賭。」', run() { return '年輕人點點頭：「爹也這麼說過。」'; } }] },
+};
+
+// ---------- 第三批人物：沈清禾（金丹）、殷九娘（化神）、陸知微（合體）、顧長歌（大乘） ----------
+// 跟其他人物一樣，整個遊戲只登場一次；結局在之後某一世以前世羈絆找上你
+Object.assign(ARCS, {
+  // 沈清禾：玄霄宗內門弟子，被宗門當成棋子
+  shen: { name: '沈清禾', steps: [
+    { min: 12, title: '迷路的內門弟子', text: '一個穿玄霄宗內門服飾的少女在山裡迷了路，劍上沾著血，卻說是師門派她來「處理一點小事」。', choices: [
+      { t: '送她回山門', run() { arc('shen').aff += 2; return '一路上她話很少。到了山門口，她回頭說：「我叫沈清禾。今天的事，別跟人說。」'; } },
+      { t: '問她處理了什麼', run() { const a = arc('shen'); a.aff += 1; a.know = 1; return '她沉默了很久：「一個不肯把靈脈讓給宗門的散修。」說完就走了。'; } }] },
+    { min: 13, title: '宗門的命令', text() { return arc('shen').aff >= 2 ? '沈清禾找到你，臉色很差：「宗門要我去殺一個人。那人沒做錯什麼。你說，我該不該去？」' : '玄霄宗的人到處在找一個叫沈清禾的弟子，說她違抗師命，私自下山。'; }, choices: [
+      { t: '「不該做的事，就別做。」', run() { const a = arc('shen'); a.aff += 2; a.defy = 1; return '她看了你很久，把宗門令牌捏碎了。'; } },
+      { t: '「宗門養你，你就該聽話。」', run() { const a = arc('shen'); a.obey = 1; return '她點點頭，眼裡的光暗了下去。'; } }] },
+    { min: 14, title: '追兵', text() { return arc('shen').defy ? '玄霄宗派了長老追殺沈清禾。她躲進你的洞府，渾身是傷。' : '沈清禾成了玄霄宗最鋒利的那把劍。她帶著人經過你的洞府，像沒看見你一樣。'; }, choices: [
+      { t: '替她擋下追兵', cond: () => !!arc('shen').defy, run(s) { const a = arc('shen'); if (battle('玄霄宗長老', s.stage + 2, 1.15)) { a.aff += 3; a.saved = 1; return '你打退了長老。沈清禾靠在洞壁上，第一次笑了。'; } injure(240); a.aff += 2; return '你沒能打贏，但拖住了時間，她逃了。'; } },
+      { t: '叫住她', cond: () => !arc('shen').defy, run() { const a = arc('shen'); a.aff += 1; return '她停下腳步，沒有回頭：「我已經回不去了。」'; } },
+      { t: '不插手', run() { return '你關上了洞府的門。'; } }] },
+    { min: 16, title: '清禾', text() { const a = arc('shen'); return a.saved ? '很多年後，沈清禾在一座小山上開了自己的宗門，只收無家可歸的孩子。她寫信邀你去看看。' : a.defy ? '你聽說沈清禾逃出了玄霄宗，從此下落不明。有人說在海外見過她。' : '沈清禾當上了玄霄宗的長老。她來見你一面，穿著你第一次見她時那種顏色的衣服。'; }, choices: [
+      { t: '去看她', run() { const a = arc('shen'); if (a.saved) { arcEnd('shen', 'founded'); return `她的宗門很小，孩子們都叫她師父。臨走時她把當年那把劍送給你：${giftArt([3])}。`; } if (a.defy) { arcEnd('shen', 'free'); return '你沒找到她。但海邊的礁石上刻著一行字：「我自由了。」'; } arcEnd('shen', 'elder'); return '她說：「我現在也在下命令了。」你不知道該說什麼。'; } }] },
+  ] },
+  // 殷九娘：開黑市、賣情報、也賣毒，亦正亦邪
+  yin: { name: '殷九娘', steps: [
+    { min: 18, title: '黑市老闆娘', text: '一間只在半夜開門的鋪子，老闆娘倚在櫃檯上抽著煙斗：「我叫殷九娘。這裡什麼都賣，消息、毒藥、人命。你想買什麼？」', choices: [
+      { t: '買一條消息', run(s) { s.stone = Math.max(0, s.stone - stoneUnit() * 5); arc('yin').aff += 2; return `她說了一處靈脈的位置。你去了，果然有：靈石 ${addStone(stoneUnit() * 10)}。`; } },
+      { t: '「我什麼都不買。」', run() { arc('yin').aff += 1; return '她笑了：「難得。你這種人最貴。」'; } }] },
+    { min: 19, title: '一份名單', text: '殷九娘遞給你一份名單：「這上面的人都該死。幫我殺一個，我欠你一個人情。」', choices: [
+      { t: '先查查這個人', run() { const a = arc('yin'); a.aff += 2; a.check = 1; return '你查了。那人確實罪有應得——但殷九娘要他死，是因為他擋了她的財路。'; } },
+      { t: '直接動手', run(s) { const a = arc('yin'); if (battle('名單上的人', s.stage + 1, 1.1)) { a.kill = 1; a.aff += 1; return '人死了。殷九娘送來一大袋靈石，什麼也沒問。'; } injure(180); return '那人比你想的強，你負傷退走。'; } },
+      { t: '拒絕', run() { arc('yin').refuse = 1; return '她收回名單：「好人活不長的。」'; } }] },
+    { min: 20, title: '九娘的毒', text: '殷九娘中了毒——她自己配的毒，被仇家下回了她身上。她躺在鋪子裡，臉色發青，卻還在笑。', choices: [
+      { t: '替她找解藥', run() { const a = arc('yin'); if (battle('藏著解藥的仇家', L().stage + 2, 1.15)) { a.aff += 3; a.cured = 1; return '你搶回了解藥。她醒來後盯著你看了很久：「你圖什麼？」'; } injure(240); return '你沒拿到解藥。她自己硬撐了過來，只是瞎了一隻眼。'; } },
+      { t: '「這是你自找的。」', run() { arc('yin').leave = 1; return '她閉上眼睛：「對，是我自找的。」'; } }] },
+    { min: 22, title: '收攤', text() { const a = arc('yin'); return a.cured && a.aff >= 6 ? '殷九娘把鋪子關了，說要去做點正經事。她問你，願不願意當她第一個正經生意的客人。' : a.leave ? '鋪子換了主人。新老闆說，前一個老闆娘把名單上剩下的人都殺光了，然後消失了。' : '殷九娘的生意越做越大，半個修仙界的消息都經過她的手。她託人帶話給你：「你還欠我一個人情。」'; }, choices: [
+      { t: '去見她', run() { const a = arc('yin'); if (a.cured && a.aff >= 6) { arcEnd('yin', 'honest'); return `她開了一間藥鋪，賣的全是真藥。第一單生意送你三顆${addPill(3)}，不收錢。`; } if (a.leave) { arcEnd('yin', 'vanish'); return '你沒找到她。只在鋪子的櫃檯底下，找到一個刻著你名字的煙斗。'; } arcEnd('yin', 'queen'); return `她坐在高樓上，身邊全是人。她只說了一句：「人情先欠著。」然後扔給你靈石 ${addStone(stoneUnit() * 15)}。`; } }] },
+  ] },
+  // 陸知微：一輩子在研究那塊碑的學者，不是守碑人
+  lu: { name: '陸知微', steps: [
+    { min: 24, title: '抄碑的人', text: '虛空邊緣，一個書生模樣的修士正對著一片空無一物的地方抄寫。他說他在抄一塊碑，只是碑還沒出現。', choices: [
+      { t: '問他抄的是什麼', run() { arc('lu').aff += 2; return '「名字。」他頭也不抬，「我叫陸知微，抄了三千年，抄到一半的時候，發現有人在劃名字。」'; } },
+      { t: '覺得他瘋了，走開', run() { arc('lu').aff += 1; return '他在背後說：「你身上有碑的味道。」'; } }] },
+    { min: 25, title: '劃名字的人', text: '陸知微攤開一卷長得看不到頭的抄本：「被劃掉的名字，每一個都對應一個隕落的仙人。可有些名字，被劃掉之後又出現了。」', choices: [
+      { t: '幫他整理', run() { const a = arc('lu'); a.aff += 2; a.help = 1; return `你們整理了十年。你在抄本裡看到一個名字反覆出現又被劃掉，心頭一緊。對《${addTechXp(4000)}》的體悟卻因此深了。`; } },
+      { t: '「這跟我有什麼關係？」', run() { arc('lu').cold = 1; return '他看了你一眼：「你自己心裡清楚。」'; } }] },
+    { min: 26, title: '碑的另一面', text: '陸知微說，他找到了碑在仙界的倒影。只要有人守住這一頭，他就能過去看一眼。', choices: [
+      { t: '替他守著', run(s) { const a = arc('lu'); if (battle('從裂縫裡湧出的虛空獸', s.stage + 1, 1.15)) { a.aff += 3; a.saw = 1; return '他回來時臉色蒼白，只說了一句：「上面也有人在等你。」'; } injure(240); a.aff += 1; return '你沒守住，裂縫關上了。他嘆了口氣：「下次吧。」'; } },
+      { t: '勸他別去', run() { arc('lu').stay = 1; return '他沉默了很久，收起了抄本。'; } }] },
+    { min: 27, title: '抄本', text() { const a = arc('lu'); return a.saw ? '陸知微要去仙界了——不是飛升，是偷渡。他把抄本託付給你。' : '陸知微老了。他把三千年的抄本攤在你面前，說他想不通的事，也許你想得通。'; }, choices: [
+      { t: '收下抄本', run(s) { const a = arc('lu'); if (a.saw) { arcEnd('lu', 'crossed'); s.brkBonus += .1; return '他走了，再也沒有回來。抄本最後一頁是你的名字，旁邊寫著：「別被劃掉。」下次突破成功率 +10%。'; } arcEnd('lu', 'scholar'); return `你翻遍抄本，找到他留給你的一句話：「名字不是被劃掉的，是被藏起來的。」對《${addTechXp(5000)}》的領悟大進。`; } }] },
+  ] },
+  // 顧長歌：活了很久的大乘女修，在某一個前世教過你
+  gu: { name: '顧長歌', steps: [
+    { min: 27, title: '認得你的人', text: '一位白髮如雪的大乘女修在路上攔住你，看了很久：「你這一世，長這個樣子啊。」', choices: [
+      { t: '「我們見過？」', run() { arc('gu').aff += 2; return '「很多世以前，你是我師父。」她說，「那時候我叫顧長歌，現在也是。」'; } },
+      { t: '戒備地退開', run() { arc('gu').aff += 1; return '她笑了：「上一世你也是這樣。」'; } }] },
+    { min: 28, title: '師父的劍', text: '顧長歌拿出一柄舊劍：「這是你當年的劍。你走的時候，什麼都沒帶。」', choices: [
+      { t: '握住劍', run() { const a = arc('gu'); a.aff += 2; a.sword = 1; return `劍在你手裡輕輕震了一下。你想不起任何事，眼眶卻熱了。你得到${giftArt([4])}。`; } },
+      { t: '「那不是我。」', run() { arc('gu').deny = 1; return '她收回了劍：「也是。人總會變的。」'; } }] },
+    { min: 29, title: '渡劫之前', text: '顧長歌說她要渡劫了。三千年前你沒撐過去的那道雷，她想替你撐一次。', choices: [
+      { t: '替她護法', run(s) { const a = arc('gu'); if (battle('劫雷的餘波', s.stage + 1, 1.2)) { a.aff += 3; a.guard = 1; return '你擋下了劫雷的餘波。她渡過了前八道。'; } injure(300); a.aff += 2; return '你被餘波震傷了，但她說，有你在旁邊就夠了。'; } },
+      { t: '「我們一起撐。」', run() { arc('gu').aff += 2; return '她搖頭：「你的劫，要你自己渡。」'; } }] },
+    { min: 30, title: '長歌', text() { const a = arc('gu'); return a.guard && a.aff >= 7 ? '第九道雷落下時，顧長歌回頭看你，笑了。然後她飛升了。' : '第九道雷落下時，你沒看清。等雷光散去，原地只剩一片燒焦的地。'; }, choices: [
+      { t: '抬頭', run(s) { const a = arc('gu'); if (a.guard && a.aff >= 7) { arcEnd('gu', 'ascended'); s.brkBonus += .1; return '天上落下一片衣角，上面寫著：「師父，我在上面等你。」下次突破成功率 +10%。'; } if (a.deny) { arcEnd('gu', 'stranger'); return '你站了很久。你始終沒想起她是誰。'; } arcEnd('gu', 'fallen'); addLife(100); return '你在焦土裡找到她留下的一顆丹，服下之後壽元 +100。那是她三千年攢下的。'; } }] },
+  ] },
+});
+Object.assign(ARC_END_LABEL, {
+  founded: '她開了自己的宗門', free: '她逃出宗門，從此自由', elder: '她成了玄霄宗的長老',
+  honest: '她收了黑市，開了間真藥鋪', vanish: '她殺光名單上的人後消失了', queen: '她成了修仙界的消息女王',
+  crossed: '他偷渡去了仙界', scholar: '他把抄本留給了你',
+  ascended: '她替你撐過了那道雷，先飛升了', fallen: '她倒在了第九道雷下', stranger: '你始終沒想起她',
+});
+MEMORIES.push(
+  { id: 'shen_f', bond: 'shen', end: 'founded', min: 9, title: '小宗門', text: '路過一座小山，山門上掛著一塊舊匾。守門的孩子聽說你的名字，愣了一下，跑進去捧出一個布包：「祖師說，等這個名字的人來了，就把這個交給他。」', choices: [
+    { t: '打開布包', run() { return `布包裡是一卷手抄的劍訣：${giftSkill([2, 3])}，還有一張字條：「謝謝你當年沒讓我去。」`; } }] },
+  { id: 'shen_e', bond: 'shen', end: 'elder', min: 12, title: '玄霄宗的長老', text: '一位玄霄宗長老來招攬你，開出的條件好得出奇。她說，宗門一位已故的太上長老留過話：要對這個名字的人好一點。', choices: [
+    { t: '收下見面禮', run() { return `見面禮是靈石 ${addStone(stoneUnit() * 10)}。你總覺得那位太上長老，有點像某個人。`; } }] },
+  { id: 'yin_h', bond: 'yin', end: 'honest', min: 6, title: '九娘藥鋪', text: '一間老藥鋪掛著「九娘」的招牌，掌櫃是個年輕姑娘，聽說你的名字，從櫃檯底下拿出一個舊煙斗。「曾祖母說，有人來就送他。」', choices: [
+    { t: '收下', run() { return `煙斗裡塞著一張藥方，你照方煉了三顆${addPill(3)}。`; } }] },
+  { id: 'yin_q', bond: 'yin', end: 'queen', min: 15, title: '欠著的人情', text: '一個面具人攔住你：「我們主人說，你前世欠她一個人情。今生她不要了，算她欠你的。」', choices: [
+    { t: '「什麼人情？」', run() { return `面具人沒有回答，留下一份情報走了。照著情報，你找到靈石 ${addStone(stoneUnit() * 15)}${tryDrop(.5)}。`; } }] },
+  { id: 'lu_s', bond: 'lu', end: 'scholar', min: 18, title: '抄本殘頁', text: '你在一家舊書鋪翻到一頁發黃的紙，上面密密麻麻抄滿了名字，有些被劃掉了。最後一行的字跡你很熟悉。', choices: [
+    { t: '讀到最後', run(s) { s.brkBonus += .08; return '最後一行寫著：「名字不是被劃掉的，是被藏起來的。」下次突破成功率 +8%。'; } }] },
+  { id: 'gu_a', bond: 'gu', end: 'ascended', min: 12, title: '天上的衣角', text: '一陣風從天上吹下來一片衣角，落在你手心。上面寫著兩個字：「師父」。', choices: [
+    { t: '收好', run() { addLife(50); return '衣角化成一縷仙氣，沒入你的眉心。壽元 +50。'; } }] },
+  { id: 'gu_f', bond: 'gu', end: 'fallen', min: 15, title: '焦土上的花', text: '一片燒焦的地上開滿了白花，當地人說，很久以前有個女修在這裡渡劫失敗。你站在花裡，忽然很想哭。', choices: [
+    { t: '在花裡坐一會兒', run() { return `你坐了一整天，修為 +${fmt(addXiu(.4))}。離開時，你不知道自己為什麼要說「對不起」。`; } }] },
+);
