@@ -259,11 +259,22 @@ function pathArtCheck(s = L()) {
   const id = PATH_ARTS[myPaths(s)[0]];
   if (id) { gainArt(id); log(`踏入化神，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」。`); }
 }
-// 路線專屬大招：金丹、化神時領悟（兼修的路線也算）
-const PATH_SKILLS = { ti: [['fatian', 2], ['santou', 4]], hun: [['shenhun', 2], ['wannian', 4]] };
+// 路線專屬大招（進化型）：金丹學會基礎型，化神進化成強化型，進化後基礎型換成強化型、熟練度延續（兼修的路線也算）
+const PATH_ULT = { ti: ['santou', 'fatian'], hun: ['shenhun', 'wannian'] };
 function pathSkillCheck(s = L()) {
   if (!s.paths) return;
-  for (const p of s.paths) for (const [id, mj] of PATH_SKILLS[p] || []) if (stg(s).major >= mj && !(id in s.skills)) { learnSkill(id); log(`你領悟了${PATHS[p].name}的大神通「${SKILLS[id].name}」！`); }
+  for (const p of s.paths) {
+    const pair = PATH_ULT[p]; if (!pair) continue;
+    const [base, evo] = pair, mj = stg(s).major;
+    // 舊規則留下的狀態：兩型都有就只留強化型；還沒到化神卻只有強化型（舊規則交換造成）就退回基礎型
+    if (base in s.skills && evo in s.skills) delete s.skills[base];
+    else if (!(base in s.skills) && evo in s.skills && mj < 4) { s.skills[base] = s.skills[evo]; delete s.skills[evo]; }
+    if (mj >= 2 && !(base in s.skills) && !(evo in s.skills)) { learnSkill(base); log(`你領悟了${PATHS[p].name}的大招「${SKILLS[base].name}」！`); }
+    if (mj >= 4 && base in s.skills && !(evo in s.skills)) {
+      const lv = s.skills[base]; delete s.skills[base]; s.skills[evo] = lv; codexAdd('k', evo);
+      log(`踏入化神，《${SKILLS[base].name}》進化成了「${SKILLS[evo].name}」！`);
+    }
+  }
 }
 // 舊存檔：這一世還沒擇道，可以在根骨頁選一次
 function choosePathLate(id) {
@@ -1844,8 +1855,9 @@ function renderSkill() {
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
   const list = all.filter(id => (skillTab === '全部' || SKILLS[id].elem === skillTab) && (skillKind === '全部' || KIND_GROUP[SKILLS[id].kind] === skillKind))
     .sort((a, b) => skillSort === 'pow' ? skillPow(b) - skillPow(a) : skillSort === 'lv' ? s.skills[b] - s.skills[a] : SKILLS[b].grade - SKILLS[a].grade || skillPow(b) - skillPow(a));
-  return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}（${{ fa: '每回合回 8%，帶到下一場', ti: '開戰只有兩成，出手 +10%、挨打 +8%', hun: '每回合只回 4%，帶到下一場，戰鬥外也回得慢' }[k]}）`).join('；')}。法術耗法力、體術耗血氣、神魂術耗神識；不是本路的術法從${RES_NAME[myPaths()[0]]}轉換；攻擊術法威力 -40%、耗費 ×1.5，回復、護盾、增益、身法這類輔助術法是通用小術，不受影響。兼修那條路就沒有懲罰。</p><h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(id => row(id)).join('') || '<p class="muted">沒有裝備術法，只會普通攻擊。</p>'}
-    ${ult.length ? `<h3>大招欄（${ult.length}）</h3><p class="muted small">路線專屬，不佔出招欄位，學會就自動施展，優先於一般術法。</p>${ult.map(ultRow).join('')}` : ''}
+  return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}（${{ fa: '每回合回 8%，帶到下一場', ti: '開戰只有兩成，出手 +10%、挨打 +8%', hun: '每回合只回 4%，帶到下一場，戰鬥外也回得慢' }[k]}）`).join('；')}。法術耗法力、體術耗血氣、神魂術耗神識；不是本路的術法從${RES_NAME[myPaths()[0]]}轉換；攻擊術法威力 -40%、耗費 ×1.5，回復、護盾、增益、身法這類輔助術法是通用小術，不受影響。兼修那條路就沒有懲罰。</p>
+    ${ult.length ? `<h3>大招欄（${ult.length}）</h3><p class="muted small">路線專屬，不佔出招欄位，學會就自動施展，優先於一般術法；到化神會進化成更強的版本。</p>${ult.map(ultRow).join('')}` : ''}
+    <h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(id => row(id)).join('') || '<p class="muted">沒有裝備術法，只會普通攻擊。</p>'}
     <div class="row"><h3>其他術法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setSkillView('kind', this.value)">${['全部', '攻', '防', '輔'].map(k => `<option value="${k}" ${skillKind === k ? 'selected' : ''}>${k === '全部' ? '攻防輔全部' : k === '攻' ? '只看攻擊' : k === '防' ? '只看防禦' : '只看輔助'}</option>`).join('')}</select>
       <select class="mini" onchange="setSkillView('sort', this.value)">${[['grade', '品階'], ['pow', '威力'], ['lv', '熟練度']].map(([k, n]) => `<option value="${k}" ${skillSort === k ? 'selected' : ''}>依${n}排序</option>`).join('')}</select></span></div>
