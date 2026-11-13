@@ -1728,12 +1728,12 @@ function techCard(id, btns = '', hint = '') {
 let cultTab = 'gong';
 function setCultTab(k) { cultTab = k; armed = ''; render(); }
 function renderCult() {
-  return `<nav>${[['gen', '根骨'], ['gong', '功法']].map(([k, n]) => `<button class="${cultTab === k ? 'on' : ''}" onclick="setCultTab('${k}')">${n}</button>`).join('')}</nav>`
-    + (cultTab === 'gen' ? renderGen() : renderGong());
+  return `<nav>${[['gen', '根骨'], ['gong', '功法'], ['shen', '神通']].map(([k, n]) => `<button class="${cultTab === k ? 'on' : ''}" onclick="setCultTab('${k}')">${n}</button>`).join('')}</nav>`
+    + (cultTab === 'gen' ? renderGen() : cultTab === 'shen' ? renderShenTab() : renderGong());
 }
-// 根骨：靈根、體質、境界品質、身體、神通（不太會變動的東西）
+// 根骨：靈根、體質、境界品質、身體（不太會變動的東西）
 function renderGen() {
-  const s = L(), st = stats(), rt = rootType(), shen = s.shen || [];
+  const s = L(), st = stats(), rt = rootType();
   return `<h3>靈根</h3>
     <div class="item"><div class="row"><b>${rootName()}</b><span class="small">修煉 ×${rootRate()}${rootRate() !== rt.rate ? `（${PATHS[myPaths()[0]].name}只算${ROOT_WEIGHT[myPaths()[0]] === .3 ? '三成' : '一半'}，原本 ×${rt.rate}）` : ''}${rt.aff ? ` · 親和屬性術法 +${Math.round(rt.aff * 100)}%` : ''}</span></div>
       <div class="muted small">${rt.desc || (s.root.elems.length ? `親和：${s.root.elems.join('、')}。主修同屬性功法再快 15%，地階以上只能修這些屬性（或無屬性）的功法${myPaths()[0] === 'ti' ? '；鍛體功法不挑靈根' : ''}。` : '')}</div>
@@ -1746,8 +1746,12 @@ function renderGen() {
       <div class="small same">修煉、氣血、攻擊、防禦合計 +${Math.round(qualBonus() * 100)}%</div></div>` : '<p class="muted small">還沒突破過大境界。大境界突破成功時會決定品質：根基越厚、靈根越好、突破丹越多，品質越好；選「全力一搏」更容易出好品質，但成功率較低、失敗更慘。想要極品，還得有對應境界的天材地寶。</p>'}
     <h3>身體</h3>
     <div class="stats"><span>氣血 ${fmt(st.hp)}</span><span>法力 ${fmt(st.mp)}</span><span>攻擊 ${fmt(st.atk)}</span><span>防禦 ${fmt(st.def)}</span><span>身法 ${st.spd}</span>
-      <span>暴擊 ${Math.round(st.crit * 100)}%</span><span>暴傷 ${Math.round(st.critDmg * 100)}%</span><span>閃避 ${Math.round(st.dodge * 100)}%</span><span>屬性 ${TECHS[s.tech].elem}</span></div>
-    <h3>神通欄（${(s.shenEquip || []).length}/${maxShen()}）</h3>${shen.length ? shen.map(id => { const x = SHENS[id], on = (s.shenEquip || []).includes(id);
+      <span>暴擊 ${Math.round(st.crit * 100)}%</span><span>暴傷 ${Math.round(st.critDmg * 100)}%</span><span>閃避 ${Math.round(st.dodge * 100)}%</span><span>屬性 ${TECHS[s.tech].elem}</span></div>`;
+}
+// 神通：哪些學會了、哪些裝進了神通欄
+function renderShenTab() {
+  const s = L(), shen = s.shen || [];
+  return `<h3>神通欄（${(s.shenEquip || []).length}/${maxShen()}）</h3>${shen.length ? shen.map(id => { const x = SHENS[id], on = (s.shenEquip || []).includes(id);
       return `<div class="item"><div class="row"><b class="g4">${x.name}</b><span class="small muted">${x.type} · ${{ open: '開場發動', field: '整場生效', lethal: '危急時發動' }[x.trig]}</span></div>
         <div class="row small"><span>${x.desc}</span><span><button class="mini ${on ? 'on' : ''}" ${!on && (s.shenEquip || []).length >= maxShen() ? 'disabled' : ''} onclick="toggleShen('${id}')">${on ? '卸下' : '裝備'}</button></span></div></div>`; }).join('')
     : '<p class="muted small">還沒有神通。踏入化神時會依靈根覺醒本命神通；大境界突破出極品、稀有體質、天階功法圓滿（覺醒該功法專屬的神通）、天階法寶祭煉圓滿，也都會覺醒神通。每門神通一場戰鬥發動一次，不耗法力；只有裝備進神通欄的才會生效，欄位有限，學會的都會留在輪迴錄裡。</p>'}`;
