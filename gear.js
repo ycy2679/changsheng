@@ -380,7 +380,8 @@ const PHYSIQUES = {
   daotai:    { name: '先天道胎', r: 3, path: 'fa', techXp: .5, brk: .05 },
   jingangdt: { name: '金剛道體', r: 3, path: 'ti', hp: .4, def: .3, normalAtk: .3 },
   zifu:      { name: '紫府道體', r: 3, path: 'hun', shenUp: .3, crit: .08 },
-  tiandu:    { name: '天妒之體', r: 3, rate: .6, lifePct: -.4, desc: '修煉極快，但天妒英才，壽元只剩六成。' },
+  tiandu:    { name: '天妒之體', r: 3, rate: .6, lifePct: -.4, grow: { rate: .25 },
+               desc: '修煉極快，但天妒英才，壽元只剩六成。修煉 +60%，每過一個大境界再 +25%。' },
   changsheng: { name: '長生道體', r: 3, life: 200, lateRate: .5 },
   // 聖體
   zhanti:    { name: '不滅戰體', r: 4, path: 'ti', hp: .4, regen: .03, killXiu: .003 },

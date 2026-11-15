@@ -560,12 +560,14 @@ function techMul(id, s = L()) { const l = techLayer(id, s); return 1 + .1 * l + 
 function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return NO_SCALE.includes(key) ? v : v * techMul(id, s); }
 // 法寶祭煉倍率
 const artMul = (id, s = L()) => 1 + .15 * (s.arts[id] || 0);
+// 體質數值；有 grow 的每過一個大境界再加一次（天妒之體）
+function physVal(key, s = L()) { const ph = PHYSIQUES[s.phys]; return (ph[key] || 0) + (ph.grow && ph.grow[key] || 0) * stg(s).major; }
 // 所有加成來源：主修＋輔修功法、法寶（隨祭煉放大）、體質
 function eff(key, s = L()) {
   let v = equipped(s).reduce((a, id, i) => a + (i && key === 'rate' ? 0 : effOf(id, key, s) * (i ? subBoost(id, s) : 1)), 0) + pathEff(key, s);   // 輔修不算修煉速度
   const t2 = dualOn(s); if (t2) v += effOf(t2, key, s) * dualFactor(t2, s.tech);   // 副主修打折
   for (const id of gearIds(s)) v += (ARTS[id][key] || 0) * (NO_SCALE.includes(key) ? 1 : artMul(id, s));
-  if (s.phys) v += (PHYSIQUES[s.phys][key] || 0) * physMul(s);
+  if (s.phys) v += physVal(key, s) * physMul(s);
   return v + talentEff(key) + buffEff(key, s) + sectEff(key, s);
 }
 // ---------- 限時藥效（s.buffs：丹藥 id → 剩幾秒） ----------
