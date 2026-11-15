@@ -2186,11 +2186,18 @@ const arrayUsed = (s = L()) => Object.keys(s.arrays || {}).length;   // 已經�
 const arrayOnCount = (s = L()) => Object.values(s.arrOn || {}).filter(Boolean).length;
 // 陣法的實際效果：蓋了但沒啟用就是 0
 const arrEff = (id, s = L()) => (s.arrOn && s.arrOn[id]) ? arrLv(id, s) : 0;
-const arrayCost = (l, id) => ({ ore: (id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[l], n: 5, stone: ARRAY_STONE[l] });
+// 每座陣的材料：[礦材份數, 靈草份數]，第 N 級用 N 階材料
+const ARRAY_MATS = { juling: [5, 5], yaoyuan: [0, 5], kuangmai: [5, 0], danshi: [5, 10], dihuo: [10, 5], hushan: [5, 0] };
+const arrayCost = (l, id) => {
+  const [o, h] = ARRAY_MATS[id], mats = id === 'juling' ? [[MAT_ORE[l], o], [MAT_HERB[l], h]] : [[MAT_HERB[l], h], [MAT_ORE[l], o]];
+  return { mats: mats.filter(m => m[1]), stone: ARRAY_STONE[l] };
+};
+const arrayAfford = c => c.mats.every(([id, n]) => count(id) >= n) && L().stone >= c.stone;
 function buildArray(id) {
   const s = L(), l = arrLv(id) + 1, c = arrayCost(l, id); s.arrays = s.arrays || {}; s.arrOn = s.arrOn || {};
-  if (l > 4 || count(c.ore) < c.n || s.stone < c.stone) return;
-  s.items[c.ore] -= c.n; s.stone -= c.stone; s.arrays[id] = l;
+  if (l > 4 || !arrayAfford(c)) return;
+  for (const [m, n] of c.mats) s.items[m] -= n;
+  s.stone -= c.stone; s.arrays[id] = l;
   if (l === 1 && arrayOnCount(s) < arraySlots(s)) s.arrOn[id] = true;
   log(l === 1 ? `你在洞府佈下${ARRAYS[id].name}${s.arrOn[id] ? '' : '，但陣位已滿，還沒啟用'}。` : `${ARRAYS[id].name}升到第 ${l} 級。`); save(); render();
 }
@@ -2224,15 +2231,15 @@ function renderArrays() {
   const ores = [...MAT_HERB.slice(1), ...MAT_ORE.slice(1)].map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
     const a = ARRAYS[id], l = arrLv(id), c = l < 4 ? arrayCost(l + 1, id) : null, isOn = !!(s.arrOn && s.arrOn[id]);
-    const can = c && count(c.ore) >= c.n && s.stone >= c.stone;
-    const buildBtn = !c ? '<span class="same">已滿級</span>' : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${ITEMS[c.ore].name} ×${c.n}＋${fmt(c.stone)} 靈石</button>`;
+    const can = c && arrayAfford(c);
+    const buildBtn = !c ? '<span class="same">已滿級</span>' : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${c.mats.map(([m, n]) => `${ITEMS[m].name} ×${n}`).join('＋')}＋${fmt(c.stone)} 靈石</button>`;
     const onBtn = l ? `<button class="mini ${isOn ? 'on' : ''}" ${!isOn && on >= slots ? 'disabled' : ''} onclick="toggleArrOn('${id}')">${isOn ? '停用' : '啟用'}</button>` : '';
     return `<div class="item"><div class="row"><b>${a.name}</b>${l ? ` <span class="same">第 ${l} 級${isOn ? '' : '・未啟用'}</span>` : ''}</div>
       <div class="small muted">${!l ? '佈下後：' + a.desc(1) : isOn ? '目前：' + a.desc(l) : '已蓋好，但沒有啟用，沒有效果'}${l && l < 4 ? `；升級後：${a.desc(l + 1)}` : ''}</div>
       ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[l]}）</option>${[1, 2, 3, 4].filter(g => g <= l).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}
       <div class="btnrow">${buildBtn}${onBtn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</div></div>`;
   };
-  return `<h3>啟用中 ${on}/${slots}</h3><p class="small muted">六座陣法都能蓋，但同時間只能啟用 ${slots} 座（${next !== undefined ? `洞府升到 ${next} 級多一座，最高 4 座` : '已經是上限'}），沒啟用的不算效果。每座陣最多 4 級，佈陣、升級要材料和靈石（第 N 級用 N 階材料 5 份，藥園陣用靈草，其他用礦材），撤陣材料不退。藥園、礦脈能長到陣法等級那一階。</p>
+  return `<h3>啟用中 ${on}/${slots}</h3><p class="small muted">六座陣法都能蓋，但同時間只能啟用 ${slots} 座（${next !== undefined ? `洞府升到 ${next} 級多一座，最高 4 座` : '已經是上限'}），沒啟用的不算效果。每座陣最多 4 級，佈陣、升級要材料和靈石（第 N 級用 N 階的靈草、礦材），撤陣材料不退。藥園、礦脈能長到陣法等級那一階。</p>
     <p class="small">材料：${ores}</p>${Object.keys(ARRAYS).map(row).join('')}`;
 }
 let craftTab = 'dan';
