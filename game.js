@@ -773,7 +773,7 @@ function renderCodex() {
   else if (codexTab === 'v') body = section('遊歷事件', 'g2', 'v', EVENTS.map(e => e.id), id => EVENTS.find(e => e.id === id).title);
   else body = `<div class="small" style="margin-top:8px">${Object.keys(ARCS).map(id => { const end = S.meta.arcDone[id];
       return `<div class="row item"><b class="who">${ARCS[id].name}</b><span>${end ? ARC_END_LABEL[end] || end : '<span class="muted">未結緣</span>'}</span></div>`; }).join('')}</div>
-      <p class="muted small">重要人物整個遊戲只會遇見一次，走到哪個結局就是哪個。</p>`;
+      <p class="muted small">重要人物整個遊戲只會遇見一次，走到哪個結局就是哪個。一世最多結識 ${ARC_PER_LIFE} 位，其他人要等之後的輪迴（守碑人除外）。</p>`;
   return `<p class="small">已收錄 ${n} 項。每收錄 ${CODEX_STEP} 項悟得道果 ${CODEX_GUO}，下一次在 ${next} 項。</p>
     ${nav(LUN_TABS.map(([k, name]) => [k, name]), codexTab, 'tab')}${body}`;
 }
@@ -1224,10 +1224,14 @@ function encounter() {
 // ---------- 事件 ----------
 function arc(id) { const s = L(); return s.arcs[id] || (s.arcs[id] = { step: 0, aff: 0 }); }
 function arcEnd(id, end) { arc(id).ended = 1; S.meta.arcDone[id] = end; S.meta.arcLife[id] = S.meta.lives; if (id === 'bei') storyMark('n4'); codexPay(); }
+// 每一世最多認識幾位新的重要人物，其餘的留到之後幾世；守碑人是飛升條件，不受限
+const ARC_PER_LIFE = 3;
+const arcsMet = (s = L()) => Object.keys(s.arcs).filter(id => id !== 'bei' && (s.arcs[id].step > 0 || s.arcs[id].ended)).length;
 function popEvent(storyOnly) {
-  const s = L(), m = S.meta, c = [];
+  const s = L(), m = S.meta, c = [], full = arcsMet(s) >= ARC_PER_LIFE;
   for (const id in ARCS) {
     const a = arc(id), step = ARCS[id].steps[a.step];
+    if (full && id !== 'bei' && !a.step && !a.ended) continue;
     if (!m.arcDone[id] && !a.ended && step && s.stage >= step.min) c.push({ ref: { arc: id }, w: 4 });
   }
   for (const e of MEMORIES) if (!m.memSeen[e.id] && m.arcDone[e.bond] === e.end && m.arcLife[e.bond] < m.lives && s.stage >= e.min) c.push({ ref: { mem: e.id }, w: 6 });
