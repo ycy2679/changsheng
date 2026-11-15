@@ -1336,6 +1336,7 @@ function tryBreak(offline = false) {
       if (mj === 4 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '踏入化神，元神與天地相合'); }
       pathSkillCheck(s);
       pathArtCheck(s);
+      if (mj === 7 && S.meta.dao < ASCEND_DAO) log(`道心只有 ${S.meta.dao}/${ASCEND_DAO}。道心主要在坐化或兵解時才會增加，這一世就算渡劫圓滿，多半也飛升不了；不想空等的話，可以考慮兵解轉世。`);
     }
     return { ok: true, major, msg: `突破成功${used ? `（服下${pill} ${used} 顆）` : ''}，晉入${stg().name}！` + (major ? `${ql}壽元增至 ${Math.floor(lifespan())} 年。` : '') };
   } else {
@@ -1718,8 +1719,9 @@ function updateDyn() {
     $('mplbl').textContent = RES_NAME[m0] + (m0 === 'ti' ? '（開戰兩成）' : '');
     $('mptxt').textContent = ps.map((k, i) => `${i ? RES_NAME[k] + ' ' : ''}${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}`).join(' · ');
     $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
-  { const atTop = s.stage >= STAGES.length - 1, w = atTop ? ascendWhy(s) : [], bt = buffText(s);
-    $('buffs').textContent = bt + (atTop ? (bt ? '　' : '') + (w.length ? '飛升還差：' + w.join('、') : '九道天雷之後就能飛升，但失敗就會身死。') : ''); } $('realm').textContent = realmName(s);
+  { const atTop = s.stage >= STAGES.length - 1, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = stg().major >= 7 && S.meta.dao < ASCEND_DAO;
+    const tip = atTop ? (w.length ? '飛升還差：' + w.join('、') + (noDao ? '（道心在坐化或兵解時才會增加，這一世多半飛升不了）' : '') : '九道天雷之後就能飛升，但失敗就會身死。') : noDao ? `道心 ${S.meta.dao}/${ASCEND_DAO}，這一世多半飛升不了` : '';
+    $('buffs').textContent = bt + (tip ? (bt ? '　' : '') + tip : ''); } $('realm').textContent = realmName(s);
   $('res').innerHTML = `靈石 ${fmt(s.stone)}${s.found >= .01 ? ` · <span class="same">根基 +${Math.round(s.found * 100)}%</span>` : ''}${s.tox >= 1 ? ` · <span class="${s.tox > 50 ? 'hurt' : ''}">丹毒 ${Math.ceil(s.tox)}%</span>` : ''}`;
   $('inj').innerHTML = s.injury > 0 ? `<span class="hurt">負傷 ${Math.ceil(s.injury)} 秒</span>${count('heal') ? ' <button class="mini" onclick="useHeal()">服療傷丹</button>' : ''}` : (s.mode === 'travel' ? `遊歷${place().name}` : '閉關中');
   const b = $('brk'), last = s.stage >= STAGES.length - 1, u = brkPillsUsed();
