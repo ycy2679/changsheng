@@ -2093,7 +2093,8 @@ function brewChance(id, s = L()) {
 }
 const brewNeed = id => ({ id: MAT_HERB[RECIPES[id].g], n: RECIPES[id].n });
 // 爐費：坊市價的三成靈石（藥引、丹火），免得自己煉比買便宜太多
-const brewFee = id => Math.round(itemPrice(id) * .3);
+// 修為丹、突破丹一爐出好幾顆又好賣，爐費改收原價八成五（不打折），轉賣報酬最多約 3 倍
+const brewFee = id => ['xiu', 'brk'].includes(ITEMS[id].kind) ? Math.round(sellItemPrice(id) / SELL_RATE * .85) : Math.round(itemPrice(id) * .3);
 const brewSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrEff('danshi', s));
 const brewMax = (id, s = L()) => s.furnace || !brewOk(id, s) ? 0 : Math.min(Math.floor(count(brewNeed(id).id) / brewNeed(id).n) || 0, Math.floor(s.stone / brewFee(id)) || 0);
 // 修為丹、突破丹只能煉目前大境界的那一種
@@ -2289,7 +2290,7 @@ function renderCraft() {
     <p class="small">靈草：${herbs}</p>
     <h3>丹方（${known.length}/${total}）</h3>
     ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))([1, 2, 3, 4].filter(g => known.some(id => RECIPES[id].g === g)))}
-    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的靈石當爐費。修為丹、突破丹只能煉目前大境界用的那一種。失敗靈草會燒掉，地階以上的丹還可能炸爐受傷。黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。</p>`;
+    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的靈石當爐費；修為丹、突破丹的爐費是原價八成五，而且只能煉目前大境界用的那一種。失敗靈草會燒掉，地階以上的丹還可能炸爐受傷。黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
