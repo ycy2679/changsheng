@@ -370,7 +370,7 @@ const sellItemPrice = id => {
   return Math.max(1, Math.round(base * SELL_RATE));
 };
 const sellArtPrice = id => Math.round(ART_PRICE[ARTS[id].grade] * SELL_RATE * (1 + .3 * (L().arts[id] || 0)));   // 每祭煉一重 +30%
-function sellItem(id) { const s = L(); if (!count(id)) return; s.items[id]--; s.stone += sellItemPrice(id); save(); render(); }
+function sellItem(id, n = 1) { const s = L(); n = Math.min(n, count(id)); if (n < 1) return; s.items[id] -= n; s.stone += sellItemPrice(id) * n; save(); render(); }
 function sellArt(id) {
   if (!canDrop('art', id)) return;
   if (armed !== 'sell:' + id) { armed = 'sell:' + id; render(); return; }
@@ -2032,7 +2032,8 @@ function renderBag() {
     const ok = k === 'heal' ? s.injury > 0 || (s.hpNow ?? 1) < 1 : k === 'xiu' ? s.xiu < stg().need : true;
     return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>`;
   };
-  const sell = id => `<button class="mini" onclick="sellItem('${id}')">賣 ${fmt(sellItemPrice(id))}</button>`;
+  const sell = id => { const max = count(id), q = getQty('sell:' + id, max);
+    return (max > 1 ? qtyPicker('sell:' + id, max) : '') + `<button class="mini" onclick="sellItem('${id}', ${q})">賣${q > 1 ? ` ×${q}` : ''} ${fmt(sellItemPrice(id) * q)}</button>`; };
   const nav = `<nav>${BAG_TABS.map(([k, n, f]) => `<button class="${tb[0] === k ? 'on' : ''}" onclick="setBagTab('${k}')">${n}（${all.filter(id => f(ITEMS[id].kind)).length}）</button>`).join('')}</nav>`;
   const head = tb[0] === 'dan' ? `<h3>丹毒 ${Math.ceil(s.tox)}%</h3>${bar('tox', s.tox / 100)}
     <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。用不到的丹藥可以按原價七成賣給坊市。</p>` : '';
