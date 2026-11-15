@@ -1129,6 +1129,7 @@ function techShenCheck(id, l) {
   if (l < 9 || !sid || hasShen(sid, s)) return;
   gainShen(sid, `《${TECHS[id].name}》功法圓滿`);
 }
+const DUNWU_SEC = 2400;   // 閉關時平均幾秒（線上，60 秒＝1 年）頓悟一次
 function tick(dt) {
   const s = L(); if (s.dead || s.draw) return;   // 還在抽根骨時不算時間
   if (s.mortal) { mortalTick(dt); return; }      // 還是凡人
@@ -1151,10 +1152,10 @@ function tick(dt) {
     if (!s.ev) { s.evT -= dt; if (s.evT <= 0) { s.evT = evGap(); popEvent(false); } }
   } else {
     if (!s.ev) { s.evT -= dt * .5; if (s.evT <= 0) { s.evT = evGap(); popEvent(true); } }
-    if (pct(dt / 1800 * (1 + tl('dunwu')))) {   // 平均約 30 年一次：少而重
-      const want = Math.round(stg().need * .63), g = addXiu(1.8), rest = want - g;   // 約當前境界六成的修為；超出這一境的部分化為根基
-      if (rest > 0) addFound(rest);
-      log(g ? `閉關中豁然開朗，頓悟了，修為 +${fmt(g)}${rest > 0 ? '，餘下的化為根基' : ''}。` : '閉關中頓悟，修為已滿，化為根基。');
+    if (pct(dt / DUNWU_SEC * (1 + tl('dunwu')))) {   // 頓悟：直接填滿這個小境界的修為；已滿就化為根基
+      const g = stg().need - s.xiu;
+      if (g > 0) { s.xiu = stg().need; log(`閉關中豁然開朗，頓悟了，修為 +${fmt(g)}，${stg().name}圓滿。`); }
+      else { addFound(stg().need * .3); log('閉關中頓悟，修為已滿，化為根基。'); }
     }
   }
   autoActs();
