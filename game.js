@@ -1199,7 +1199,7 @@ function autoActs() {
   if (autoOn('a_main')) {
     // 比潛力（圓滿後的修煉速度，也就是基礎速度），不看目前層數；沒當主修的功法不會長層數，看層數會永遠換不上高階功法
     const pot = id => TECHS[id].rate || 0;
-    const best = Object.keys(s.techs).filter(id => canMain(id)).sort((a, b) => pot(b) - pot(a))[0];
+    const best = Object.keys(s.techs).filter(id => canMain(id) && id !== s.tech2).sort((a, b) => pot(b) - pot(a))[0];   // 副主修交給玩家自己安排
     if (best && pot(best) > pot(s.tech)) switchTech(best, true);
   }
   // 隨緣應變：普通事件 30 秒沒選就自動選（人物劇情、前世羈絆不算）
@@ -1625,7 +1625,10 @@ function applyOffline(sec) {
   s.injury = Math.max(0, s.injury - off);
   tickBuffs(off, s);   // 離線期間藥效照樣過
   brewTick(off, s); forgeTick(off, s); arrayTick(off * offRate(), s);   // 爐子離線也照煉，藥園礦脈照離線效率長
-  s.age += off * OFFLINE_AGE / YEAR_SEC;   // 離線也會變老，但比較慢
+  // 離線也會變老，但比較慢；最多老到壽元剩一成，不會在離線時坐化
+  const ageCap = Math.max(s.age, lifespan() * .9), age1 = s.age + off * OFFLINE_AGE / YEAR_SEC;
+  s.age = Math.min(age1, ageCap);
+  if (age1 > ageCap) log('壽元將盡，閉關中你強撐著一口氣，沒有再老下去。');
   s.tox = Math.max(0, s.tox - off / 6 * (1 + .5 * tl('jiedu')));
   const stones = s.mode === 'travel' ? addStone(off / 16 * .6 * stoneUnit() * .5 * (1 + eff('stone'))) : 0;
   if (s.mode === 'travel') { const n = Math.floor(off / 16 * .6 * .25); if (n) addMat(matGrade(), Math.random() < .5 ? 'herb' : 'ore', n); }
