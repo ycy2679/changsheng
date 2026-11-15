@@ -1750,9 +1750,9 @@ function renderOffline() {
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
 const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem !== '無' && rootFits(t.elem)) ? ` · <span class="same">靈根親和${isMainType(t.type) ? '（主修時修煉 +15%）' : ''}</span>` : '';
-function techCard(id, btns = '', hint = '') {
+function techCard(id, btns = '', hint = '', lock = false) {
   const s = L(), t = TECHS[id], l = techLayer(id);
-  return `<div class="item"><div class="row"><b>《${t.name}》</b>${gradeTag(t.grade, `${t.custom ? '自創 · ' : ''}${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
+  return `<div class="item"><div class="row"><span>${lock ? lockBtn('tech', id) : ''}<b>《${t.name}》</b></span>${gradeTag(t.grade, `${t.custom ? '自創 · ' : ''}${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
     <div class="small">${effText(t, id) || '<span class="muted">沒有特別加成</span>'}</div>
     ${techAff(t) || hint ? `<div class="small">${[techAff(t).replace(/^ · /, ''), hint].filter(Boolean).join(' · ')}</div>` : ''}
     ${l < 9 ? bar('xiu thin', ((s.techs[id] || 0) - techNeed(id, l)) / (techNeed(id, l + 1) - techNeed(id, l))) : ''}
@@ -1844,7 +1844,7 @@ function renderGong() {
       <button class="mini ${techUsable ? 'on' : ''}" onclick="setTechView('usable')">只看修得了的</button></span></div>
     ${renderBatch('tech')}
     ${all.length ? `<nav class="wrap">${['全部', ...types].map(ty => `<button class="${techTab === ty ? 'on' : ''}" onclick="setTechView('tab', '${ty}')">${ty}</button>`).join('')}</nav>` : ''}
-    ${list.map(id => techCard(id, extra(id), techHint(id))).join('') || '<p class="muted">沒有符合的功法。坊市、遊歷、奇遇都可能得到。</p>'}
+    ${list.map(id => techCard(id, extra(id), techHint(id), true)).join('') || '<p class="muted">沒有符合的功法。坊市、遊歷、奇遇都可能得到。</p>'}
     <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（主修七成、輔修平分三成；主修圓滿就全給輔修），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。鎖定的不會被批量處理。</p>`;
 }
 // ---------- 術法分頁：屬性分頁、攻防輔篩選、排序 ----------
@@ -1862,7 +1862,7 @@ function skillHint(id) {
 function renderSkill() {
   const s = L(), te = TECHS[s.tech].elem;
   const row = (id, hint = '') => { const k = SKILLS[id], on = s.equip.includes(id), lv = skillLv(id), nx = MASTERY_USES[lv + 1];
-    return `<div class="item"><div class="row"><b>${k.name}</b>${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
+    return `<div class="item"><div class="row"><span>${on ? '' : lockBtn('skill', id)}<b>${k.name}</b></span>${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}${hint ? ' · ' + hint : ''}</div>
       <div class="small">${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}${ownSch(id) || isSupport(id) ? '' : ' · <span class="hurt">非本路：威力 -40%、耗費 ×1.5</span>'}${k.elem !== '無' && k.elem === te ? ' · <span class="same">與主修同屬性</span>' : ''}${skillFits(k.elem) ? ' · <span class="same">靈根親和</span>' : ''}</div>
       <div class="btnrow">${on ? `<button class="mini" onclick="moveEquip('${id}',-1)">↑</button><button class="mini" onclick="moveEquip('${id}',1)">↓</button>` : ''}<button class="mini ${on ? 'on' : ''}" onclick="toggleEquip('${id}')">${on ? '卸下' : '裝備'}</button>${on ? '' : dropBtns('skill', id)}</div></div>`; };
@@ -1903,13 +1903,12 @@ function toggleLock(kind, id) {
   if (s[LOCK_KEY[kind]][id]) delete s[LOCK_KEY[kind]][id]; else s[LOCK_KEY[kind]][id] = 1;
   save(); render();
 }
-const lockBtn = (kind, id) => `<button class="mini ${isLocked(kind, id) ? 'on' : ''}" onclick="toggleLock('${kind}','${id}')">${isLocked(kind, id) ? '🔒已鎖定' : '🔓鎖定'}</button>`;
+const lockBtn = (kind, id) => `<button class="lockico ${isLocked(kind, id) ? 'on' : ''}" title="${isLocked(kind, id) ? '已鎖定，點一下解鎖' : '點一下鎖定'}" onclick="toggleLock('${kind}','${id}')">📌</button>`;
 function dropBtns(kind, id) {
   const price = kind === 'tech' ? techSellPrice(id) : skillSellPrice(id);
-  if (isLocked(kind, id)) return lockBtn(kind, id) + '<span class="muted small">鎖定中，不會被參悟或賣出</span>';
+  if (isLocked(kind, id)) return '<span class="muted small">已鎖定，不會被參悟或賣出</span>';
   const a = armed === `study:${kind}:${id}`, b = armed === `sellx:${kind}:${id}`;
-  return lockBtn(kind, id)
-    + (kind === 'tech' && !studySplit(id) ? '<span class="muted small">功法都圓滿了</span>' : `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`)
+  return (kind === 'tech' && !studySplit(id) ? '<span class="muted small">功法都圓滿了</span>' : `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`)
     + `<button class="mini ${b ? 'danger' : ''}" onclick="sellIt('${kind}','${id}')">${b ? '確定賣出？' : `賣 ${fmt(price)}`}</button>`;
 }
 // canDrop 同時當作「能不能賣／參悟」的資格判斷：裝備中、鎖定中的都不行
@@ -2000,12 +1999,11 @@ function renderArt() {
   const s = L();
   const card = id => {
     const a = ARTS[id], lv = s.arts[id], on = isOn(id), full = lv >= ART_MAX_REFINE, p = refinePrice(id), locked = isLocked('art', id);
-    return `<div class="item"><div class="row"><b>${a.name}</b>${gradeTag(a.legend ? 5 : a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
+    return `<div class="item"><div class="row"><span>${on ? '' : lockBtn('art', id)}<b>${a.name}</b></span>${gradeTag(a.legend ? 5 : a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
       <div class="small">${effText(a, null, artMul(id))}${a.path ? ` · <span class="same">${PATHS[a.path].name}專屬</span>` : ''}</div>
       <div class="btnrow">
         <button class="mini" ${full || s.stone < p || (refineOre(id) && !count(refineOre(id))) ? 'disabled' : ''} onclick="refineArt('${id}')">${full ? '已祭煉圓滿' : `祭煉 ${fmt(p)} 靈石${refineOre(id) ? `＋${ITEMS[refineOre(id)].name}（有 ${count(refineOre(id))}）` : ''}`}</button>
         ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">${artBlock(id)}</span>` : '<span class="muted">欄位已滿</span>'}
-        ${on ? '' : lockBtn('art', id)}
         ${on || locked ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</div></div>`;
   };
   const owned = Object.keys(s.arts);
