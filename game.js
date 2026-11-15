@@ -2244,7 +2244,7 @@ function getQty(key, max) { const q = Math.max(1, Math.min(max, craftQty[key] ||
 function adjQty(key, max, d) { craftQty[key] = Math.max(1, Math.min(max, (craftQty[key] || 1) + d)); render(); }
 function setQty(key, max, v) { craftQty[key] = Math.max(1, Math.min(max, Math.round(+v) || 1)); render(); }
 const qtyPicker = (key, max) => { const q = getQty(key, max);
-  return `<span class="qtyrow"><button class="mini" ${q <= 1 ? 'disabled' : ''} onclick="adjQty('${key}', ${max}, -1)">－</button><input class="qtyinput" type="number" min="1" max="${max}" value="${q}" onchange="setQty('${key}', ${max}, this.value)">×<button class="mini" ${q >= max ? 'disabled' : ''} onclick="adjQty('${key}', ${max}, 1)">＋</button></span>`; };
+  return `<span class="qtyrow"><button class="mini" ${q <= 1 ? 'disabled' : ''} onclick="adjQty('${key}', ${max}, -1)">－</button><input class="qtyinput" type="number" min="1" max="${max}" value="${q}" onchange="setQty('${key}', ${max}, this.value)"><button class="mini" ${q >= max ? 'disabled' : ''} onclick="adjQty('${key}', ${max}, 1)">＋</button></span>`; };
 // 煉丹、煉器的品階小分頁：沒選過就停在當前境界那一階（沒有就取最高的）
 const craftGrade = {};
 function craftG(k, gs) { if (!gs.includes(craftGrade[k])) craftGrade[k] = gs.includes(matGrade()) ? matGrade() : gs[gs.length - 1]; return craftGrade[k]; }
