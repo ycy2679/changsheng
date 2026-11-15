@@ -303,7 +303,7 @@ function renderMortal() {
     <div class="opts">${Object.entries(PATHS).map(([id, x]) => { const i = m.pick.indexOf(id); return `<button class="opt ${i >= 0 ? 'on' : ''}" onclick="pickPath('${id}')"><b>${x.name}${i === 0 && pathMax() > 1 ? '（主）' : i > 0 ? '（兼修）' : ''}</b><span class="small">${x.desc}</span></button>`; }).join('')}</div>
     <div class="btns"><button class="primary" ${m.pick.length ? '' : 'disabled'} onclick="confirmPath()">就走這條路</button></div></section>`;
   if (m.phase === 'qi') return `${head}<section class="panel card"><b>感氣</b>
-    <p>${FATES[m.fate].test.split('。')[0]}。如今你身負${rootName()}，正盤坐著感應天地間的靈氣。</p>
+    <p>如今你知道自己身負${rootName()}，正盤坐著感應天地間的靈氣。</p>
     <div class="row small"><span>感氣</span><span id="qitxt"></span></div>${bar('xiu', 0, 'qibar')}
     <p class="small muted">靈根越好，感氣越快。感氣完成就能踏入練氣一層。</p></section>`;
   const yrs = mortalYears(), left = Math.max(0, m.start + yrs - s.age);
@@ -339,7 +339,13 @@ const pct = p => Math.random() < p;
 const pick = a => a[Math.floor(Math.random() * a.length)];
 function pickW(list, w) { let x = Math.random() * list.reduce((a, o) => a + w(o), 0); return list.find(o => (x -= w(o)) < 0) || list[list.length - 1]; }
 function fmt(n) { n = Math.floor(n); return n >= 1e8 ? (n / 1e8).toFixed(2) + '億' : n >= 1e4 ? (n / 1e4).toFixed(1) + '萬' : String(n); }
-function log(text) { const s = L(); s.log.unshift({ age: Math.floor(s.age), text }); if (s.log.length > 120) s.log.length = 120; dirty = true; }
+// routine：打怪、撿靈石這類日常。日常最多留 40 條，免得洗掉劇情；坐化時的紀事也不列出
+function log(text, routine) {
+  const s = L(); s.log.unshift(routine ? { age: Math.floor(s.age), text, r: 1 } : { age: Math.floor(s.age), text });
+  if (routine && s.log.filter(l => l.r).length > 40) s.log.splice(s.log.findLastIndex(l => l.r), 1);
+  if (s.log.length > 120) s.log.length = 120;
+  dirty = true;
+}
 const place = (s = L()) => PLACES.find(p => p.id === s.place);
 const placeLv = () => place().lv;
 const stoneUnit = (lv = placeLv()) => Math.round(4 * Math.pow(lv, 1.4));
@@ -1097,14 +1103,16 @@ function battle(name, lv, mult = 1, loot = false, elem = '無') {
     let msg = `擊敗${name}（${how}）`;
     const kx = eff('killXiu') + shenSum('winXiu');
     if (kx) { const g = Math.min(stg().need - s.xiu, Math.round(stg().need * kx)); s.xiu += Math.max(0, g); }
+    let rare = false;   // 掉了功法、法寶、丹藥這類稀有東西，就不算日常
     if (loot) {
-      msg += `，得靈石 ${addStone(stoneUnit(lv) * (.8 + Math.random() * .4) * (1 + eff('stone')) * (1 + shenSum('loot')))}${tryDrop(.04 * (1 + shenSum('dropUp')))}`;
+      const drop = tryDrop(.04 * (1 + shenSum('dropUp'))); rare = !!drop;
+      msg += `，得靈石 ${addStone(stoneUnit(lv) * (.8 + Math.random() * .4) * (1 + eff('stone')) * (1 + shenSum('loot')))}${drop}`;
       if (pct(.25 * (1 + eff('drop')))) msg += `，採到${addMat(pick(pl_grades()))}`;
-      if (s.place !== 'bamboo' && pct(.01 * (1 + eff('drop')))) msg += `，還撿到一顆${addPill(1)}`;
-      if (tcNext() && pct(.004 * (1 + eff('drop')))) msg += `，竟然還有一份${addTc()}`;   // 天材地寶：極少掉落
-      if (essenceNext() && pct(.002 * (1 + eff('drop')))) msg += `，還凝出一團${addEssence()}`;   // 五行之精：更少
+      if (s.place !== 'bamboo' && pct(.01 * (1 + eff('drop')))) { msg += `，還撿到一顆${addPill(1)}`; rare = true; }
+      if (tcNext() && pct(.004 * (1 + eff('drop')))) { msg += `，竟然還有一份${addTc()}`; rare = true; }   // 天材地寶：極少掉落
+      if (essenceNext() && pct(.002 * (1 + eff('drop')))) { msg += `，還凝出一團${addEssence()}`; rare = true; }   // 五行之精：更少
     }
-    log(msg + '。');
+    log(msg + '。', loot && !rare);
   } else { injure(90 * (1 + pathEff('injury', s))); log(`不敵${name}，負傷退走（${how}）。`); }
   return res.win;
 }
@@ -1220,7 +1228,7 @@ function encounter() {
     const [name, elem] = pick(pl.foes);
     if (s.injury > 0) log(`傷勢未癒，你避開了${name}。`);
     else battle(name, pl.lv, pl.mult, true, elem);
-  } else if (r < .85) log(`在${pl.name}拾得靈石 ${addStone(stoneUnit() * .5 * (1 + eff('stone')))}。`);
+  } else if (r < .85) log(`在${pl.name}拾得靈石 ${addStone(stoneUnit() * .5 * (.8 + Math.random() * .4) * (1 + eff('stone')))}。`, true);
 }
 
 // ---------- 事件 ----------
@@ -2331,7 +2339,7 @@ function renderGuide() {
     ${seen.map(x => `<div class="item"><b>${x.title}</b><div class="small">${x.text}</div></div>`).join('') || '<p class="muted">還沒有看過任何提示。</p>'}
     <p class="muted small">碰到新系統時會跳出提示，看過的都收在這裡。</p>`;
 }
-function renderLog() { return `<ul class="log">${L().log.map(l => `<li><span class="muted">${l.age} 歲</span> ${l.text}</li>`).join('')}</ul>`; }
+function renderLog(story) { return `<ul class="log">${L().log.filter(l => !story || !l.r).map(l => `<li><span class="muted">${l.age} 歲</span> ${l.text}</li>`).join('')}</ul>`; }
 // 道途分頁：道心與悟道樹／輪迴錄／羈絆、前世、其他
 let daoTab = 'tree';
 function setDaoTab(k) { daoTab = k; armed = ''; render(); }
@@ -2365,10 +2373,10 @@ function renderDeath() {
     <p>碑上的名字一路往前延伸，看不到盡頭。在很前面、很前面的位置，有一個被劃掉的名字。你認得那個筆跡——那是你自己寫的字。</p>
     <p>你飛升過，也隕落過。這一次，碑上的你，還會被劃掉嗎？</p>
     <p class="same">凡界篇・完　仙界篇製作中。飛升的獎勵：道心、道果各額外 +${s.ascendBonus}。你可以繼續輪迴，再走一次。</p>` : `<b>第 ${S.meta.lives} 世 · ${s.tribFail ? '渡劫失敗' : '坐化'}</b>`}
-    <p>你在 ${h.age} 歲走到了盡頭。這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
+    <p>${s.ascended ? `你在 ${h.age} 歲飛升。` : `你在 ${h.age} 歲走到了盡頭。`}這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
     <p>這一世的感悟化為道心 +${s.daoGot}、道果 +${s.daoGot}。現在共有道果 <b class="same">${S.meta.guo}</b>，可以到悟道樹點天賦。</p>
     <div class="choices"><button class="primary" onclick="setDeathView('tree')">入悟道</button></div></section>
-    <section class="panel"><h3>這一世的紀事</h3>${renderLog()}</section>`;
+    <section class="panel"><h3>這一世的紀事</h3>${renderLog(true)}</section>`;
 }
 
 // ---------- 開始介面 ----------
