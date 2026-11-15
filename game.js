@@ -1151,9 +1151,10 @@ function tick(dt) {
     if (!s.ev) { s.evT -= dt; if (s.evT <= 0) { s.evT = evGap(); popEvent(false); } }
   } else {
     if (!s.ev) { s.evT -= dt * .5; if (s.evT <= 0) { s.evT = evGap(); popEvent(true); } }
-    if (pct(dt / 300 * (1 + tl('dunwu')))) {
-      const g = addXiu(.3);   // 約當前境界一成的修為；修為已滿就化為根基
-      if (g) log(`閉關中豁然開朗，頓悟了，修為 +${fmt(g)}。`); else { addFound(stg().need * .1); log('閉關中頓悟，修為已滿，化為根基。'); }
+    if (pct(dt / 1800 * (1 + tl('dunwu')))) {   // 平均約 30 年一次：少而重
+      const want = Math.round(stg().need * .63), g = addXiu(1.8), rest = want - g;   // 約當前境界六成的修為；超出這一境的部分化為根基
+      if (rest > 0) addFound(rest);
+      log(g ? `閉關中豁然開朗，頓悟了，修為 +${fmt(g)}${rest > 0 ? '，餘下的化為根基' : ''}。` : '閉關中頓悟，修為已滿，化為根基。');
     }
   }
   autoActs();
