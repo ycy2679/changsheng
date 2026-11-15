@@ -2095,10 +2095,13 @@ const brewNeed = id => ({ id: MAT_HERB[RECIPES[id].g], n: RECIPES[id].n });
 // 爐費：坊市價的三成靈石（藥引、丹火），免得自己煉比買便宜太多
 const brewFee = id => Math.round(itemPrice(id) * .3);
 const brewSec = (g, s = L()) => BREW_SEC[g] * (1 - .15 * arrEff('danshi', s));
-const brewMax = (id, s = L()) => s.furnace ? 0 : Math.min(Math.floor(count(brewNeed(id).id) / brewNeed(id).n) || 0, Math.floor(s.stone / brewFee(id)) || 0);
+const brewMax = (id, s = L()) => s.furnace || !brewOk(id, s) ? 0 : Math.min(Math.floor(count(brewNeed(id).id) / brewNeed(id).n) || 0, Math.floor(s.stone / brewFee(id)) || 0);
+// 修為丹、突破丹只能煉目前大境界的那一種
+const brewMajor = id => ITEMS[id].kind === 'xiu' ? XIU_PILLS.indexOf(id) : ITEMS[id].kind === 'brk' ? BRK_PILLS.indexOf(id) : -1;
+const brewOk = (id, s = L()) => brewMajor(id) < 0 || brewMajor(id) === stg(s).major;
 function tryBrew(id, qty = 1, s = L()) {
   const r = RECIPES[id], nd = brewNeed(id);
-  if (s.furnace || !r || !knowRecipe(id) || qty < 1 || count(nd.id) < nd.n * qty || s.stone < brewFee(id) * qty) return false;
+  if (s.furnace || !r || !knowRecipe(id) || !brewOk(id, s) || qty < 1 || count(nd.id) < nd.n * qty || s.stone < brewFee(id) * qty) return false;
   s.items[nd.id] -= nd.n * qty; s.stone -= brewFee(id) * qty;
   s.furnace = { id, qty, t: brewSec(r.g, s), total: brewSec(r.g, s) };
   return true;
@@ -2275,7 +2278,7 @@ function renderCraft() {
     return `<div class="item"><div class="row"><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}</div>
       <div class="small">${ITEMS[id].desc}</div>
       <div class="small muted">${ITEMS[nd.id].name} ×${nd.n * q}（有 ${count(nd.id)}）＋靈石 ${fmt(brewFee(id) * q)} · ${Math.round(brewSec(r.g))} 秒/爐 · 成功 ${Math.round(brewChance(id) * 100)}%</div>
-      <div class="btnrow">${max >= 1 ? qtyPicker(key, max) : ''}<button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}', ${q})">開爐${q > 1 ? `×${q}` : ''}</button></div></div>`;
+      <div class="btnrow">${!brewOk(id, s) ? `<span class="muted small">${MAJORS[brewMajor(id)].name}期才能煉</span>` : `${max >= 1 ? qtyPicker(key, max) : ''}<button class="mini" ${ok ? '' : 'disabled'} onclick="startBrew('${id}', ${q})">開爐${q > 1 ? `×${q}` : ''}</button>`}</div></div>`;
   };
   if (craftTab === 'qi') return craftNav() + renderForge();
   if (craftTab === 'zhen') return craftNav() + renderArrays();
@@ -2286,7 +2289,7 @@ function renderCraft() {
     <p class="small">靈草：${herbs}</p>
     <h3>丹方（${known.length}/${total}）</h3>
     ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))([1, 2, 3, 4].filter(g => known.some(id => RECIPES[id].g === g)))}
-    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的靈石當爐費。失敗靈草會燒掉，地階以上的丹還可能炸爐受傷。黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。</p>`;
+    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的靈石當爐費。修為丹、突破丹只能煉目前大境界用的那一種。失敗靈草會燒掉，地階以上的丹還可能炸爐受傷。黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
