@@ -1197,9 +1197,10 @@ function autoActs() {
   const xp = XIU_PILLS[stg().major];
   if (autoOn('a_xiu') && s.tox < 30 && s.xiu < need && count(xp)) usePill(xp);
   if (autoOn('a_main')) {
-    // 比算上層數之後的修煉加成，免得換到一部還沒練過、其實比較慢的功法
-    const best = Object.keys(s.techs).filter(id => canMain(id)).sort((a, b) => effOf(b, 'rate', s) - effOf(a, 'rate', s))[0];
-    if (best && effOf(best, 'rate', s) > effOf(s.tech, 'rate', s)) switchTech(best, true);
+    // 比潛力（圓滿後的修煉速度，也就是基礎速度），不看目前層數；沒當主修的功法不會長層數，看層數會永遠換不上高階功法
+    const pot = id => TECHS[id].rate || 0;
+    const best = Object.keys(s.techs).filter(id => canMain(id)).sort((a, b) => pot(b) - pot(a))[0];
+    if (best && pot(best) > pot(s.tech)) switchTech(best, true);
   }
   // 隨緣應變：普通事件 30 秒沒選就自動選（人物劇情、前世羈絆不算）
   if (autoOn('a_event') && s.ev && s.ev.ev && (s.ev.w = (s.ev.w || 0) + 1) >= 30) autoChoose();
