@@ -1991,7 +1991,7 @@ function renderBatch(kind) {
     const sellN = batchEligible(kind, g, false).length, studyN = kind === 'art' ? 0 : batchEligible(kind, g, true).length;
     if (!sellN && !studyN) return '';
     const sKey = `bsell:${kind}:${g}`, tKey = `bstudy:${kind}:${g}`;
-    return `<div class="row small"><span>${GRADES[g]}</span><span>${studyN ? `<button class="mini ${armed === tKey ? 'danger' : ''}" onclick="batchStudy('${kind}', ${g})">${armed === tKey ? `確定參悟 ${studyN} 件？` : `批量參悟（${studyN}）`}</button>` : ''}${sellN ? `<button class="mini ${armed === sKey ? 'danger' : ''}" onclick="batchSell('${kind}', ${g})">${armed === sKey ? `確定賣出 ${sellN} 件？` : `批量賣出（${sellN}）`}</button>` : ''}</span></div>`;
+    return `<div class="small">${GRADES[g]}</div><div class="btnrow">${studyN ? `<button class="mini ${armed === tKey ? 'danger' : ''}" onclick="batchStudy('${kind}', ${g})">${armed === tKey ? `確定參悟 ${studyN} 件？` : `批量參悟（${studyN}）`}</button>` : ''}${sellN ? `<button class="mini ${armed === sKey ? 'danger' : ''}" onclick="batchSell('${kind}', ${g})">${armed === sKey ? `確定賣出 ${sellN} 件？` : `批量賣出（${sellN}）`}</button>` : ''}</div>`;
   }).join('');
   return rows ? `<div class="item"><div class="row small muted"><span>批量操作</span><span>依品階選未鎖定的${KIND_NAME[kind]}一次處理</span></div>${rows}</div>` : '';
 }
@@ -2038,7 +2038,7 @@ function renderBag() {
   const head = tb[0] === 'dan' ? `<h3>丹毒 ${Math.ceil(s.tox)}%</h3>${bar('tox', s.tox / 100)}
     <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。用不到的丹藥可以按原價七成賣給坊市。</p>` : '';
   const empty = { dan: '沒有丹藥。', bao: '沒有天材地寶或五行之精。秘境、遊歷和奇遇有機會得到。', mat: '沒有材料。遊歷打怪、宗門採藥、秘境、坊市櫃台和藥園礦脈都能得到。' }[tb[0]];
-  return nav + head + (ids.map(id => `<div class="item"><div class="row"><b>${ITEMS[id].name}</b>${ITEMS[id].grade ? ' ' + gradeTag(ITEMS[id].grade) : ''} ×${count(id)}</div>
+  return nav + head + (ids.map(id => `<div class="item"><div class="row"><span><b>${ITEMS[id].name}</b>${ITEMS[id].grade ? ' ' + gradeTag(ITEMS[id].grade) : ''} ×${count(id)}</span></div>
     <div class="small">${ITEMS[id].desc}</div>
     <div class="btnrow">${btn(id)}${sell(id)}</div></div>`).join('') || `<p class="muted">${empty}</p>`);
 }
@@ -2048,18 +2048,18 @@ function renderShop() {
   const slot = (o, i) => {
     if (o.sold) return `<div class="item row muted"><span>（已售出）</span></div>`;
     const deal = o.deal ? ' <span class="deal">奇貨</span>' : '';
-    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><b>《${t.name}》</b>${deal} ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? ' · <span class="muted">你只能輔修</span>' : ` · <span class="hurt">${mainBlock(o.id)}</span>`) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
-    if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row"><b>${k.name}</b>${deal} ${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
-    if (o.k === 'art') { const a = ARTS[o.id]; return `<div class="item"><div class="row"><b>${a.name}</b>${deal} ${gradeTag(a.grade, `法寶 · ${a.slot}`)}</div><div class="small">${effText(a)}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
+    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><span><b>《${t.name}》</b>${deal}</span> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? ' · <span class="muted">你只能輔修</span>' : ` · <span class="hurt">${mainBlock(o.id)}</span>`) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
+    if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row"><span><b>${k.name}</b>${deal}</span> ${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
+    if (o.k === 'art') { const a = ARTS[o.id]; return `<div class="item"><div class="row"><span><b>${a.name}</b>${deal}</span> ${gradeTag(a.grade, `法寶 · ${a.slot}`)}</div><div class="small">${effText(a)}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     const it = ITEMS[o.id];
-    return `<div class="item"><div class="row"><b>${it.name}</b>${deal}</div><div class="small">${it.desc}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`;
+    return `<div class="item"><div class="row"><span><b>${it.name}</b>${deal}</span></div><div class="small">${it.desc}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`;
   };
   return `<h3>櫃台</h3>
     <div class="item"><div class="row"><b>療傷丹</b></div><div class="small">立刻治好傷勢</div><div class="btnrow">${btn(healPrice(), "buy('heal')")}</div></div>
     <div class="item"><div class="row"><b>回氣丹</b></div><div class="small">戰鬥中法力不夠又受傷時自動服用</div><div class="btnrow">${btn(mpPillPrice(), "buy('mp')")}</div></div>
     ${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => `<div class="item"><div class="row"><span><b>${ITEMS[MAT_HERB[g]].name}</b>／<b>${ITEMS[MAT_ORE[g]].name}</b></span></div><div class="small">${GRADES[g]}靈草／礦材</div><div class="btnrow">${btn(herbPrice(g), `buy('herb', ${g})`).replace('</button>', ' 買靈草</button>')}${btn(herbPrice(g), `buy('ore', ${g})`).replace('</button>', ' 買礦材</button>')}</div></div>`).join('')}
     <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
-    <div class="item row"><span><b>洞府 ${s.cave} 級</b> <span class="muted small">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</span></span>${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div>
+    <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div><div class="btnrow">${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
     <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨。</p>`;
@@ -2446,7 +2446,7 @@ function renderTree() {
       ${lv > eff ? `<div class="small same">已點到 ${lv} 級，這一世仍按 ${eff} 級生效，下一世開局才會套用到 ${lv} 級</div>` : ''}
       ${t.req.length ? `<div class="small ${ok ? 'muted' : 'hurt'}">前置：${t.req.map(r => TAL[r].name).join('、')}</div>` : ''}
       ${next(t).length ? `<div class="small muted">通往：${next(t).map(x => x.name).join('、')}</div>` : ''}
-      <div class="row small">${action}<span>${thr}${auto}</span></div></div>`;
+      <div class="btnrow small">${action}${thr}${auto}</div></div>`;
   };
   // 這個天賦是哪些天賦的前置
   const next = t => TALENTS.filter(x => x.req.includes(t.id));
