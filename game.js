@@ -2349,14 +2349,14 @@ const TIPS = [
   { id: 'death', title: '壽元將盡', when: s => s.age / lifespan(s) > .8, text: '壽元快到了。坐化不是結束：這一世的成就會化為道心和道果，帶進下一世。想再拚一把，可以吃延壽丹或衝下一個大境界。' },
   { id: 'rebirth', title: '輪迴', tab: 'dao', when: s => S.meta.lives >= 2, text: '這是你的第二世。「道途」→「悟道」用道果點天賦，越點越強，化身天賦還能替你自動處理雜事；「輪迴錄」記下歷世見過的一切，收錄越多道果越多。' },
 ];
-let tipNow = null;
+let tipNow = null, tipAge = -9;   // tipAge：上一個提示關掉時的年齡，兩個提示之間至少隔 45 秒（0.75 年），免得一入道就連跳好幾個
 const curTip = () => tipNow ? TIPS.find(x => x.id === tipNow) : null;
 function tipCheck(s = L()) {
-  const m = S.meta; if (m.tipsOff || tipNow || !m.tips) return;
+  const m = S.meta; if (m.tipsOff || tipNow || !m.tips || (s.age >= tipAge && s.age - tipAge < .75)) return;   // 轉世後年齡變小就不算
   const x = TIPS.find(x => !m.tips[x.id] && x.when(s));
   if (x) { tipNow = x.id; dirty = true; }
 }
-function closeTip(off) { if (tipNow) S.meta.tips[tipNow] = 1; tipNow = null; if (off) S.meta.tipsOff = 1; save(); render(); }
+function closeTip(off) { if (tipNow) S.meta.tips[tipNow] = 1; tipNow = null; tipAge = L().age; if (off) S.meta.tipsOff = 1; save(); render(); }
 function renderTip() {
   const x = curTip();
   return `<section class="panel card tip"><div class="row"><b>${x.title}</b><span class="who">提示</span></div><p>${x.text}</p>
