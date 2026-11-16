@@ -278,7 +278,12 @@ function pathArtCheck(s = L()) {
   if (!s.paths || s.stage < 18 || s.flags.pathArt) return;
   s.flags.pathArt = 1;
   const id = PATH_ARTS[myPaths(s)[0]];
-  if (id) { gainArt(id); log(`踏入化神，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」。`); }
+  if (!id) return;
+  gainArt(id);
+  // 本命法寶直接戴上：有空格就放空格，沒有就換掉品階最低的飾品
+  let put = '';
+  if (!isOn(id, s)) { const k = freeKey(id, s) || swapKey(id, s); if (k) { put = s.gear[k] ? `，換下了「${ARTS[s.gear[k]].name}」` : ''; s.gear[k] = id; } }
+  log(`踏入化神，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」，隨即戴上${put}。`);
 }
 // 路線專屬大招（進化型）：金丹學會基礎型，化神進化成強化型，進化後基礎型換成強化型、熟練度延續（兼修的路線也算）
 const PATH_ULT = { ti: ['santou', 'fatian'], hun: ['shenhun', 'wannian'] };
@@ -829,11 +834,14 @@ const gearIds = (s = L()) => gearKeys().map(k => s.gear[k]).filter(Boolean);
 const isOn = (id, s = L()) => gearKeys().some(k => s.gear[k] === id);
 // 這件法寶能放的空格（武器、護甲直接換掉；飾品找空著的格子，滿了就回 null）
 const freeKey = (id, s = L()) => ARTS[id].slot !== '飾品' ? ARTS[id].slot : accKeys().find(k => !s.gear[k]) || null;
+// 飾品欄滿了：換掉品階最低（同品階看祭煉重數）的那件；本命法寶不會被換下
+const swapKey = (id, s = L()) => ARTS[id].slot !== '飾品' ? null : accKeys().filter(k => s.gear[k] && !ARTS[s.gear[k]].path)
+  .sort((a, b) => ARTS[s.gear[a]].grade - ARTS[s.gear[b]].grade || s.arts[s.gear[a]] - s.arts[s.gear[b]])[0] || null;
 function gainArt(id) { const s = L(); codexAdd('a', id); if (!(id in s.arts)) { s.arts[id] = 0; const k = freeKey(id, s); if (k && !s.gear[k] && artOk(id, s)) s.gear[k] = id; } }
 function equipArt(id) {
   const s = L(), on = gearKeys().find(k => s.gear[k] === id);
   if (on) s.gear[on] = null;
-  else { const k = freeKey(id); if (!k || !artOk(id)) return; s.gear[k] = id; }
+  else { const k = freeKey(id) || swapKey(id); if (!k || !artOk(id)) return; s.gear[k] = id; }
   save(); render();
 }
 const refinePrice = id => Math.round(ART_PRICE[ARTS[id].grade] * .4 * Math.pow(1.6, L().arts[id]));
@@ -1310,7 +1318,10 @@ function setMode(m) { L().mode = m; L().encT = 8; dirty = true; render(); }
 function setPlace(id) { L().place = id; dirty = true; render(); }
 function breakthrough() {
   const s = L(); if (s.stage >= STAGES.length - 1) { tribulation(); return; } if (s.xiu < stg().need || s.stage >= STAGES.length - 1) return;
-  log(tryBreak().msg); save(); render();
+  // 突破成功那一行要排在本命法寶、神通、新地點這些附帶結果前面（紀事是新的在上）
+  const top = s.log[0], r = tryBreak(), k = top ? s.log.indexOf(top) : s.log.length;
+  log(r.msg); if (k > 0) s.log.splice(k, 0, s.log.shift());
+  save(); render();
 }
 // 衝擊下一個境界（手動和離線共用同一套規則），回傳結果文字
 // ---------- 神通的取得 ----------
@@ -1659,7 +1670,7 @@ function applyOffline(sec) {
   s.tox = Math.max(0, s.tox - off / 6 * (1 + .5 * tl('jiedu')));
   const stones = s.mode === 'travel' ? addStone(off / 16 * .6 * stoneUnit() * .5 * (1 + eff('stone'))) : 0;
   if (s.mode === 'travel') { const n = Math.floor(off / 16 * .6 * .25); if (n) addMat(matGrade(), Math.random() < .5 ? 'herb' : 'ore', n); }
-  s.offline = { sec: Math.round(sec), off: Math.round(off), xiu: Math.round(gained), stones, up: s.stage > stage0 ? stg().name : '' };
+  s.offline = { sec: Math.round(sec), off: Math.round(off), xiu: Math.round(gained), stones, up: s.stage > stage0 ? stg().name : '', travel: s.mode === 'travel' };
   dirty = true;
 }
 function closeOffline() { L().offline = null; render(); }
@@ -1794,7 +1805,7 @@ function renderOffline() {
   const o = L().offline;
   return `<section class="panel card"><b>閉關歸來</b>
     <p>你離開了 ${dur(o.sec)}${o.off < o.sec ? `（洞府只撐得住 ${dur(o.off)}）` : ''}。這段時間修為 +${fmt(o.xiu)}${o.up ? `，突破到了${o.up}` : ''}${o.stones ? `，遊歷所得靈石 ${fmt(o.stones)}` : ''}。</p>
-    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園礦脈也照常運轉。</p>
+    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${o.travel ? '（你離開時在遊歷，修為再減半、不吃洞府加成，但有靈石和材料）' : ''}${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園礦脈也照常運轉。</p>
     <div class="choices"><button onclick="closeOffline()">知道了</button></div></section>`;
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
@@ -1966,7 +1977,7 @@ function canDrop(kind, id) {
   if (isLocked(kind, id)) return false;
   if (kind === 'tech') return id in s.techs && !equipped().includes(id) && id !== s.tech2;
   if (kind === 'skill') return id in s.skills && !s.equip.includes(id) && !SKILLS[id].only;
-  return id in s.arts && !isOn(id);
+  return id in s.arts && !isOn(id) && !ARTS[id].path;   // 本命法寶不能賣
 }
 function studySplit(id, s = L()) {
   const g = techStudyGain(id), subs = s.subs.filter(x => x !== id && techLayer(x, s) < 9), main = techLayer(s.tech, s) < 9;
@@ -2052,12 +2063,12 @@ function renderArt() {
       <div class="small">${effText(a, null, artMul(id))}${a.path ? ` · <span class="same">${PATHS[a.path].name}專屬</span>` : ''}</div>
       <div class="btnrow">
         <button class="mini" ${full || s.stone < p || (refineOre(id) && !count(refineOre(id))) ? 'disabled' : ''} onclick="refineArt('${id}')">${full ? '已祭煉圓滿' : `祭煉 ${fmt(p)} 靈石${refineOre(id) ? `＋${ITEMS[refineOre(id)].name}（有 ${count(refineOre(id))}）` : ''}`}</button>
-        ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">${artBlock(id)}</span>` : '<span class="muted">欄位已滿</span>'}
-        ${on || locked ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</div></div>`;
+        ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">${artBlock(id)}</span>` : swapKey(id) ? `<button class="mini" onclick="equipArt('${id}')">替換「${ARTS[s.gear[swapKey(id)]].name}」</button>` : '<span class="muted">欄位已滿</span>'}
+        ${on || locked || a.path ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</div></div>`;
   };
   const owned = Object.keys(s.arts);
   return renderBatch('art') + ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
-    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，只有那條路線能裝備。鎖定的不會被批量賣出。</p>';
+    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，會直接戴上，只有那條路線能裝備，也不能賣。飾品欄滿了可以直接「替換」品階最低的那件。鎖定的不會被批量賣出。</p>';
 }
 // 行囊小分頁：丹藥、寶物（天材地寶、五行之精）、材料
 let bagTab = 'dan';
