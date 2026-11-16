@@ -965,7 +965,7 @@ const SECRETS = [
 ];
 const SECRET_CD = 30;   // 冷卻（遊戲年）
 // 各秘境的難度倍率：前期角色弱、後期角色強，所以前低後高
-const SECRET_SCALE = [0, .8, .85, .9, 1.2, 1.4, 1.6, 1.85, 2.1];
+const SECRET_SCALE = [0, .58, .75, .9, 1.2, 1.4, 1.6, 1.85, 2.1];   // 築基、金丹兩座調低：剛開的時候第一次闖大約一半到七成能過
 const secretOpen = (x, s = L()) => stg(s).major >= x.mj;
 const secretWait = (x, s = L()) => { const t = s.flags['sj_' + x.id]; return t === undefined ? 0 : Math.max(0, Math.ceil(t + SECRET_CD - s.age)); };
 // 第 floor 層（0、1 精英，2 頭目）的強度
@@ -1254,7 +1254,7 @@ function encounter() {
   const s = L(), pl = place(), r = Math.random();
   if (r < .6) {
     const [name, elem] = pick(pl.foes);
-    if (s.injury > 0) log(`傷勢未癒，你避開了${name}。`);
+    if (s.injury > 0) log(`傷勢未癒，你避開了${name}。`, true);
     else battle(name, pl.lv, pl.mult, true, elem);
   } else if (r < .85) log(`在${pl.name}拾得靈石 ${addStone(stoneUnit() * .5 * (.8 + Math.random() * .4) * (1 + eff('stone')))}。`, true);
 }
@@ -1463,11 +1463,25 @@ function usePill(id) {
   } else if (it.kind === 'life') { const n = Math.round(15 * pe * tf); s.lifeBonus += n; addTox(30); msg = `服下延壽丹，壽元 +${n}。`; }
   else if (it.kind === 'body') { s.body += .03 * tf; if (!tl('xisuiwudu')) addTox(30); msg = '服下洗髓丹，筋骨一陣劇痛，氣血、攻擊、防禦永久提升。'; }
   else if (it.kind === 'dan') { msg = useDan(id, it, addTox); if (!msg) return; }
-  else if (it.kind === 'tech') { msg = `服下悟道丹，對《${addTechXp(600 * pe)}》的領悟更深一層。`; }
+  else if (it.kind === 'tech') { if (danBlock(id, s)) return; msg = `服下悟道丹，對《${addTechXp(600 * pe)}》的領悟更深一層。`; }
   else return;
   s.items[id]--; S.meta.pills++; log(msg, ['heal', 'xiu'].includes(it.kind) || it.fx === 'huichun'); save(); render();   // 常吃的療傷丹、修為丹、回春丹記成例行，不洗紀事
 }
 // 雜丹的效果；不能用時回空字串（不會吃掉）
+// 丹藥現在吃不了的原因（給行囊顯示，也擋住白白浪費）；能吃回空字串
+function danBlock(id, s = L()) {
+  const it = ITEMS[id];
+  if (it.kind === 'tech') return techLayer(s.tech, s) >= 9 && !s.subs.some(x => techLayer(x, s) < 9) ? '功法都圓滿了' : '';
+  if (it.kind !== 'dan') return '';
+  switch (it.fx) {
+    case 'guben': return (s.found || 0) >= .3 ? '根基已滿' : '';
+    case 'huichun': return (s.hpNow ?? 1) >= 1 && (s.mpNow ?? 1) >= 1 ? '氣血法力都滿' : '';
+    case 'qingxin': return s.tox < 1 ? '沒有丹毒' : '';
+    case 'zhuyan': return s.age < 26 ? '未滿 26 歲' : '';
+    case 'pozhang': case 'humai': case 'xingshen': case 'tianji': return s.flags[it.fx] ? '效果還在' : '';
+  }
+  return '';
+}
 function useDan(id, it, addTox) {
   const s = L();
   switch (it.fx) {
@@ -1761,7 +1775,7 @@ function render() {
     ${s.ev ? renderEvent() : ''}
     ${curTip() ? renderTip() : ''}
     <nav>${TABS.map(([k, n]) => `<button class="${tab === k ? 'on' : ''} ${curTip() && curTip().tab === k ? 'glow' : ''}" onclick="setTab('${k}')">${n}</button>`).join('')}</nav>
-    <section class="panel">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, craft: renderCraft, shop: renderShop, log: renderLog, dao: renderDao })[tab]()}</section>`;
+    <section class="panel">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, craft: renderCraft, shop: renderShop, log: renderLogTab, dao: renderDao })[tab]()}</section>`;
   updateDyn();
 }
 
@@ -2100,8 +2114,8 @@ function renderBag() {
     }
     if (k === 'tc') return `<span class="muted small">衝擊${MAJORS[ITEMS[id].major + 1].name}時自動使用</span>`;
     if (k === 'mat') return `<span class="muted small">${ITEMS[id].mat === 'herb' ? '到百藝煉丹' : '到百藝煉器、祭煉用'}</span>`;
-    const ok = k === 'heal' ? s.injury > 0 || (s.hpNow ?? 1) < 1 : k === 'xiu' ? s.xiu < stg().need : true;
-    return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>`;
+    const why = danBlock(id, s), ok = k === 'heal' ? s.injury > 0 || (s.hpNow ?? 1) < 1 : k === 'xiu' ? s.xiu < stg().need : !why;
+    return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>${why ? `<span class="muted small">${why}</span>` : ''}`;
   };
   const sell = id => { const max = count(id), q = getQty('sell:' + id, max);
     return (max > 1 ? qtyPicker('sell:' + id, max) : '') + `<button class="mini" onclick="sellItem('${id}', ${q})">賣${q > 1 ? ` ×${q}` : ''} ${fmt(sellItemPrice(id) * q)}</button>`; };
@@ -2398,6 +2412,10 @@ function renderGuide() {
     ${seen.map(x => `<div class="item"><b>${x.title}</b><div class="small">${x.text}</div></div>`).join('') || '<p class="muted">還沒有看過任何提示。</p>'}
     <p class="muted small">碰到新系統時會跳出提示，看過的都收在這裡。</p>`;
 }
+// 紀事分頁：預設只看大事（例行的打怪、撿靈石收起來），可以切到全部
+let logAll = false;
+function setLogAll(v) { logAll = v; render(); }
+const renderLogTab = () => `<nav><button class="${logAll ? '' : 'on'}" onclick="setLogAll(false)">只看大事</button><button class="${logAll ? 'on' : ''}" onclick="setLogAll(true)">全部</button></nav>` + renderLog(!logAll);
 function renderLog(story) { return `<ul class="log">${L().log.filter(l => !story || !l.r).map(l => `<li><span class="muted">${l.age} 歲</span> ${l.text}</li>`).join('')}</ul>`; }
 // 道途分頁：道心與悟道樹／輪迴錄／羈絆、前世、其他
 let daoTab = 'tree';
