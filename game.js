@@ -1231,7 +1231,7 @@ function autoActs() {
   if (autoOn('a_event') && s.ev && s.ev.ev && (s.ev.w = (s.ev.w || 0) + 1) >= 30) autoChoose();
   if (autoOn('a_refine')) for (const id of gearIds()) { if (s.arts[id] < ART_MAX_REFINE && s.stone > refinePrice(id) * 3 && (!refineOre(id) || count(refineOre(id)))) refineArt(id); }
   if (s.xiu >= need && s.stage < STAGES.length - 1) {
-    if (isMajorNext() ? autoOn('a_major') && brkChance() >= S.meta.autoMajor : autoOn('a_minor')) breakthrough();
+    if (isMajorNext() ? autoOn('a_major') && realChance() >= S.meta.autoMajor : autoOn('a_minor')) breakthrough();
   }
 }
 // 自動轉世：坐化後自動轉世，測根骨時挑修煉倍率最高的靈根、最稀有的體質
@@ -1355,11 +1355,13 @@ function toggleShen(id) {
 }
 function setBrkMode(v) { L().brkMode = v; save(); updateDyn(); }
 // offline：離線自動突破一律穩紮穩打
+// 體修淬體：大境界突破要額外花靈石（突破丹價的一半，兼修的五折），不夠就成功率打八折
+const tiCost = (s = L()) => { if (!isMajorNext(s)) return 0; const w = pathList(s).filter(([id]) => id === 'ti').reduce((a, [, x]) => a + x, 0); return Math.round(BRK_PILL_PRICE[Math.min(7, stg(s).major)] * .5 * w); };
+const realChance = (s = L(), mode) => brkChance(s, mode) * (tiCost(s) && s.stone < tiCost(s) ? .8 : 1);   // 算進淬體靈石不夠的八折
 function tryBreak(offline = false) {
   const s = L(), major = isMajorNext(), mode = major && !offline ? s.brkMode : 'safe';
   // 體修淬體：大境界突破要額外花靈石（突破丹價的一半），不夠就成功率打八折
-  const tiW = major ? pathList(s).filter(([id]) => id === 'ti').reduce((a, [, w]) => a + w, 0) : 0, tiCost = Math.round(BRK_PILL_PRICE[Math.min(7, stg().major)] * .5 * tiW);
-  const tiShort = tiW && s.stone < tiCost; if (tiW && !tiShort) s.stone -= tiCost;
+  const tCost = tiCost(s), tiShort = tCost && s.stone < tCost; if (tCost && !tiShort) s.stone -= tCost;
   const pz = !major && s.flags.pozhang;   // 破障丹
   if (pz) s.flags.pozhang = 0;
   const p = pz ? 1 : brkChance(s, mode) * (tiShort ? .8 : 1), used = brkPillsUsed(), pill = major ? ITEMS[BRK_PILLS[stg().major]].name : '', found = s.found || 0;
@@ -1656,7 +1658,7 @@ function applyOffline(sec) {
     left -= t; gained += stg().need - s.xiu; s.xiu = stg().need;
     if (s.stage >= STAGES.length - 1) break;
     // 不能自動突破就停在這裡，剩下的時間化為根基
-    if (isMajorNext() ? !(autoOn('a_major') && brkChance(s, 'safe') >= S.meta.autoMajor) : !autoOn('a_minor')) { addFound(left * r); break; }
+    if (isMajorNext() ? !(autoOn('a_major') && realChance(s, 'safe') >= S.meta.autoMajor) : !autoOn('a_minor')) { addFound(left * r); break; }
     const res = tryBreak(true);
     if (!res.ok && res.major) { log(how + '時衝擊大境界，' + res.msg); break; }   // 大境界失敗就停下等你回來
   }
@@ -1792,7 +1794,7 @@ function updateDyn() {
   const why = last ? ascendWhy(s) : [];
   b.disabled = last ? why.length > 0 : s.xiu < need;
   b.className = 'primary' + (armed === 'trib' ? ' danger' : '');
-  b.textContent = last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(brkChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}`;
+  b.textContent = last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
   $('recent').innerHTML = s.log.slice(0, 4).map(l => `<li>${l.text}</li>`).join('');
   if ($('shopT')) { if (ensureShop()) { render(); return; } $('shopT').textContent = dur2(Math.max(0, (s.shop.next - Date.now()) / 1000)); }
 }
@@ -1951,7 +1953,7 @@ function renderSkill() {
     ${renderBatch('skill')}
     ${all.length ? `<nav class="wrap">${['全部', ...elems].map(e => `<button class="${skillTab === e ? 'on' : ''}" onclick="setSkillView('tab', '${e}')">${e}</button>`).join('')}</nav>` : ''}
     ${list.map(id => row(id, skillHint(id))).join('') || '<p class="muted">沒有符合的術法。</p>'}
-    <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好、法力也夠的術法施放；都放不了就普通攻擊。法力會延續到下一場，戰鬥外慢慢回滿；術法品階越高越耗法力，主修功法層數越高法力越多。用得越多越熟練，和主修同屬性威力 +20%。用不到的術法可以「參悟」化為出招中術法的熟練度，或賣給坊市。</p>`;
+    <p class="muted small">戰鬥時每回合由上往下找第一個冷卻好、${RES_NAME[myPaths()[0]]}也夠的術法施放；都放不了就普通攻擊。術法品階越高越耗${RES_NAME[myPaths()[0]]}${myPaths()[0] === 'fa' ? '，主修功法層數越高法力越多' : ''}（怎麼回復看最上面那段）。用得越多越熟練，和主修同屬性威力 +20%。用不到的術法可以「參悟」化為出招中術法的熟練度，或賣給坊市。</p>`;
 }
 // ---------- 參悟、賣出用不到的功法和術法 ----------
 const techSellPrice = id => Math.round(TECH_PRICE[TECHS[id].grade] * SELL_RATE * (1 + .2 * techLayer(id)));   // 每一層 +20%
