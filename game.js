@@ -49,6 +49,7 @@ function load() {
   }
   // 舊存檔轉換：破境丹 → 當前境界的突破丹，功法改成主修＋輔修，補上靈根
   const s = S.life;
+  if (s.ev && s.ev.ev === 'tiancai' && !tcNext(s)) s.ev = null;   // 卡在渡劫還沒選的天材地寶事件（v1.5.7 以前會讓畫面壞掉）
   // 悟道樹上線前的存檔：補上新欄位，已累積的道心也當成道果給你
   const m = S.meta, d = newMeta();
   for (const k of ['talents', 'auto', 'autoMajor', 'wins', 'pills', 'keepTech']) if (m[k] === undefined) m[k] = d[k];
@@ -375,7 +376,7 @@ const SELL_RATE = .7;
 const ESSENCE_PRICE = 30000;   // 五行之精
 const tcPrice = id => BRK_PILL_PRICE[ITEMS[id].major] * 3;
 // 下一個大境界要用的天材地寶（渡劫以後沒有）
-const tcNext = (s = L()) => s.stage < STAGES.length - 1 ? TC_ITEMS[stg(s).major] : null;
+const tcNext = (s = L()) => s.stage < STAGES.length - 1 && TC_ITEMS[stg(s).major] || null;
 const tcBuyPrice = () => Math.round(tcPrice(tcNext()) * .8);
 function addTc() { const id = tcNext(); if (!id) return ''; addItem(id); return ITEMS[id].name; }
 const sellItemPrice = id => {
@@ -1352,6 +1353,7 @@ function tryBreak(offline = false) {
   s.brkBonus = 0; s.found = 0;
   if (pct(p)) {
     s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
+    if (s.ev && s.ev.ev === 'tiancai' && !tcNext(s)) s.ev = null;   // 還沒選的天材地寶事件：渡劫以後沒有東西可給，直接散去
     let ql = '';
     if (major) {
       const q = rollQual(s, found, used, mode, tc), mj = stg().major;
