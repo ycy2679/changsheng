@@ -1670,6 +1670,7 @@ function applyOffline(sec) {
   brewTick(off, s); forgeTick(off, s); arrayTick(off * offRate(), s);   // 爐子離線也照煉，藥園礦脈照離線效率長
   // 離線也會變老，但比較慢；最多老到壽元剩一成，不會在離線時坐化
   const ageCap = Math.max(s.age, lifespan() * .9), age1 = s.age + off * OFFLINE_AGE / YEAR_SEC;
+  if (s.sect) s.sect.duty += Math.min(age1, ageCap) - s.age;   // 離線不算偷懶：宗門任務的期限跟著往後延
   s.age = Math.min(age1, ageCap);
   if (age1 > ageCap) log(`壽元將盡，${how}中你強撐著一口氣，沒有再老下去。`);
   s.tox = Math.max(0, s.tox - off / 6 * (1 + .5 * tl('jiedu')));
