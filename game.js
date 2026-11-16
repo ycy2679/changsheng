@@ -1648,7 +1648,8 @@ const offRate = () => OFFLINE_RATE + .1 * tl('lixianxiao') + .1 * arrEff('hushan
 function applyOffline(sec) {
   const s = L(); if (s.dead || s.draw || s.mortal || sec < 30) return;
   s.hpNow = s.mpNow = s.snNow = 1;   // 離線回來一律回滿
-  const off = Math.min(sec, offlineCap());
+  // 分頁放背景時瀏覽器大約一分鐘才跑一次，會變成很多段短短的離線：連續的離線算同一段，共用洞府的時限（回到線上才重新計算）
+  const used = s.offUsed || 0, off = Math.min(sec, Math.max(0, offlineCap() - used)); s.offUsed = used + off;
   // 離線突破：小境界要有「水到渠成」，大境界要有「順勢破境」且成功率夠；規則和手動突破一樣
   const stage0 = s.stage, how = s.mode === 'travel' ? '遊歷' : '閉關';
   let left = off * offRate(), gained = 0;
@@ -1674,7 +1675,8 @@ function applyOffline(sec) {
   s.tox = Math.max(0, s.tox - off / 6 * (1 + .5 * tl('jiedu')));
   const stones = s.mode === 'travel' ? addStone(off / 16 * .6 * stoneUnit() * .5 * (1 + eff('stone'))) : 0;
   if (s.mode === 'travel') { const n = Math.floor(off / 16 * .6 * .25); if (n) addMat(matGrade(), Math.random() < .5 ? 'herb' : 'ore', n); }
-  s.offline = { sec: Math.round(sec), off: Math.round(off), xiu: Math.round(gained), stones, up: s.stage > stage0 ? stg().name : '', travel: s.mode === 'travel' };
+  const o = s.offline;   // 還沒按「知道了」的上一段離線報告：累加起來，不要只顯示最後一分鐘
+  s.offline = { sec: Math.round(sec) + (o ? o.sec : 0), off: Math.round(off) + (o ? o.off : 0), xiu: Math.round(gained) + (o ? o.xiu : 0), stones: stones + (o ? o.stones : 0), up: s.stage > stage0 ? stg().name : o ? o.up : '', travel: s.mode === 'travel' };
   dirty = true;
 }
 function closeOffline() { L().offline = null; render(); }
@@ -2543,7 +2545,7 @@ setInterval(() => {
   const now = Date.now(), dt = (now - lastNow) / 1000; lastNow = now;
   if (title) return;   // 停在開始介面時不算時間
   autoLife();
-  if (dt > 30) applyOffline(dt); else tick(dt * gameSpeed());    // 分頁在背景太久就當成離線；光陰如梭只加速線上時間
+  if (dt > 30) applyOffline(dt); else { L().offUsed = 0; tick(dt * gameSpeed()); }    // 分頁在背景太久就當成離線；光陰如梭只加速線上時間
   if ((saveT += dt) >= 10) { saveT = 0; save(); }
   // 下拉選單打開時不要整頁重繪，不然選單會被關掉
   if (dirty && document.activeElement?.tagName !== 'SELECT') render(); else updateDyn();
