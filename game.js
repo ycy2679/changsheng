@@ -1627,27 +1627,27 @@ function applyOffline(sec) {
   s.hpNow = s.mpNow = s.snNow = 1;   // 離線回來一律回滿
   const off = Math.min(sec, offlineCap());
   // 離線突破：小境界要有「水到渠成」，大境界要有「順勢破境」且成功率夠；規則和手動突破一樣
-  const stage0 = s.stage;
+  const stage0 = s.stage, how = s.mode === 'travel' ? '遊歷' : '閉關';
   let left = off * offRate(), gained = 0;
   while (left > 0) {
-    const r = rate(s, 'closed'), t = (stg().need - s.xiu) / r;
+    const r = rate(s), t = (stg().need - s.xiu) / r;   // 照離開時的模式算：遊歷跟線上一樣修為減半、不吃洞府
     if (t > left) { s.xiu += r * left; gained += r * left; break; }
     left -= t; gained += stg().need - s.xiu; s.xiu = stg().need;
     if (s.stage >= STAGES.length - 1) break;
     // 不能自動突破就停在這裡，剩下的時間化為根基
     if (isMajorNext() ? !(autoOn('a_major') && brkChance(s, 'safe') >= S.meta.autoMajor) : !autoOn('a_minor')) { addFound(left * r); break; }
     const res = tryBreak(true);
-    if (!res.ok && res.major) { log('閉關時衝擊大境界，' + res.msg); break; }   // 大境界失敗就停下等你回來
+    if (!res.ok && res.major) { log(how + '時衝擊大境界，' + res.msg); break; }   // 大境界失敗就停下等你回來
   }
-  if (s.stage > stage0) log(`閉關期間突破到了${stg().name}。`);
-  growTechs(off * offRate());
+  if (s.stage > stage0) log(`${how}期間突破到了${stg().name}。`);
+  growTechs(off * offRate() * (s.mode === 'travel' ? .5 : 1));
   s.injury = Math.max(0, s.injury - off);
   tickBuffs(off, s);   // 離線期間藥效照樣過
   brewTick(off, s); forgeTick(off, s); arrayTick(off * offRate(), s);   // 爐子離線也照煉，藥園礦脈照離線效率長
   // 離線也會變老，但比較慢；最多老到壽元剩一成，不會在離線時坐化
   const ageCap = Math.max(s.age, lifespan() * .9), age1 = s.age + off * OFFLINE_AGE / YEAR_SEC;
   s.age = Math.min(age1, ageCap);
-  if (age1 > ageCap) log('壽元將盡，閉關中你強撐著一口氣，沒有再老下去。');
+  if (age1 > ageCap) log(`壽元將盡，${how}中你強撐著一口氣，沒有再老下去。`);
   s.tox = Math.max(0, s.tox - off / 6 * (1 + .5 * tl('jiedu')));
   const stones = s.mode === 'travel' ? addStone(off / 16 * .6 * stoneUnit() * .5 * (1 + eff('stone'))) : 0;
   if (s.mode === 'travel') { const n = Math.floor(off / 16 * .6 * .25); if (n) addMat(matGrade(), Math.random() < .5 ? 'herb' : 'ore', n); }
