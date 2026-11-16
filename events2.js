@@ -2,10 +2,10 @@
 // 每個事件都是不同的情境，不做換名字的重複事件。沒標 repeat 的一世只發生一次。
 
 // 小工具：給一件沒拿過的法寶／功法／術法，回傳文字（拿不到就給靈石）
-function giftArt(grades, slot) { const id = randomUnowned('art', grades, slot ? x => x.slot === slot : null); if (id) { gainArt(id); return `「${ARTS[id].name}」`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
+function giftArt(grades, slot) { const id = randomUnowned('art', grades, slot ? x => x.slot === slot : null); if (id) { gainArt(id); return `「${ARTS[id].name}」`; } return `靈石 ${addStone(stoneUnit(topPlace().lv) * 6)}`; }
 function gainArtNamed(id) { gainArt(id); return `「${ARTS[id].name}」`; }
-function giftTech(grades) { const id = randomUnowned('tech', grades); if (id) { learnTech(id); return `《${TECHS[id].name}》`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
-function giftSkill(grades, elem) { const id = randomUnowned('skill', grades, elem ? x => x.elem === elem : null); if (id) { learnSkill(id); return `《${SKILLS[id].name}》`; } return `靈石 ${addStone(stoneUnit() * 6)}`; }
+function giftTech(grades) { const id = randomUnowned('tech', grades); if (id) { learnTech(id); return `《${TECHS[id].name}》`; } return `靈石 ${addStone(stoneUnit(topPlace().lv) * 6)}`; }
+function giftSkill(grades, elem) { const id = randomUnowned('skill', grades, elem ? x => x.elem === elem : null); if (id) { learnSkill(id); return `《${SKILLS[id].name}》`; } return `靈石 ${addStone(stoneUnit(topPlace().lv) * 6)}`; }
 
 EVENTS.push(
   // ---------- 練氣期 ----------

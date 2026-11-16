@@ -993,8 +993,10 @@ function enterSecret(id) {
   // 頭目獎勵：天材地寶、高階寶物、靈石丹藥，第一次通關必掉專屬，之後四分之一
   const lv = s.stage + 3, gr = x.mj >= 4 ? [4] : [3, 4], got = [];
   const tc = x.mj === stg().major ? addTc() : ''; if (tc) got.push(tc);   // 天材地寶只有當前境界的秘境才給，免得低階秘境被反覆刷
-  got.push(pick([giftArt, giftTech, giftSkill])(gr));
-  got.push(`靈石 ${addStone(stoneUnit(lv) * 30)}`, `${addPill(2)} 2 顆`, addMat(matGrade(), 'herb', 3), addMat(matGrade(), 'ore', 3));
+  // 高階寶物都有了會改給靈石：併進頭目的靈石裡，不要寫成兩筆
+  const st0 = s.stone, gift = pick([giftArt, giftTech, giftSkill])(gr), extra = gift.startsWith('靈石') ? s.stone - st0 : 0;
+  if (!extra) got.push(gift);
+  got.push(`靈石 ${addStone(stoneUnit(lv) * 30) + extra}`, `${addPill(2)} 2 顆`, addMat(matGrade(), 'herb', 3), addMat(matGrade(), 'ore', 3));
   { const r = randomRecipe([1, 2, 3, 4].filter(g => g <= matGrade() + 1)); if (r) got.push(r); }
   const first = !s.flags['sjc_' + id]; s.flags['sjc_' + id] = 1;
   const [kind, uid] = x.uniq, owned = kind === 'art' ? uid in s.arts : uid in s.skills;
@@ -1699,13 +1701,17 @@ function renderDraw() {
   const s = L(), d = s.draw, fake = r => rootName({ root: r });
   const intro = s.mortal ? FATES[s.mortal.fate].test : S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。';
   const opt = (kind, i, on, title, cls, desc) => `<button class="opt ${on ? 'on' : ''}" onclick="pickDraw('${kind}',${i})"><b class="${cls}">${title}</b><span class="small">${desc}</span></button>`;
+  // 前世功法（悟道樹）帶來的主修如果挑靈根，提醒要哪個屬性
+  const kid = S.meta.keepTech && S.meta.keepTech.id, kt = kid && kid !== 'yinqi' && kid in s.techs ? TECHS[kid] : null;
+  const needEl = kt && kt.grade >= 3 && kt.elem !== '無' && kt.type !== '鍛體' ? kt.elem : null;
   const rootCls = r => ({ heaven: 'g4', mutant: 'g4', void: 'g4', dual: 'g3', triple: 'g2', quad: 'g1', five: 'g1' })[r.type];
   return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel card"><b>${s.mortal ? '測靈根' : '測根骨'}</b>
       <p>${intro}</p>
+      ${needEl ? `<p class="small">前世功法《${kt.name}》要${needEl}屬性靈根才能當主修，合得上的靈根標了「合前世功法」。</p>` : ''}
       <p class="small">靈根、體質各選一個。靈根、體質各能重抽 ${d.rr.r}／${d.rr.p} 次（道心越高次數越多，好根骨也越常出現）。</p>
       <div class="row"><h3>靈根</h3><button class="mini" ${d.rr.r ? '' : 'disabled'} onclick="rerollDraw('r')">重抽靈根</button></div>
-      <div class="opts">${d.roots.map((r, i) => opt('r', i, d.r === i, fake(r), rootCls(r), rootDesc(r))).join('')}</div>
+      <div class="opts">${d.roots.map((r, i) => opt('r', i, d.r === i, fake(r), rootCls(r), rootDesc(r) + (needEl && (r.type === 'void' || r.elems.includes(needEl)) ? ' · <span class="same">合前世功法</span>' : ''))).join('')}</div>
       <div class="row"><h3>體質</h3><button class="mini" ${d.rr.p ? '' : 'disabled'} onclick="rerollDraw('p')">重抽體質</button></div>
       <div class="opts">${d.phys.map((id, i) => opt('p', i, d.p === i, `${PHYSIQUES[id].name} <span class="small">${PHYS_RANK[PHYSIQUES[id].r]}</span>`, 'g' + PHYSIQUES[id].r, physDesc(id))).join('')}</div>
       <div class="choices"><button class="primary" ${d.r >= 0 && d.p >= 0 ? '' : 'disabled'} onclick="confirmDraw()">就是這副根骨</button></div>
