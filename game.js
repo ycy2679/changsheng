@@ -22,7 +22,7 @@ function newLife(meta) {
   meta.lives++;
   const t = id => meta.talentsEff[id] || 0;   // 這一世的效果一律看 talentsEff（已套用、凍結的那份）
   const s = {
-    stage: 0, xiu: 0, age: 12 - 2 * t('tongyan'), stone: 300 * t('kaijushi') * t('kaijushi'), items: { heal: t('kaijudan'), juqi: 3 * t('kaijudan') }, mode: 'closed', place: 'bamboo',
+    name: randName(), stage: 0, xiu: 0, age: 12 - 2 * t('tongyan'), stone: 300 * t('kaijushi') * t('kaijushi'), items: { heal: t('kaijudan'), juqi: 3 * t('kaijudan') }, mode: 'closed', place: 'bamboo',
     tech: 'yinqi', subs: [], techs: { yinqi: 0 }, skills: { qijin: 0 }, equip: ['qijin'], cave: 0, injury: 0,
     root: null, phys: null, draw: null, mortal: newMortal(12 - 2 * t('tongyan')), arts: {}, gear: {}, tox: 0, body: 0, shop: null,
     lifeBonus: 0, brkBonus: 0, flags: {}, arcs: {}, encT: 15, evT: 100, ev: null, log: [], wins: 0, peak: 0,
@@ -199,6 +199,14 @@ function drawOrigins() { const ids = []; while (ids.length < 4) ids.push(pickW(O
 const mortalYears = () => tl('xianyuan') >= 2 ? 0 : MORTAL_YEARS / (1 + tl('xianyuan'));
 // 感氣要幾秒：靈根越好越快
 const qiNeed = (s = L()) => tl('xianyuan') >= 2 ? 0 : Math.max(5, Math.round(40 / rootRate(s) / (s.mortal && ORIGINS[s.mortal.origin]?.fastQi ? 2 : 1)));
+// ---------- 名字：每一世出身時取一個，預先隨機帶入 ----------
+const NAME_SUR = '林沈蘇顧陸江葉韓秦許謝白程方魏宋孟岳溫柳衛蕭杜唐莊石紀沐殷'.split('');
+const NAME_GIVEN = '青雲遠山清禾安然寧川玄墨行舟知微晚照長歌明月星河子衡疏影丹心若虛南星'.split('');
+function randName() { return pick(NAME_SUR) + (Math.random() < .3 ? pick(NAME_GIVEN) : pick(NAME_GIVEN) + pick(NAME_GIVEN)); }
+const cleanName = v => [...String(v).replace(/[<>&"'`\\\s]/g, '')].slice(0, 8).join('');
+function setName(v) { const n = cleanName(v); if (n) L().name = n; save(); render(); }
+function rerollName() { L().name = randName(); save(); render(); }
+const nameTag = (s = L()) => s.name ? ` · ${s.name}` : '';
 function newMortal(start) { return { phase: 'birth', origins: drawOrigins(), origin: null, act: 'farm', start, acts: Object.fromEntries(Object.keys(MORTAL_ACTS).map(k => [k, 0])), fates: null, fate: null, qi: 0, robT: 30 }; }
 function chooseOrigin(id) {
   const s = L(), m = s.mortal; if (m.phase !== 'birth' || !m.origins.includes(id)) return;
@@ -291,9 +299,10 @@ function choosePathLate(id) {
 }
 function renderMortal() {
   const s = L(), m = s.mortal;
-  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 凡人${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 凡人${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
   if (m.phase === 'birth') return `${head}<section class="panel card"><b>出身</b>
     <p>${S.meta.lives === 1 ? '你降生在山腳下的一個小鎮。聽說山裡住著會飛的仙人，但沒有人真的見過。' : '你又一次生在凡人家裡，前世的事像一場記不清的夢。'}這一世，你生在什麼樣的人家？</p>
+    <div class="namerow small">名字：<input class="nameinput" maxlength="8" value="${s.name || ''}" onchange="setName(this.value)"><button class="mini" onclick="rerollName()">換一個</button></div>
     <div class="opts">${m.origins.map(id => { const o = ORIGINS[id]; return `<button class="opt" onclick="chooseOrigin('${id}')"><b class="g${o.r}">${o.name}</b><span class="small">${o.desc}</span></button>`; }).join('')}</div></section>`;
   if (m.phase === 'fate') return `${head}<section class="panel card"><b>仙緣</b>
     <p>${Math.floor(s.age)} 歲這年，平靜的日子起了波瀾。你只能抓住其中一個機會。</p>
@@ -1580,7 +1589,7 @@ function tribulation() {
 }
 function die() {
   const s = L(); s.dead = true;
-  S.meta.history.push({ life: S.meta.lives, stageName: STAGES[s.peak].name + (s.ascended ? '・飛升' : s.tribFail ? '・渡劫失敗' : ''), age: Math.floor(s.age), root: s.root ? rootName(s) + (s.phys ? '、' + PHYSIQUES[s.phys].name : '') : '' });
+  S.meta.history.push({ life: S.meta.lives, name: s.name || '', stageName: STAGES[s.peak].name + (s.ascended ? '・飛升' : s.tribFail ? '・渡劫失敗' : ''), age: Math.floor(s.age), root: s.root ? rootName(s) + (s.phys ? '、' + PHYSIQUES[s.phys].name : '') : '' });
   S.meta.keepTech = { id: s.tech, xp: s.techs[s.tech], def: TECHS[s.tech].custom ? TECHS[s.tech] : null };   // 給「前世功法」天賦用（自創的連定義一起帶）
   S.meta.lastShen = (s.shen || []).slice();                // 給「宿世神通」天賦用
   // 坐化當下就拿到道心和道果，轉世前可以先在悟道樹上花掉
@@ -1664,7 +1673,7 @@ function renderDraw() {
   const intro = s.mortal ? FATES[s.mortal.fate].test : S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。';
   const opt = (kind, i, on, title, cls, desc) => `<button class="opt ${on ? 'on' : ''}" onclick="pickDraw('${kind}',${i})"><b class="${cls}">${title}</b><span class="small">${desc}</span></button>`;
   const rootCls = r => ({ heaven: 'g4', mutant: 'g4', void: 'g4', dual: 'g3', triple: 'g2', quad: 'g1', five: 'g1' })[r.type];
-  return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
+  return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel card"><b>${s.mortal ? '測靈根' : '測根骨'}</b>
       <p>${intro}</p>
       <p class="small">靈根、體質各選一個。靈根、體質各能重抽 ${d.rr.r}／${d.rr.p} 次（道心越高次數越多，好根骨也越常出現）。</p>
@@ -1685,7 +1694,7 @@ function render() {
   if (s.mortal) { app.innerHTML = renderMortal(); updateMortal(); return; }
   if (tab === 'shop') ensureShop();
   app.innerHTML = `
-    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · 道心 ${S.meta.dao}${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
+    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel">
       <div class="row"><span><b class="realm" id="realm">${realmName()}</b> <span class="root">${rootName()}</span></span><span class="muted" id="age"></span></div>
       ${bar('life', 0, 'lifebar')}
@@ -2365,25 +2374,25 @@ function renderDao() {
   if (daoTab === 'guide') return nav + renderGuide();
   const bonds = Object.entries(m.arcDone).map(([id, end]) => `<li><b>${ARCS[id].name}</b>：${ARC_END_LABEL[end]}（第 ${m.arcLife[id]} 世）</li>`).join('');
   return nav + `<h3>羈絆</h3><ul class="log">${bonds || '<li class="muted">還沒有。</li>'}</ul>
-    <h3>前世</h3><ul class="log">${m.history.map(h => `<li>第 ${h.life} 世：${h.root ? h.root + '，' : ''}${h.stageName}，${h.age} 歲坐化</li>`).join('') || '<li class="muted">這是你的第一世。</li>'}</ul>
+    <h3>前世</h3><ul class="log">${m.history.map(h => `<li>第 ${h.life} 世${h.name ? `・${h.name}` : ''}：${h.root ? h.root + '，' : ''}${h.stageName}，${h.age} 歲${/飛升/.test(h.stageName) ? '飛升' : '坐化'}</li>`).join('') || '<li class="muted">這是你的第一世。</li>'}</ul>
     <h3>其他</h3><div class="btns">
       <button class="danger" onclick="arm('rebirth')">${armed === 'rebirth' ? `確定兵解？可得道心、道果各 ${daoGain()}` : '兵解轉世'}</button>
       <button class="danger" onclick="arm('reset')">${armed === 'reset' ? '再按一次：全部清除' : '清除存檔'}</button></div>`;
 }
 function renderDeath() {
   const s = L(), h = S.meta.history[S.meta.history.length - 1];
-  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世 · ${s.ascended ? '飛升' : '坐化'}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag(s)} · ${s.ascended ? '飛升' : '坐化'}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
   if (deathView === 'tree') return `${head}<section class="panel card">
     <div class="row"><b>悟道</b><span>可用道果 <b class="same">${S.meta.guo}</b></span></div>
     <p class="small muted">天賦永久保留，下一世開始就生效。點好了就轉世，重新抽根骨。</p>
     <div class="choices"><button onclick="setDeathView('sum')">回顧這一世</button><button class="primary" onclick="rebirth()">轉世</button></div></section>
     <section class="panel">${renderTree()}</section>`;
   return `${head}<section class="panel card">
-    ${s.ascended ? `<b>第 ${S.meta.lives} 世 · 飛升</b>
-    <p>你的名字刻上了無字碑。</p>
+    ${s.ascended ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · 飛升</b>
+    <p>你的名字${s.name ? `「${s.name}」` : ''}刻上了無字碑。</p>
     <p>碑上的名字一路往前延伸，看不到盡頭。在很前面、很前面的位置，有一個被劃掉的名字。你認得那個筆跡——那是你自己寫的字。</p>
     <p>你飛升過，也隕落過。這一次，碑上的你，還會被劃掉嗎？</p>
-    <p class="same">凡界篇・完　仙界篇製作中。飛升的獎勵：道心、道果各額外 +${s.ascendBonus}。你可以繼續輪迴，再走一次。</p>` : `<b>第 ${S.meta.lives} 世 · ${s.tribFail ? '渡劫失敗' : '坐化'}</b>`}
+    <p class="same">凡界篇・完　仙界篇製作中。飛升的獎勵：道心、道果各額外 +${s.ascendBonus}。你可以繼續輪迴，再走一次。</p>` : `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.tribFail ? '渡劫失敗' : '坐化'}</b>`}
     <p>${s.ascended ? `你在 ${h.age} 歲飛升。` : `你在 ${h.age} 歲走到了盡頭。`}這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
     <p>這一世的感悟化為道心 +${s.daoGot}、道果 +${s.daoGot}。現在共有道果 <b class="same">${S.meta.guo}</b>，可以到悟道樹點天賦。</p>
     <div class="choices"><button class="primary" onclick="setDeathView('tree')">入悟道</button></div></section>
