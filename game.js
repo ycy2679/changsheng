@@ -152,9 +152,10 @@ const MORTAL_ACTS = {
 };
 const storyFates = n => n >= 160 ? 2 : n >= 60 ? 1 : 0;
 const FATES = {
-  sect:   { name: '仙門收徒', desc: '仙門下山到鎮上測靈根收徒。入門後有宗門發的靈石和丹藥。',
+  sect:   { name: '仙門收徒', desc: '仙門下山到鎮上測靈根收徒。入道就是外門弟子，宗門會發靈石和丹藥（之後要定期做宗門任務）。',
             test: '仙師取出一塊巴掌大的測靈石，讓你把手按上去。石頭亮了起來。',
-            enter: '你被收入仙門，成了外門弟子', give: s => { s.stone += 300; addItem('juqi', 2); addItem('heal', 2); return '宗門發下靈石 300、聚氣丹 2 顆、療傷丹 2 顆'; } },
+            enter: '你被收入仙門，成了外門弟子', give: s => { const ids = Object.keys(SECTS).filter(id => !SECTS[id].path || myPaths(s).includes(SECTS[id].path)), id = pickW(ids, id => SECTS[id].path ? 2 : 1);
+              joinSect(id, true); s.stone += 300; addItem('juqi', 2); addItem('heal', 2); return `收你的是${SECTS[id].name}，宗門發下靈石 300、聚氣丹 2 顆、療傷丹 2 顆`; } },
   scroll: { name: '山中殘卷', desc: '在山洞裡撿到半卷古書。沒有師門照應，但得到一部偏門功法。',
             test: '殘卷末頁畫著一套感氣的法門。照著練了幾夜，你隱約看見了自己體內的靈根。',
             enter: '你照著殘卷自己摸索，踏上了仙途', give: s => { const id = randomUnowned('tech', [2]); if (!id) return ''; learnTech(id); return `從殘卷裡悟出《${TECHS[id].name}》`; } },
@@ -240,12 +241,15 @@ function chooseFate(id) {
 function enterPath() {
   if (!L().paths) { L().paths = ['fa']; L().flags.pathFree = 1; }
   const s = L(), m = s.mortal, f = FATES[m.fate], o = ORIGINS[m.origin], a = m.acts;
-  s.stone += Math.floor(a.farm * 2 + a.trade * 4); s.body += a.wu * .0004; s.techs[s.tech] += Math.floor(a.book * 2);
-  if (a.herb >= 30) addItem('juqi', Math.floor(a.herb / 30));
+  const wSt = Math.floor(a.farm * 2 + a.trade * 4), wXp = Math.floor(a.book * 2), wPill = Math.floor(a.herb / 30);
+  s.stone += wSt; s.body += a.wu * .0004; s.techs[s.tech] += wXp;
+  if (wPill) addItem('juqi', wPill);
+  // 凡人時做的事有什麼成果，寫進入道那條紀事
+  const work = [wSt >= 10 && `務農跑商攢下靈石 ${wSt}`, a.wu >= 30 && '習武打熬出一副好筋骨', wXp && `讀書讓《${TECHS[s.tech].name}》精進 ${wXp}`, wPill && `採藥換得聚氣丹 ${wPill} 顆`].filter(Boolean).join('、');
   const gift = [o.enter ? o.enter(s) : '', f.give(s)].filter(Boolean).join('；'), age = Math.floor(s.age);
   s.mortal = null;
   const intro = S.meta.lives === 1 ? `${age} 歲那年，${f.enter}。` : `第 ${S.meta.lives} 世。${age} 歲那年，${f.enter}，心裡卻記得一些不該記得的事。`;
-  log(`${intro}你出身${o.name}，身負${rootName()}、${PHYSIQUES[s.phys].name}。引氣入體的那一刻，你成了練氣一層的修士。${gift ? gift + '。' : ''}`);
+  log(`${intro}你出身${o.name}，身負${rootName()}、${PHYSIQUES[s.phys].name}。${work ? `凡人那幾年，你${work}。` : ''}引氣入體的那一刻，你成了練氣一層的修士。${gift ? gift + '。' : ''}`);
   save(); dirty = true;
 }
 // 擇道：第一條是主路線；兼修天賦可以多選
@@ -357,6 +361,7 @@ function log(text, routine) {
   dirty = true;
 }
 const place = (s = L()) => PLACES.find(p => p.id === s.place);
+const topPlace = (s = L()) => PLACES.filter(p => s.stage >= p.min).pop();   // 境界能去的最高地點
 const placeLv = () => place().lv;
 const stoneUnit = (lv = placeLv()) => Math.round(4 * Math.pow(lv, 1.4));
 const auctionPrice = () => Math.round(400 * Math.pow(1.3, Math.max(0, L().stage - 5)));
@@ -1024,9 +1029,9 @@ function recruitCands(s = L()) {
   return Object.keys(SECTS).filter(id => !SECTS[id].path || myPaths(s).includes(SECTS[id].path));
 }
 const recruitPick = (s = L()) => pickW(recruitCands(s), id => SECTS[id].path ? 2 : 1);
-function joinSect(id) {
+function joinSect(id, quiet) {
   const s = L(); s.sect = { id, rank: 0, contrib: 0, total: 0, pay: s.age + SECT_PAY, duty: s.age, bigbi: s.age + 5 };
-  log(`你拜入${SECTS[id].name}，成了外門弟子。`);
+  if (!quiet) log(`你拜入${SECTS[id].name}，成了外門弟子。`);
 }
 function leaveSect() {
   const s = L(); if (!s.sect) return;
@@ -1037,14 +1042,14 @@ function leaveSect() {
 const SECT_TASKS = [
   { id: 'hunt', name: '討伐妖獸', desc: '宗門附近有妖獸作亂。', run(s, g) { if (battle('作亂的妖獸', placeLv() + 1, 1.1)) return g * 1.5; return 0; } },
   { id: 'herb', name: '採集靈藥', desc: '替丹房採一批靈藥，自己也能留三份，有機會失手受傷。', run(s, g) { if (Math.random() < .8) { addMat(matGrade(s), 'herb', 3); return g; } injure(120); return 0; } },
-  { id: 'guard', name: '護送弟子', desc: '護送一批新弟子回山，路上可能遇襲。', run(s, g) { if (Math.random() < .5 || battle('劫道的散修', placeLv(), 1)) { addStone(stoneUnit() * 2); return g * 1.2; } return 0; } },
+  { id: 'guard', name: '護送弟子', desc: '護送一批新弟子回山，路上可能遇襲。', run(s, g) { if (Math.random() < .5 || battle('劫道的散修', placeLv(), 1)) { addStone(stoneUnit(topPlace(s).lv) * 2); return g * 1.2; } return 0; } },
 ];
 const sectTaskGain = (s = L()) => Math.round(10 * (1 + stg(s).major) * (1 + .25 * s.sect.rank));
 function doSectTask(tid) {
   const s = L(); if (!s.sect || s.injury > 0 || (s.sect.task || 0) > s.age) return;
   const k = SECT_TASKS.find(x => x.id === tid), g = Math.round(k.run(s, sectTaskGain(s)));
   s.sect.task = s.age + 5; s.sect.duty = s.age;
-  if (g) { s.sect.contrib += g; s.sect.total += g; log(`宗門任務「${k.name}」完成，得貢獻 ${g}。`); sectPromote(); } else log(`宗門任務「${k.name}」失敗了。`);
+  if (g) { s.sect.contrib += g; s.sect.total += g; log(`宗門任務「${k.name}」完成，得貢獻 ${g}。`, true); sectPromote(); } else log(`宗門任務「${k.name}」失敗了。`, true);
   save(); render();
 }
 function sectPromote() {
@@ -1073,14 +1078,14 @@ function sectBigbi() {
   let w = 0;
   for (let i = 0; i < 3; i++) { const r = fight({ ...secretFoe({ elem: '無', mj: Math.max(1, stg().major) }, i), hp: 115 * (1 + .5 * (s.stage + i)) * (1 + .1 * i) }); s.hpNow = r.hp; s.mpNow = r.mp; if (!r.win) break; w++; }
   const g = Math.round(sectTaskGain(s) * [1, 3, 6, 12][w]);
-  s.sect.contrib += g; s.sect.total += g; addStone(stoneUnit() * 3 * (w + 1));
+  s.sect.contrib += g; s.sect.total += g; addStone(stoneUnit(topPlace(s).lv) * 3 * (w + 1));
   log(`宗門大比，你${w === 3 ? '奪得魁首' : `贏了 ${w} 場`}，得貢獻 ${g}${w === 3 ? `，宗主親賜${giftArt([Math.min(4, 2 + s.sect.rank)])}` : ''}。`);
   sectPromote(); save(); render();
 }
 // 每一跳：發俸祿、檢查有沒有偷懶
 function sectTick(s = L()) {
   if (!s.sect) return;
-  if (s.age >= s.sect.pay) { s.sect.pay += SECT_PAY; const n = addStone(stoneUnit() * [2, 4, 8, 15][s.sect.rank]); s.sect.contrib += 5 * (s.sect.rank + 1); log(`${SECTS[s.sect.id].name}發下俸祿：靈石 ${n}。`); }
+  if (s.age >= s.sect.pay) { s.sect.pay += SECT_PAY; const n = addStone(stoneUnit(topPlace(s).lv) * [2, 4, 8, 15][s.sect.rank]); s.sect.contrib += 5 * (s.sect.rank + 1); log(`${SECTS[s.sect.id].name}發下俸祿：靈石 ${n}。`, true); }
   if (s.age - s.sect.duty > SECT_DUTY) {
     s.sect.duty = s.age;
     if (s.sect.rank > 0) { s.sect.rank--; log(`你太久沒做宗門任務，被降為${SECT_RANK[s.sect.rank]}。`); }
@@ -1353,6 +1358,7 @@ function tryBreak(offline = false) {
   s.brkBonus = 0; s.found = 0;
   if (pct(p)) {
     s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
+    { const np = PLACES.find(q => q.min === s.stage && q.min > 0); if (np && s.place !== np.id) log(`以你現在的境界，已經能去${np.name}遊歷了（上方的地點選單）。那裡妖獸更強，靈石和掉落也多得多。`); }
     if (s.ev && s.ev.ev === 'tiancai' && !tcNext(s)) s.ev = null;   // 還沒選的天材地寶事件：渡劫以後沒有東西可給，直接散去
     let ql = '';
     if (major) {
@@ -2343,6 +2349,7 @@ const TIPS = [
   { id: 'mat', title: '材料與百藝', tab: 'craft', when: s => Object.keys(s.items).some(id => ITEMS[id] && ITEMS[id].kind === 'mat' && s.items[id] > 0), text: '你採到了材料。靈草可以到「百藝」照丹方煉丹，礦材可以煉器或祭煉法寶。煉得越多越熟練，成功率越高。' },
   { id: 'shop', title: '坊市', tab: 'shop', when: s => s.stone >= 200, text: '靈石攢了一些。「坊市」櫃台賣療傷丹、修為丹、材料，也能升級洞府；貨架上的功法、術法、法寶、丹藥定時換一批。' },
   { id: 'major', title: '大境界', when: s => isMajorNext(s) && s.xiu >= stg(s).need * .5, text: '下一步是大境界，成功率低很多，失敗會損修為甚至折壽。突破丹會自動服用；閉關時修為滿了會化為根基，根基越厚越穩、突破品質也越好。可以選「穩紮穩打」或「全力一搏」，有天材地寶才可能出極品。' },
+  { id: 'place', title: '新的遊歷地點', when: s => topPlace(s).lv > place(s).lv, text: '有更高階的遊歷地點可以去了，在上方「閉關、遊歷」那一排的地點選單裡換。新地點的妖獸更強，但靈石、掉落、材料都多很多；打不過再換回來就好。' },
   { id: 'secret', title: '秘境', when: s => stg(s).major >= 1, text: '築基了，上方的「秘境」可以闖了：三層連戰打頭目，必得天材地寶和高階寶物。戰敗會重傷退出，不會身死，每座秘境要隔一陣子才能再闖。' },
   { id: 'sect', title: '宗門', when: s => !!(s.ev && s.ev.recruit), text: '有宗門來招收你。入宗門有俸祿、藏經閣、晉升，但要定期做宗門任務；當散修比較自由，遊歷收穫也比較多。拒絕了之後還有機會再來。' },
   { id: 'array', title: '陣法', tab: 'craft', when: s => s.cave >= 1, text: '洞府升級了。「百藝」→「陣法」可以在洞府佈陣：聚靈陣加快修煉，藥園、礦脈會自己長出材料。洞府等級越高，陣位越多。' },
