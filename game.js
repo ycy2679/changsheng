@@ -1450,7 +1450,7 @@ function usePill(id) {
   else if (it.kind === 'dan') { msg = useDan(id, it, addTox); if (!msg) return; }
   else if (it.kind === 'tech') { msg = `服下悟道丹，對《${addTechXp(600 * pe)}》的領悟更深一層。`; }
   else return;
-  s.items[id]--; S.meta.pills++; log(msg); save(); render();
+  s.items[id]--; S.meta.pills++; log(msg, ['heal', 'xiu'].includes(it.kind) || it.fx === 'huichun'); save(); render();   // 常吃的療傷丹、修為丹、回春丹記成例行，不洗紀事
 }
 // 雜丹的效果；不能用時回空字串（不會吃掉）
 function useDan(id, it, addTox) {
@@ -1925,7 +1925,7 @@ function renderSkill() {
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
   const list = all.filter(id => (skillTab === '全部' || SKILLS[id].elem === skillTab) && (skillKind === '全部' || KIND_GROUP[SKILLS[id].kind] === skillKind))
     .sort((a, b) => skillSort === 'pow' ? skillPow(b) - skillPow(a) : skillSort === 'lv' ? s.skills[b] - s.skills[a] : SKILLS[b].grade - SKILLS[a].grade || skillPow(b) - skillPow(a));
-  return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}（${{ fa: '每回合回 8%，帶到下一場', ti: '開戰只有兩成，出手 +10%、挨打 +8%', hun: '每回合只回 4%，帶到下一場，戰鬥外也回得慢' }[k]}）`).join('；')}。法術耗法力、體術耗血氣、神魂術耗神識；不是本路的術法從${RES_NAME[myPaths()[0]]}轉換；攻擊術法威力 -40%、耗費 ×1.5，回復、護盾、增益、身法這類輔助術法是通用小術，不受影響。兼修那條路就沒有懲罰。</p>
+  return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}（${{ fa: '每回合回 8%，帶到下一場', ti: '開戰只有兩成，出手 +10%、挨打 +8%', hun: '每回合只回 4%，帶到下一場，戰鬥外也回得慢' }[k]}）`).join('；')}。法術耗法力、體術耗血氣、神魂術耗神識；不是本路的術法改用${RES_NAME[myPaths()[0]]}施放：攻擊類威力 -40%、耗費 ×1.5；回復、護盾、增益、身法這類輔助術法是通用小術，不受影響。兼修那條路就沒有懲罰。</p>
     ${ult.length ? `<h3>大招欄（${ult.length}）</h3><p class="muted small">路線專屬，不佔出招欄位，學會就自動施展，優先於一般術法；到化神會進化成更強的版本。</p>${ult.map(ultRow).join('')}` : ''}
     <h3>出招順序（最多 ${maxEquip()} 個）</h3>${s.equip.map(id => row(id)).join('') || '<p class="muted">沒有裝備術法，只會普通攻擊。</p>'}
     <div class="row"><h3>其他術法（${all.length}）</h3><span class="small">
