@@ -1482,7 +1482,7 @@ function restock() {
       let ids = unowned([pickW(gs, shopWeight)]);
       if (!ids.length) ids = unowned(grades);
       if (!ids.length) break;   // 這一類都學完了，就少擺幾格
-      const id = k === 'tech' ? pickTech(ids, s) : pick(ids);
+      const id = shopPick(k, ids, s);
       slots.push({ k, id, price: Math.round(prices[pool[id].grade] * (.8 + Math.random() * .4)) });
     }
   }
@@ -1494,6 +1494,14 @@ function restock() {
   for (const id of [rare, ...common].slice(0, per)) slots.push({ k: 'item', id, price: itemPrice(id) });
   for (const slot of slots) if (pct(.12 * (1 + tl('qihuo')))) { slot.deal = 1; slot.price = Math.round(slot.price * .6); }
   s.shop = { next: Date.now() + shopRefresh() * 1000, slots };
+}
+// 貨架偏向這一世的主修：功法、術法跟主修功法同五行、跟修行路線對得上的，每格約一半機會從裡面抽（兩樣都對得上的優先）；法寶照舊隨機
+function shopPick(k, ids, s = L()) {
+  if (k === 'art') return pick(ids);
+  const me = TECHS[s.tech].elem, pool = k === 'tech' ? TECHS : SKILLS;
+  const sc = id => (me && me !== '無' && pool[id].elem === me ? 1 : 0) + ((k === 'tech' ? isMainType(TECHS[id].type) && pathOk(id, s) : ownSch(id, s)) ? 1 : 0);
+  const top = Math.max(...ids.map(sc));
+  return top > 0 && Math.random() < .5 ? pick(ids.filter(id => sc(id) === top)) : pick(ids);
 }
 const shopRefresh = () => SHOP_REFRESH - 120 * tl('jinhuo');
 function ensureShop() { const s = L(); if (!s.shop || Date.now() >= s.shop.next) { restock(); return true; } return false; }
@@ -2098,7 +2106,7 @@ function renderShop() {
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div><div class="btnrow">${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
-    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨。</p>`;
+    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；跟主修同五行、跟修行路線對得上的功法、術法比較常上架。</p>`;
 }
 // ---------- 百藝・煉丹：丹方（跨世保留）、開爐、出爐 ----------
 const matGrade = (s = L()) => majorGrade(stg(s).major);
@@ -2152,11 +2160,11 @@ function brewDone(f, s) {
   if (pct(brewChance(f.id, s))) {
     const sc = .5 * alchLv(s) + .5 * eff('pillEff', s) + Math.random() * 2, q = sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0;
     addItem(f.id, q + 1); s.alch = (s.alch || 0) + BREW_XP[g] * (q === 3 ? 2 : 1);
-    log(`丹成！${QUAL_RANK[q]}${nm} ${q + 1} 顆出爐。`);
+    log(`丹成！${QUAL_RANK[q]}${nm} ${q + 1} 顆出爐。`, true);
   } else {
     s.alch = (s.alch || 0) + Math.ceil(BREW_XP[g] / 2);
-    if (g >= 3 && pct(.3)) { injure(60 * g); log(`煉${nm}時丹爐炸了，你受了點傷，靈草全毀。`); }
-    else log(`煉${nm}失敗，靈草化成了一爐藥渣。`);
+    if (g >= 3 && pct(.3)) { injure(60 * g); log(`煉${nm}時丹爐炸了，你受了點傷，靈草全毀。`, true); }
+    else log(`煉${nm}失敗，靈草化成了一爐藥渣。`, true);
   }
   dirty = true;
 }
@@ -2191,16 +2199,16 @@ function forgeTick(dt, s = L()) {
 function forgeDone(f, s) {
   const pool = forgePool(f.slot, f.g, s);
   if (pool.length && pct(forgeChance(f.g, s))) {
-    const id = pick(pool), q = (sc => sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0)(.5 * forgeLv(s) + Math.random() * 2);
+    const fresh = pool.filter(id => !(id in s.arts)), id = pick(fresh.length ? fresh : pool), q = (sc => sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0)(.5 * forgeLv(s) + Math.random() * 2);
     s.forge = (s.forge || 0) + BREW_XP[f.g] * (q === 3 ? 2 : 1);
     if (id in s.arts) {
-      if (q > s.arts[id]) { s.arts[id] = q; log(`器成！又煉出一件「${ARTS[id].name}」，比原本的${QUAL_RANK[q]}，直接升到 ${q} 重祭煉！`); }
-      else log(`器成！又煉出一件「${ARTS[id].name}」，品質沒有比原本的好，材料就當練手了。`);
+      if (q > s.arts[id]) { s.arts[id] = q; log(`器成！又煉出一件「${ARTS[id].name}」，比原本的${QUAL_RANK[q]}，直接升到 ${q} 重祭煉！`, true); }
+      else log(`器成！又煉出一件「${ARTS[id].name}」，品質沒有比原本的好，材料就當練手了。`, true);
     } else { gainArt(id); s.arts[id] = q; log(`器成！${QUAL_RANK[q]}${f.slot}「${ARTS[id].name}」出爐${q ? `，一出爐就有 ${q} 重祭煉` : ''}。`); }
   } else {
     s.forge = (s.forge || 0) + Math.ceil(BREW_XP[f.g] / 2);
-    if (f.g >= 3 && pct(.3)) { injure(60 * f.g); log(`煉器時地火失控，你受了點傷，礦材全毀。`); }
-    else log(`煉器失敗，礦材燒成了一爐廢鐵。`);
+    if (f.g >= 3 && pct(.3)) { injure(60 * f.g); log(`煉器時地火失控，你受了點傷，礦材全毀。`, true); }
+    else log(`煉器失敗，礦材燒成了一爐廢鐵。`, true);
   }
   dirty = true;
 }
