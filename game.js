@@ -1398,6 +1398,8 @@ function toggleEquip(id) {
   save(); render();
 }
 function moveEquip(id, d) { const e = L().equip, i = e.indexOf(id), j = i + d; if (j < 0 || j >= e.length) return; [e[i], e[j]] = [e[j], e[i]]; save(); render(); }
+// 坊市櫃台選要買哪一階的靈草／礦材（0 = 目前買得到的最高階）
+function setMatG(k, g) { const s = L(); (s.matG = s.matG || {})[k] = +g; save(); render(); }
 function buy(kind, id, n = 1) {   // n：靈草、礦材一次買幾份
   const s = L(), mat = kind === 'herb' || kind === 'ore'; if (!mat) n = 1;
   const price = (kind === 'heal' ? healPrice() : kind === 'mp' ? mpPillPrice() : kind === 'xiu' ? xiuPillPrice() : mat ? herbPrice(id) : cavePrice()) * n;
@@ -2079,8 +2081,10 @@ function renderShop() {
   return `<h3>櫃台</h3>
     <div class="item"><div class="row"><b>療傷丹</b></div><div class="small">立刻治好傷勢</div><div class="btnrow">${btn(healPrice(), "buy('heal')")}</div></div>
     <div class="item"><div class="row"><b>回氣丹</b></div><div class="small">戰鬥中法力不夠又受傷時自動服用</div><div class="btnrow">${btn(mpPillPrice(), "buy('mp')")}</div></div>
-    ${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => { const p = herbPrice(g), max = Math.max(1, Math.floor(s.stone / p)), q = getQty('mat:' + g, max), x = q > 1 ? ` ×${q}` : '';
-      return `<div class="item"><div class="row"><span><b>${ITEMS[MAT_HERB[g]].name}</b>／<b>${ITEMS[MAT_ORE[g]].name}</b></span></div><div class="small">${GRADES[g]}靈草／礦材</div><div class="btnrow">${max > 1 ? qtyPicker('mat:' + g, max) : ''}${btn(p * q, `buy('herb', ${g}, ${q})`).replace('</button>', `${x} 買靈草</button>`)}${btn(p * q, `buy('ore', ${g}, ${q})`).replace('</button>', `${x} 買礦材</button>`)}</div></div>`; }).join('')}
+    ${[['herb', '靈草', '煉丹用的靈草。', MAT_HERB], ['ore', '礦材', '煉器、祭煉法寶用的礦材。', MAT_ORE]].map(([k, name, desc, M]) => {
+      const top = matGrade(), chosen = (s.matG || {})[k] || 0, g = Math.min(chosen || top, top), p = herbPrice(g), max = Math.max(1, Math.floor(s.stone / p)), q = getQty('mat:' + k, max);
+      const sel = `<select class="mini" onchange="setMatG('${k}', this.value)"><option value="0" ${!chosen ? 'selected' : ''}>最高（${GRADES[top]}・${ITEMS[M[top]].name}）</option>${[1, 2, 3, 4].filter(x => x <= top).map(x => `<option value="${x}" ${chosen === x ? 'selected' : ''}>${GRADES[x]}・${ITEMS[M[x]].name}</option>`).join('')}</select>`;
+      return `<div class="item"><div class="row"><b>${name}</b></div><div class="small">${desc}選擇：${sel}</div><div class="btnrow">${max > 1 ? qtyPicker('mat:' + k, max) : ''}${btn(p * q, `buy('${k}', ${g}, ${q})`).replace('</button>', `${q > 1 ? ` ×${q}` : ''} 買</button>`)}</div></div>`; }).join('')}
     <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div><div class="btnrow">${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
