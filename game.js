@@ -1398,17 +1398,17 @@ function toggleEquip(id) {
   save(); render();
 }
 function moveEquip(id, d) { const e = L().equip, i = e.indexOf(id), j = i + d; if (j < 0 || j >= e.length) return; [e[i], e[j]] = [e[j], e[i]]; save(); render(); }
-function buy(kind, id) {
-  const s = L();
-  const price = kind === 'heal' ? healPrice() : kind === 'mp' ? mpPillPrice() : kind === 'xiu' ? xiuPillPrice() : kind === 'herb' || kind === 'ore' ? herbPrice(id) : cavePrice();
-  if ((kind === 'herb' || kind === 'ore') && id > matGrade()) return;
+function buy(kind, id, n = 1) {   // n：靈草、礦材一次買幾份
+  const s = L(), mat = kind === 'herb' || kind === 'ore'; if (!mat) n = 1;
+  const price = (kind === 'heal' ? healPrice() : kind === 'mp' ? mpPillPrice() : kind === 'xiu' ? xiuPillPrice() : mat ? herbPrice(id) : cavePrice()) * n;
+  if (mat && id > matGrade()) return;
   if (s.stone < price || (kind === 'cave' && s.cave >= 8)) return;
   s.stone -= price;
   if (kind === 'heal') addItem('heal');
   else if (kind === 'mp') addItem('huiqi');
   else if (kind === 'xiu') addItem(XIU_PILLS[stg().major]);
-  else if (kind === 'herb') addItem(MAT_HERB[id || matGrade()]);
-  else if (kind === 'ore') addItem(MAT_ORE[id || matGrade()]);
+  else if (kind === 'herb') addItem(MAT_HERB[id || matGrade()], n);
+  else if (kind === 'ore') addItem(MAT_ORE[id || matGrade()], n);
   else s.cave++;
   save(); render();
 }
@@ -2079,7 +2079,8 @@ function renderShop() {
   return `<h3>櫃台</h3>
     <div class="item"><div class="row"><b>療傷丹</b></div><div class="small">立刻治好傷勢</div><div class="btnrow">${btn(healPrice(), "buy('heal')")}</div></div>
     <div class="item"><div class="row"><b>回氣丹</b></div><div class="small">戰鬥中法力不夠又受傷時自動服用</div><div class="btnrow">${btn(mpPillPrice(), "buy('mp')")}</div></div>
-    ${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => `<div class="item"><div class="row"><span><b>${ITEMS[MAT_HERB[g]].name}</b>／<b>${ITEMS[MAT_ORE[g]].name}</b></span></div><div class="small">${GRADES[g]}靈草／礦材</div><div class="btnrow">${btn(herbPrice(g), `buy('herb', ${g})`).replace('</button>', ' 買靈草</button>')}${btn(herbPrice(g), `buy('ore', ${g})`).replace('</button>', ' 買礦材</button>')}</div></div>`).join('')}
+    ${[1, 2, 3, 4].filter(g => g <= matGrade()).map(g => { const p = herbPrice(g), max = Math.max(1, Math.floor(s.stone / p)), q = getQty('mat:' + g, max), x = q > 1 ? ` ×${q}` : '';
+      return `<div class="item"><div class="row"><span><b>${ITEMS[MAT_HERB[g]].name}</b>／<b>${ITEMS[MAT_ORE[g]].name}</b></span></div><div class="small">${GRADES[g]}靈草／礦材</div><div class="btnrow">${max > 1 ? qtyPicker('mat:' + g, max) : ''}${btn(p * q, `buy('herb', ${g}, ${q})`).replace('</button>', `${x} 買靈草</button>`)}${btn(p * q, `buy('ore', ${g}, ${q})`).replace('</button>', `${x} 買礦材</button>`)}</div></div>`; }).join('')}
     <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div><div class="btnrow">${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
