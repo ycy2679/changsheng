@@ -1,7 +1,7 @@
 // 長生閒記：悟道樹（轉世點數「道果」可以點的永久天賦）
 // max 最高級數、base 第一級價格、g 每升一級價格倍率、req 要先點過的天賦、
 // cond(meta) 額外解鎖條件、condText 條件說明、d(級數) 效果說明
-const TALENT_BRANCHES = ['修行', '戰鬥', '機緣', '根骨', '丹道', '化身'];
+const TALENT_BRANCHES = ['修行', '戰鬥', '機緣', '根骨', '丹道', '化身', '仙緣'];
 const T = (id, branch, name, max, base, g, req, d, extra = {}) => ({ id, branch, name, max, base, g, req, d, ...extra });
 const TALENTS = [
   // 修行
@@ -67,6 +67,11 @@ const TALENTS = [
   T('a_lu', '化身', '爐火不熄', 1, 8, 1, ['a_xiu'], () => '丹爐、器爐出爐後，材料和靈石夠就自動照原樣再開一爐（離線也會）'),
   T('a_major', '化身', '順勢破境', 1, 15, 1, ['a_main'], () => '成功率達到設定門檻時自動突破大境界（離線也會）'),
   T('a_rebirth', '化身', '輪迴不昧', 1, 30, 1, ['a_major'], () => '坐化後自動轉世，並自動挑選最好的靈根和體質'),
+  // 仙緣：飛升過才解鎖
+  T('xshou', '仙緣', '仙壽綿長', 3, 8, 2, [], l => `仙人壽元 +${10 * l}%`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
+  T('dujie', '仙緣', '渡劫經驗', 3, 10, 2, ['xshou'], l => `劫前淬鍊上限 +${10 * l}%（共 ${30 + 10 * l}%）`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
+  T('xianfu', '仙緣', '仙府家底', 3, 6, 2, ['xshou'], l => `從仙人開始時多帶仙元石 ${1000 * l * l}`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
+  T('jiyi', '仙緣', '誰記得我', 2, 8, 2.5, ['dujie'], l => `仙籍差事的仙功 +${25 * l}%`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
 ];
 const TAL = Object.fromEntries(TALENTS.map(t => [t.id, t]));
 const talentCost = (t, lv) => Math.round(t.base * Math.pow(t.g, lv));

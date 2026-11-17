@@ -263,6 +263,7 @@ function confirmPath() {
   const s = L(), m = s.mortal; if (!m || m.phase !== 'path' || !m.pick.length) return;
   s.paths = m.pick.slice(); S.meta.lastPaths = s.paths.slice();
   starterSwap(s);
+  if (s.xianStart) { xianEnter(s); lastNow = Date.now(); save(); render(); return; }
   m.phase = 'qi'; m.qi = 0; lastNow = Date.now(); save(); render();
 }
 // 體修、魂修的入門功法和入門術法（還沒練過才換）
@@ -313,7 +314,8 @@ function renderMortal() {
   if (m.phase === 'birth') return `${head}<section class="panel card"><b>出身</b>
     <p>${S.meta.lives === 1 ? '你降生在山腳下的一個小鎮。聽說山裡住著會飛的仙人，但沒有人真的見過。' : '你又一次生在凡人家裡，前世的事像一場記不清的夢。'}這一世，你生在什麼樣的人家？</p>
     <div class="namerow small">名字：<input class="nameinput" maxlength="8" value="${s.name || ''}" onchange="setName(this.value)"><button class="mini" onclick="rerollName()">換一個</button></div>
-    <div class="opts">${m.origins.map(id => { const o = ORIGINS[id]; return `<button class="opt" onclick="chooseOrigin('${id}')"><b class="g${o.r}">${o.name}</b><span class="small">${o.desc}</span></button>`; }).join('')}</div></section>`;
+    <div class="opts">${m.origins.map(id => { const o = ORIGINS[id]; return `<button class="opt" onclick="chooseOrigin('${id}')"><b class="g${o.r}">${o.name}</b><span class="small">${o.desc}</span></button>`; }).join('')}</div>
+    ${S.meta.ascends > 0 ? `<p class="small muted">你飛升過。碑上的那一縷真靈還記得仙界的路，這一世也可以不當凡人：</p><div class="opts"><button class="opt" onclick="chooseXianStart()"><b class="g8">從仙人開始</b><span class="small">跳過凡人篇和整個凡界，測完根骨、選好路線，直接是人仙一重（帶一部仙階下品功法、一門術法、一點仙元石）。這一世的道心道果只算仙界的部分。</span></button></div>` : ''}</section>`;
   if (m.phase === 'fate') return `${head}<section class="panel card"><b>仙緣</b>
     <p>${Math.floor(s.age)} 歲這年，平靜的日子起了波瀾。你只能抓住其中一個機會。</p>
     <div class="opts">${m.fates.map(id => `<button class="opt" onclick="chooseFate('${id}')"><b>${FATES[id].name}</b><span class="small">${FATES[id].desc}</span></button>`).join('')}</div></section>`;
@@ -640,7 +642,7 @@ function talentEff(key) {
 const maxEquip = () => 4 + tl('slot5') + tl('slot6');
 const maxSubs = () => 2 + tl('fuxiu');
 const maxBrkPills = () => 3 + tl('sidan');
-function lifespan(s = L()) { return (MAJORS[stg(s).major].life + eff('life', s) + s.lifeBonus) * (1 + eff('lifePct', s) + (isXian(s) && s.phys ? .05 * PHYSIQUES[s.phys].r : 0)); }   // 仙體越稀有，仙壽越長
+function lifespan(s = L()) { return (MAJORS[stg(s).major].life + eff('life', s) + s.lifeBonus) * (1 + eff('lifePct', s) + (isXian(s) ? (s.phys ? .05 * PHYSIQUES[s.phys].r : 0) + .1 * tl('xshou') : 0)); }   // 仙體越稀有，仙壽越長
 function skillLv(id, s = L()) { const u = s.skills[id] || 0; return MASTERY_USES.filter(x => u >= x).length - 1; }
 const toxFactor = (s = L()) => Math.max(.1, 1 - s.tox / 100);
 const toxRes = () => Math.min(.8, eff('toxRes'));
@@ -1594,7 +1596,7 @@ function buySlot(i) {
 }
 
 // ---------- 死亡與轉世 ----------
-function daoGain(s = L()) { const p = Math.min(s.peak, MORTAL_TOP); return Math.max(1, Math.round((p + 1) * (p + 1) / 20)) + 2 * Math.max(0, s.peak - MORTAL_TOP); }   // 仙界改成每重 +2，不再平方暴漲
+function daoGain(s = L()) { const p = Math.min(s.peak, MORTAL_TOP), x = 2 * Math.max(0, s.peak - MORTAL_TOP); return s.xianStart ? Math.max(1, x) : Math.max(1, Math.round((p + 1) * (p + 1) / 20)) + x; }   // 仙界每重 +2；從仙人開始的那一世只算仙界   // 仙界改成每重 +2，不再平方暴漲
 // ---------- 主線（碑與名）：節點記在 meta.story，也收進輪迴錄「主線」 ----------
 const STORY_NODES = [['n1', '殘夢'], ['n2', '似曾相識'], ['n3', '碑的傳說'], ['n4', '守碑人'], ['n4a', '被劃掉的名字'], ['n5', '第九道天雷'], ['n6', '刻名']];
 function storyMark(id) { const m = S.meta; m.story = m.story || {}; if (!m.story[id]) { m.story[id] = 1; codexAdd('m', id); } }
@@ -1666,7 +1668,7 @@ function ascend(s) {
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
-  s.ascView = 1;
+  s.ascView = 1; xjOpen(s);
   log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `${PHYSIQUES[s.phys].name}在天門裡蛻變成了${physName(s)}。` : ''}凡間帶來的靈​石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；${sect ? sect + '、' : ''}洞府和陣法都留在了凡界。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
@@ -1727,6 +1729,68 @@ function xianJie() {
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
   pathSkillCheck(s); pathArtCheck(s);
   save(); render();
+}
+// ---------- 仙籍（取代宗門）：名冊、差事、仙功兌換 ----------
+let showXj = false;
+function toggleXj() { showXj = !showXj; render(); }
+const xjGain = (s = L()) => Math.round(10 * (1 + xs() / 9) * (1 + .25 * tl('jiyi')));
+function xjOpen(s = L()) { if (!s.xj) { s.xj = { gong: 0, task: 0, shop: null }; xjRestock(s); } }
+// 兌換清單：渡劫仙丹、延壽仙丹、當前境界修為丹、三部沒學過的仙階功法（優先挑當得了主修的）
+function xjRestock(s = L()) {
+  const gs = [6, 7, 8].filter(g => s.stage >= GRADE_MIN_STAGE[g]);
+  const ids = Object.keys(TECHS).filter(id => gs.includes(TECHS[id].grade) && !(id in s.techs));
+  const main = ids.filter(id => canMain(id, s)), list = [];
+  for (let i = 0; i < 3 && (main.length || ids.length); i++) { const pool = main.length && i < 2 ? main : ids, id = pick(pool); list.push({ k: 'tech', id, cost: XJ_TECH_COST[TECHS[id].grade] }); main.splice(main.indexOf(id), 1); ids.splice(ids.indexOf(id), 1); }
+  s.xj.shop = list;
+}
+function xjList(s = L()) {
+  return [{ k: 'item', id: 'dujiedan', cost: 60 }, { k: 'item', id: 'xianshou', cost: 80 }, { k: 'item', id: XIU_PILLS[stg(s).major], cost: 25 }, ...(s.xj.shop || [])];
+}
+function xjBuy(i) {
+  const s = L(), o = xjList(s)[i]; if (!o || s.xj.gong < o.cost) return;
+  s.xj.gong -= o.cost;
+  if (o.k === 'tech') { learnTech(o.id); log(`用仙功換到《${TECHS[o.id].name}》。`); s.xj.shop = s.xj.shop.filter(x => x.id !== o.id); }
+  else { addItem(o.id); log(`用仙功換到${ITEMS[o.id].name}。`, true); }
+  save(); render();
+}
+function doXjTask(tid) {
+  const s = L(); if (!s.xj || s.injury > 0 || s.xj.task > s.age) return;
+  const k = XJ_TASKS.find(x => x.id === tid), g = Math.round(k.run(s, xjGain(s)));
+  s.xj.task = s.age + XJ_TASK_CD;
+  if (g) { s.xj.gong += g; const st = addStone(stoneUnit(topPlace(s).lv) * 3); log(`仙籍差事「${k.name}」辦妥了，得仙功 ${g}、仙元石 ${st}。`, true); if (pct(.2)) xjRestock(s); }
+  else log(`仙籍差事「${k.name}」沒辦成。`, true);
+  save(); render();
+}
+function renderXianji() {
+  const s = L(); xjOpen(s);
+  const m = S.meta, tw = Math.max(0, Math.ceil(s.xj.task - s.age));
+  const names = Object.keys(XIANJI).filter(id => m.arcDone[id] && XIANJI[id][m.arcDone[id]]).map(id => { const [st, txt] = XIANJI[id][m.arcDone[id]]; return `<li><b>${ARCS[id].name}</b> <span class="small ${st > 0 ? 'same' : st < 0 ? 'hurt' : 'muted'}">${st > 0 ? '在碑上' : st < 0 ? '被劃掉' : '不在仙籍'}</span><br><span class="small">${txt}</span></li>`; }).join('');
+  return `<section class="panel card"><div class="row"><b>仙籍</b><span><span class="small">仙功 <b class="same">${s.xj.gong}</b></span> <button class="mini" onclick="toggleXj()">收起</button></span></div>
+    <p class="small muted">仙籍就是碑的另一面：碑上刻著誰，仙籍上就記著誰。接引仙官會派些差事給你，辦妥了有仙功和仙元石，仙功可以換仙丹和功法。</p>
+    <h3>差事</h3>${s.injury > 0 ? '<p class="small hurt">傷勢未癒，先養傷。</p>' : tw ? `<p class="small muted">剛辦完差事，${tw} 年後可以再接。</p>` : XJ_TASKS.map(k => `<div class="item"><div class="row"><b>${k.name}</b></div><div class="small">${k.desc}</div><div class="btnrow"><button class="mini" onclick="doXjTask('${k.id}')">接下（仙功約 ${Math.round(xjGain(s) * (k.id === 'men' ? 1.5 : k.id === 'dang' ? .7 : 1))}）</button></div></div>`).join('')}
+    <h3>兌換</h3>${xjList(s).map((o, i) => { const nm = o.k === 'tech' ? `《${TECHS[o.id].name}》` : ITEMS[o.id].name, sub = o.k === 'tech' ? gradeTag(TECHS[o.id].grade, `${TECHS[o.id].type} · ${TECHS[o.id].elem}`) : '';
+      return `<div class="item"><div class="row"><b>${nm}</b> ${sub}</div><div class="small muted">${o.k === 'tech' ? effText(TECHS[o.id]) : ITEMS[o.id].desc}</div><div class="btnrow"><button class="mini" ${s.xj.gong >= o.cost ? '' : 'disabled'} onclick="xjBuy(${i})">${o.cost} 仙功</button></div></div>`; }).join('')}
+    <h3>名冊</h3><ul class="log">${names || '<li class="muted">你在凡間認識的人，仙籍上一個也找不到。</li>'}</ul>
+    <p class="small muted">還有成千上萬個名字，你一個也不認得。</p></section>`;
+}
+// ---------- 從仙人開始：飛升過一次以後，轉世可以跳過凡界 ----------
+function chooseXianStart() {
+  const s = L(), m = s.mortal; if (!m || m.phase !== 'birth' || !(S.meta.ascends > 0)) return;
+  s.xianStart = 1; m.origin = 'xian'; m.phase = 'test'; s.draw = makeDraw(S.meta);
+  save(); render();
+}
+// 擇道之後直接成為人仙一重：帶一部合得來的仙階下品主修、一門仙階下品術法、一點仙元石
+function xianEnter(s) {
+  s.mortal = null; s.stage = MORTAL_TOP + 1; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
+  s.age = 900 + Math.floor(Math.random() * 300); s.place = topPlace(s).id;
+  const tech = Object.keys(TECHS).filter(id => TECHS[id].grade === 6 && canMain(id, s)), tid = tech.length ? pick(tech) : null;
+  if (tid) { learnTech(tid); s.tech = tid; }
+  const sk = Object.keys(SKILLS).filter(id => SKILLS[id].grade === 6 && ownSch(id, s) && (SKILLS[id].elem === '無' || skillFits(SKILLS[id].elem, s))), kid = sk.length ? pick(sk) : null;
+  if (kid) learnSkill(kid);
+  s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu');
+  pathSkillCheck(s); pathArtCheck(s); xjOpen(s);
+  if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
+  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${tid ? `接引仙官留給你一部《${TECHS[tid].name}》` : ''}${kid ? `、一本《${SKILLS[kid].name}》` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
 // ---------- 天人五衰：仙人壽元過八成，每過 4% 出現一個徵兆，修煉、氣血、攻擊各 -5% ----------
 const WU_SHUAI = ['衣上生了塵垢，怎麼拂也拂不掉', '頭上的花冠開始枯萎', '腋下無端滲出汗來', '身上隱隱有了濁氣', '坐在哪裡都覺得不自在'];
@@ -1865,7 +1929,7 @@ function render() {
         <button class="${s.mode === 'closed' ? 'on' : ''}" onclick="setMode('closed')">閉關</button>
         <button class="${s.mode === 'travel' ? 'on' : ''}" onclick="setMode('travel')">遊歷</button>
         <button class="${showSecret ? 'on' : ''}" onclick="toggleSecret()" ${stg().major >= 1 ? '' : 'disabled'}>秘境</button>
-        ${isXian(s) ? '' : `<button class="${showSect ? 'on' : ''}" onclick="toggleSect()">宗門</button>`}
+        ${isXian(s) ? `<button class="${showXj ? 'on' : ''}" onclick="toggleXj()">仙籍</button>` : `<button class="${showSect ? 'on' : ''}" onclick="toggleSect()">宗門</button>`}
         <select onchange="setPlace(this.value)" ${s.mode === 'travel' ? '' : 'disabled'}>
           ${PLACES.filter(p => s.stage >= p.min && !p.xian === !isXian(s)).map(p => `<option value="${p.id}" ${p.id === s.place ? 'selected' : ''}>${p.name}</option>`).join('')}
         </select>
@@ -1877,6 +1941,7 @@ function render() {
     ${s.ascView ? renderAscend() : ''}
     ${s.offline ? renderOffline() : ''}
     ${showSect && !isXian(s) ? renderSect() : ''}
+    ${showXj && isXian(s) ? renderXianji() : ''}
     ${showSecret ? renderSecret() : ''}
     ${s.ev ? renderEvent() : ''}
     ${curTip() ? renderTip() : ''}
