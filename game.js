@@ -363,8 +363,11 @@ const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   /
 const yearSec = (s = L()) => isXian(s) ? 6 : YEAR_SEC;                   // 仙界歲月流得快：線上 6 秒一年
 // 下一步要渡劫：渡劫後期 → 九道天雷；仙界每個大境界 → 仙劫。自動突破、離線都不會碰
 const jieNext = (s = L()) => s.stage === MORTAL_TOP || (isXian(s) && s.stage < STAGES.length - 1 && STAGES[s.stage + 1].major !== stg(s).major);
-// 仙界的貨幣是仙元石：畫面和紀事裡的「靈石」一律換掉（飛升前的舊紀事在飛升時已經加了隔字，不會被換）
-const cur = (t, s = L()) => s && isXian(s) ? t.replace(/靈石/g, '仙元石') : t;
+// 成仙之後的用詞：畫面和紀事一律換掉。飛升前的舊紀事、道途分頁（跨世共用）用 keepWords 加隔字，就不會被換
+const XIAN_WORDS = { 靈石: '仙元石', 法力: '仙元', 根骨: '仙骨', 功法: '仙法', 術法: '仙術', 法寶: '靈寶', 行囊: '須彌戒', 百藝: '仙藝', 洞府: '洞天', 陣法: '仙陣', 丹爐: '仙丹爐', 器爐: '靈器爐', 煉丹: '煉仙丹', 煉器: '煉靈器', 丹藥: '仙丹' };
+const XW_RE = new RegExp(Object.keys(XIAN_WORDS).join('|'), 'g');
+const cur = (t, s = L()) => s && isXian(s) ? t.replace(XW_RE, m => XIAN_WORDS[m]) : t;
+const keepWords = t => t.replace(XW_RE, m => m[0] + '\u200b' + m.slice(1));
 const pct = p => Math.random() < p;
 const pick = a => a[Math.floor(Math.random() * a.length)];
 function pickW(list, w) { let x = Math.random() * list.reduce((a, o) => a + w(o), 0); return list.find(o => (x -= w(o)) < 0) || list[list.length - 1]; }
@@ -390,7 +393,9 @@ const auctionPrice = () => isXian() ? Math.round(500 * Math.pow(1.1, xs())) : Ma
 const pillDisc = () => (1 - .1 * tl('zhekou')) * (L().sect && L().sect.id === 'dan' ? .7 : 1);   // 丹房熟客
 const healPrice = () => px(Math.round(20 * (1 + est()) * pillDisc()));
 const mpPillPrice = () => px(Math.round(15 * (1 + est()) * pillDisc()));
-const cavePrice = () => (isXian() ? 40 : 80) * Math.pow(2, L().cave);   // 仙界重新開闢洞府，收仙元石
+const cavePrice = () => isXian() ? Math.round(40 * Math.pow(2, Math.min(8, L().cave)) * Math.pow(1.5, Math.max(0, L().cave - 8))) : 80 * Math.pow(2, L().cave);   // 仙界重新開闢洞府（洞天），收仙元石
+const caveMax = () => isXian() ? 16 : 8;
+const caveMats = (s = L()) => isXian(s) && s.cave === 8 ? [[MAT_HERB[6], 10], [MAT_ORE[6], 10]] : [];   // 洞府升洞天那一級要仙材
 const xiuPillPrice = () => Math.round((isXian() ? 200 * Math.pow(1.15, xs()) : 25 * Math.pow(1.5, L().stage)) * pillDisc());
 const itemPrice = id => px(itemPrice0(id));
 const itemPrice0 = id => {
@@ -1464,8 +1469,9 @@ function buy(kind, id, n = 1) {   // n：靈草、礦材一次買幾份
   const s = L(), mat = kind === 'herb' || kind === 'ore'; if (!mat) n = 1;
   const price = (kind === 'heal' ? healPrice() : kind === 'mp' ? mpPillPrice() : kind === 'xiu' ? xiuPillPrice() : mat ? herbPrice(id) : cavePrice()) * n;
   if (mat && id > matGrade()) return;
-  if (s.stone < price || (kind === 'cave' && s.cave >= 8)) return;
+  if (s.stone < price || (kind === 'cave' && (s.cave >= caveMax() || caveMats(s).some(([id, n]) => count(id) < n)))) return;
   s.stone -= price;
+  if (kind === 'cave') for (const [id, n] of caveMats(s)) s.items[id] -= n;
   if (kind === 'heal') addItem('heal');
   else if (kind === 'mp') addItem('huiqi');
   else if (kind === 'xiu') addItem(XIU_PILLS[stg().major]);
@@ -1667,7 +1673,7 @@ function ascend(s) {
   s.ascended = 1; S.meta.ascends = (S.meta.ascends || 0) + 1; storyMark('n6');
   const bonus = daoGain(s); S.meta.dao += bonus; S.meta.guo += bonus; s.ascendBonus = bonus;
   log('九道天雷散去，天門洞開。你飛升了。');
-  for (const l of s.log) l.text = l.text.replace(/靈石/g, '靈​石');   // 凡界的舊紀事保留「靈石」（加隔字，不會被換成仙元石）
+  for (const l of s.log) l.text = keepWords(l.text);   // 凡界的舊紀事保留原本的用詞
   // 靈石、丹藥、材料帶不上去，一起折成仙元石；洞府、陣法、宗門、爐子留在凡界
   let v = s.stone; for (const id in s.items) v += sellItemPrice(id) * s.items[id];
   const sect = s.sect && SECTS[s.sect.id].name;
@@ -1676,7 +1682,7 @@ function ascend(s) {
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
   s.ascView = 1; xjOpen(s);
-  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}凡間帶來的靈​石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；${sect ? sect + '、' : ''}洞府和陣法都留在了凡界。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
+  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；${sect ? sect + '、' : ''}洞府和陣法都留在了凡界。`)}仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
 function renderAscend() {
@@ -1941,7 +1947,7 @@ function render() {
     ${s.ev ? renderEvent() : ''}
     ${curTip() ? renderTip() : ''}
     <nav>${TABS.map(([k, n]) => `<button class="${tab === k ? 'on' : ''} ${curTip() && curTip().tab === k ? 'glow' : ''}" onclick="setTab('${k}')">${n}</button>`).join('')}</nav>
-    <section class="panel">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, craft: renderCraft, shop: renderShop, log: renderLogTab, dao: renderDao })[tab]()}</section>`);
+    <section class="panel">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, craft: renderCraft, shop: renderShop, log: renderLogTab, dao: () => isXian(s) ? keepWords(renderDao()) : renderDao() })[tab]()}</section>`);
   updateDyn();
 }
 
@@ -1965,8 +1971,8 @@ function updateDyn() {
   const st = stats(), hp = s.hpNow ?? 1, mp = s.mpNow ?? 1;
   $('hptxt').textContent = `${fmt(Math.round(st.hp * hp))} / ${fmt(st.hp)}`; $('hpbar').firstChild.style.width = hp * 100 + '%';
   { const ps = myPaths(s), fr = k => k === 'fa' ? mp : k === 'hun' ? s.snNow ?? 1 : .2, m0 = ps[0];
-    $('mplbl').textContent = RES_NAME[m0] + (m0 === 'ti' ? '（開戰兩成）' : '');
-    $('mptxt').textContent = ps.map((k, i) => `${i ? RES_NAME[k] + ' ' : ''}${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}`).join(' · ');
+    $('mplbl').textContent = cur(RES_NAME[m0]) + (m0 === 'ti' ? '（開戰兩成）' : '');
+    $('mptxt').textContent = ps.map((k, i) => `${i ? cur(RES_NAME[k]) + ' ' : ''}${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}`).join(' · ');
     $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
@@ -2317,7 +2323,7 @@ function renderShop() {
       const sel = `<select class="mini" onchange="setMatG('${k}', this.value)"><option value="0" ${!chosen ? 'selected' : ''}>最高（${GRADES[top]}・${ITEMS[M[top]].name}）</option>${[1, 2, 3, 4].filter(x => x <= top).map(x => `<option value="${x}" ${chosen === x ? 'selected' : ''}>${GRADES[x]}・${ITEMS[M[x]].name}</option>`).join('')}</select>`;
       return `<div class="item"><div class="row"><b>${name}</b></div><div class="small">${desc}選擇：${sel}</div><div class="btnrow">${max > 1 ? qtyPicker('mat:' + k, max) : ''}${btn(p * q, `buy('${k}', ${g}, ${q})`).replace('</button>', `${q > 1 ? ` ×${q}` : ''} 買</button>`)}</div></div>`; }).join('')}
     <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
-    <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div><div class="btnrow">${btn(cavePrice(), "buy('cave')", s.cave < 8)}</div></div>
+    <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
     <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；跟主修同五行、跟修行路線對得上的功法、術法比較常上架。</p>`;
@@ -2428,7 +2434,7 @@ function forgeDone(f, s) {
 }
 function renderForge() {
   const s = L(), lv = forgeLv(), xp = s.forge || 0, f = s.anvil, gs = forgeGrades();
-  const ores = MAT_ORE.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
+  const ores = MAT_ORE.slice(1).filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const cell = (slot, g) => {
     const n = forgePool(slot, g).filter(id => !(id in s.arts)).length, max = forgeMax(slot, g, s), key = 'qi:' + slot + ':' + g, q = getQty(key, Math.max(max, 1)), ok = max >= 1 && forgePool(slot, g).length;
     return `<div class="item"><div class="row"><b>${GRADES[g]}${slot}</b></div>
@@ -2491,7 +2497,7 @@ function arrayTick(dt, s = L()) {
 }
 function renderArrays() {
   const s = L(), slots = arraySlots(), on = arrayOnCount(s), next = ARRAY_SLOT_CAVE[slots];
-  const ores = [...MAT_HERB.slice(1), ...MAT_ORE.slice(1)].map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
+  const ores = [...MAT_HERB.slice(1), ...MAT_ORE.slice(1)].filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
     const a = ARRAYS[id], l = arrLv(id), c = l < 4 ? arrayCost(l + 1, id) : null, isOn = !!(s.arrOn && s.arrOn[id]);
     const can = c && arrayAfford(c);
@@ -2519,11 +2525,11 @@ function craftG(k, gs) { if (!gs.includes(craftGrade[k])) craftGrade[k] = gs.inc
 function setCraftGrade(k, g) { craftGrade[k] = g; render(); }
 const gradeNav = (k, gs) => `<nav>${gs.map(g => `<button class="${craftG(k, gs) === g ? 'on' : ''}" onclick="setCraftGrade('${k}', ${g})">${GRADES[g]}</button>`).join('')}</nav>`;
 function setCraftTab(k) { craftTab = k; render(); }
-const craftNav = () => `<nav>${[['dan', '煉丹'], ['qi', '煉器'], ['zhen', '陣法']].map(([k, n]) => `<button class="${craftTab === k ? 'on' : ''}" onclick="setCraftTab('${k}')">${n}</button>`).join('')}</nav>`;
+const craftNav = () => `<nav>${(isXian() ? [['dan', '仙丹'], ['qi', '靈器'], ['zhen', '仙陣']] : [['dan', '煉丹'], ['qi', '煉器'], ['zhen', '陣法']]).map(([k, n]) => `<button class="${craftTab === k ? 'on' : ''}" onclick="setCraftTab('${k}')">${n}</button>`).join('')}</nav>`;
 function renderCraft() {
   const s = L(), lv = alchLv(), xp = s.alch || 0, f = s.furnace;
   const known = Object.keys(RECIPES).filter(knowRecipe), total = Object.keys(RECIPES).length;
-  const herbs = MAT_HERB.slice(1).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
+  const herbs = MAT_HERB.slice(1).filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
     const r = RECIPES[id], nd = brewNeed(id), max = brewMax(id, s), key = 'dan:' + id, q = getQty(key, Math.max(max, 1)), ok = max >= 1;
     return `<div class="item"><div class="row"><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}</div>
