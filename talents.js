@@ -69,7 +69,7 @@ const TALENTS = [
   T('a_rebirth', '化身', '輪迴不昧', 1, 30, 1, ['a_major'], () => '坐化後自動轉世，並自動挑選最好的靈根和體質'),
   // 仙緣：飛升過才解鎖
   T('xshou', '仙緣', '仙壽綿長', 3, 8, 2, [], l => `仙人壽元 +${10 * l}%`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
-  T('dujie', '仙緣', '渡劫經驗', 3, 10, 2, ['xshou'], l => `劫前淬鍊上限 +${10 * l}%（共 ${30 + 10 * l}%）`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
+  T('dujie', '仙緣', '渡劫經驗', 3, 10, 2, ['xshou'], l => `劫前淬鍊上限 +${5 * l}%（共 ${30 + 5 * l}%）`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
   T('xianfu', '仙緣', '仙府家底', 3, 6, 2, ['xshou'], l => `從仙人開始時多帶仙元石 ${1000 * l * l}`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
   T('jiyi', '仙緣', '誰記得我', 2, 8, 2.5, ['dujie'], l => `仙籍差事的仙功 +${25 * l}%`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
 ];

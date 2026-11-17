@@ -833,7 +833,7 @@ function renderCodex() {
 }
 function randomUnowned(kind, grades, filter) {
   const s = L(), pool = { tech: TECHS, skill: SKILLS, art: ARTS }[kind], owned = { tech: s.techs, skill: s.skills, art: s.arts }[kind];
-  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && (!filter || filter(pool[id])));
+  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && (!filter || filter(pool[id])));
   return ids.length ? (kind === 'tech' ? pickTech(ids, s) : pick(ids)) : null;
 }
 // 抽功法：三成五機會從自己路線修得了的主修類功法裡抽（鍛體、觀想功法比吐納少，免得一直撿不到）
@@ -1520,7 +1520,8 @@ function danBlock(id, s = L()) {
     case 'huichun': return (s.hpNow ?? 1) >= 1 && (s.mpNow ?? 1) >= 1 ? '氣血法力都滿' : '';
     case 'qingxin': return s.tox < 1 ? '沒有丹毒' : '';
     case 'zhuyan': return s.age < 26 ? '未滿 26 歲' : '';
-    case 'pozhang': case 'humai': case 'xingshen': case 'tianji': return s.flags[it.fx] ? '效果還在' : '';
+    case 'tianji': if (it.xian && s.stage < GRADE_MIN_STAGE[7]) return '地仙起才有中品'; return s.flags[it.fx] ? '效果還在' : '';
+    case 'pozhang': case 'humai': case 'xingshen': return s.flags[it.fx] ? '效果還在' : '';
   }
   return '';
 }
@@ -1536,7 +1537,7 @@ function useDan(id, it, addTox) {
     case 'humai': if (s.flags.humai) return ''; s.flags.humai = 1; return `服下${it.name}，經脈被一層藥力護住。`;
     case 'zhuyan': if (s.age < 26) return ''; s.age -= it.amt || 10; addTox(it.tox); return `服下${it.name}，鬢角的白髮轉黑，年齡 -${it.amt || 10} 歲。`;
     case 'xingshen': if (s.flags.xingshen) return ''; s.flags.xingshen = 1; return `服下${it.name}，神魂清明，下一場戰鬥神通可以再發動一次。`;
-    case 'tianji': if (s.flags.tianji) return ''; s.flags.tianji = 1; return `服下${it.name}，隱約算到坊市下一批貨裡有好東西。`;
+    case 'tianji': if (s.flags.tianji || danBlock(id, s)) return ''; s.flags.tianji = 1; return `服下${it.name}，隱約算到坊市下一批貨裡有好東西。`;
   }
   return '';
 }
@@ -1554,7 +1555,7 @@ function restock() {
   const kinds = { tech: [TECHS, s.techs, TECH_PRICE], skill: [SKILLS, s.skills, SKILL_PRICE], art: [ARTS, s.arts, ART_PRICE] };
   for (const k in kinds) {
     const [pool, owned, prices] = kinds[k];
-    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
+    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
     for (let i = 0; i < per; i++) {
       // 第一格保證玄階以上（玄階還沒解鎖就照常抽）
       const low = isXian(s) ? (tj && grades.includes(7) ? 7 : 6) : tj && grades.some(g => g >= 3) ? 3 : 2;   // 天機丹：保證地階以上（仙界：中品以上）
@@ -1711,7 +1712,8 @@ function jieChance(s = L()) {
 }
 // 停在大圓滿時繼續修煉：修為化為劫前淬鍊，閉關約一個半小時到上限（遊歷減半）
 const PRESS_SEC = 5400;
-function addPress(sec) { const s = L(), cap = PRESS_CAP + .1 * tl('dujie'); s.press = Math.min(cap, (s.press || 0) + sec * cap / PRESS_SEC); }
+const pressCap = () => PRESS_CAP + .05 * tl('dujie');   // 渡劫經驗每級 +5%（滿級 45%）
+function addPress(sec) { const s = L(), cap = pressCap(); s.press = Math.min(cap, (s.press || 0) + sec * cap / PRESS_SEC); }
 // 一道一道落：總成功率攤到每一道
 function runJie(s) {
   const n = JIE_N[stg(s).major], q = Math.pow(jieChance(s), 1 / n);
@@ -1793,14 +1795,17 @@ function chooseXianStart() {
 function xianEnter(s) {
   s.mortal = null; s.stage = MORTAL_TOP + 1; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   s.age = 300 + Math.floor(Math.random() * 200); s.place = topPlace(s).id;   // 剛成仙的年紀：比飛升上來的人年輕，壽元才夠走得遠
-  const tech = Object.keys(TECHS).filter(id => TECHS[id].grade === 6 && canMain(id, s)), tid = tech.length ? pick(tech) : null;
-  if (tid) { learnTech(tid); s.tech = tid; }
-  const sk = Object.keys(SKILLS).filter(id => SKILLS[id].grade === 6 && ownSch(id, s) && (SKILLS[id].elem === '無' || skillFits(SKILLS[id].elem, s))), kid = sk.length ? pick(sk) : null;
-  if (kid) learnSkill(kid);
+  // 有前世功法（天賦）而且修得了，就直接當主修；不然接引仙官送一部合得來的仙階下品
+  const keep = S.meta.keepTech && S.meta.keepTech.id, kept = keep && keep in s.techs && canMain(keep, s);
+  const tech = kept ? [] : Object.keys(TECHS).filter(id => TECHS[id].grade === 6 && canMain(id, s)), tid = tech.length ? pick(tech) : null;
+  if (kept) s.tech = keep; else if (tid) { learnTech(tid); s.tech = tid; }
+  // 凡界帶來的入門術法在仙界沒用：換成這條路線的專屬仙術
+  const kid = 'xs_' + (s.paths[0] || 'fa');
+  s.skills = {}; s.equip = []; learnSkill(kid);
   s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu');
   pathSkillCheck(s); pathArtCheck(s); xjOpen(s);
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
-  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${tid ? `接引仙官留給你一部《${TECHS[tid].name}》` : ''}${kid ? `、一本《${SKILLS[kid].name}》` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
+  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}一本《${SKILLS[kid].name}》，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
 // ---------- 天人五衰：仙人壽元過八成，每過 4% 出現一個徵兆，修煉、氣血、攻擊各 -5% ----------
 const WU_SHUAI = ['衣上生了塵垢，怎麼拂也拂不掉', '頭上的花冠開始枯萎', '腋下無端滲出汗來', '身上隱隱有了濁氣', '坐在哪裡都覺得不自在'];
@@ -1986,7 +1991,7 @@ function updateDyn() {
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
     const tip = atTop ? (w.length ? '飛升還差：' + w.join('、') + (noDao ? '（道心在坐化或兵解時才會增加，這一世多半飛升不了）' : '') : '九道天雷之後就能飛升，但失敗就會身死。') : noDao ? `道心 ${S.meta.dao}/${ASCEND_DAO}，這一世多半飛升不了`
-      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗即隕落 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= PRESS_CAP + .1 * tl('dujie') - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ' · 渡劫仙丹 +15%' : ''}`
+      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗即隕落 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= pressCap() - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ' · 渡劫仙丹 +15%' : ''}`
       : s.stage >= STAGES.length - 1 ? '玄仙圓滿。再往上是登天——仙界篇下半部製作中。' : '';
     $('buffs').textContent = cur(bt + (tip ? (bt ? '　' : '') + tip : '') + (ws ? `　天人五衰 ${ws}/5（修煉、氣血、攻擊 -${5 * ws}%）` : '')); } $('realm').textContent = realmName(s);
   $('res').innerHTML = `${cur('靈石')} ${fmt(s.stone)}${s.found >= .01 ? ` · <span class="same">根基 +${Math.round(s.found * 100)}%</span>` : ''}${s.tox >= 1 ? ` · <span class="${s.tox > 50 ? 'hurt' : ''}">丹毒 ${Math.ceil(s.tox)}%</span>` : ''}`;
