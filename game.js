@@ -1681,7 +1681,7 @@ function ascend(s) {
   // 靈石、丹藥、材料帶不上去，一起折成仙元石；宗門留在凡界，爐裡沒煉完的也散了；洞府、陣法跟著上去（洞府成了洞天）
   let v = s.stone; for (const id in s.items) v += sellItemPrice(id) * s.items[id];
   const sect = s.sect && SECTS[s.sect.id].name;
-  s.items = {}; s.stone = Math.max(10, Math.round(Math.sqrt(v) * .75));   // 帶不上去的東西只折一點：一億靈石約七千五仙元石，剛好一兩件仙階下品 s.sect = null; s.furnace = null; s.anvil = null; s.shop = null; s.found = 0; s.tox = 0; s.buffs = {};
+  s.items = {}; s.stone = Math.max(10, Math.round(Math.sqrt(v) * .75)); s.sect = null; s.furnace = null; s.anvil = null; s.shop = null; s.found = 0; s.tox = 0; s.buffs = {};   // 帶不上去的東西只折一點：一億靈石約七千五仙元石，剛好一兩件仙階下品
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
