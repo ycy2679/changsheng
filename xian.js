@@ -311,3 +311,31 @@ for (const e of EVENTS) if (['xj_bottle', 'xj_star', 'xj_feast', 'xj_fallen', 'x
 SKILLS.xs_fa = K('接引仙光', 6, '無', 'dmg', 6, 4, { sch: 'fa', brk: .2, xs: 1 });
 SKILLS.xs_ti = K('仙軀擎嶽', 6, '無', 'multi', 1.15, 5, { hits: 4, sch: 'ti', xs: 1 });
 SKILLS.xs_hun = K('照神仙念', 6, '無', 'dmg', 5.2, 5, { stun: .35, sch: 'hun', xs: 1 });
+
+// ---------- 仙界坊市只賣仙階：多補一批靈寶、仙術，免得人仙時貨架很快就空 ----------
+// 仙術：照天階的輔助、範圍型術法放大
+for (const [kid, ...names] of [
+  ['hunyi', '仙元護體', '無相金光', '太初仙罩'],
+  ['buxiu', '金闕仙罡', '庚金仙甲訣', '萬劫金身'],
+  ['shengsheng', '春風化雨', '一葉回春', '萬木回春'],
+  ['wanliu', '弱水回瀾', '天河洗身', '滄浪仙泉'],
+  ['honglian', '紅蓮仙火', '業火焚心', '九霄真火'],
+  ['budong', '后土仙障', '九州山壁', '崑崙不動'],
+  ['leilao', '紫霄雷網', '九霄雷陣', '雷霆萬鈞'],
+  ['bingyu', '廣寒霜落', '太陰冰雨', '北冥雪暴'],
+  ['wuying', '巽風仙蹤', '太虛無影', '九天風遁'],
+]) {
+  const k = SKILLS[kid];
+  XG.forEach((g, i) => { SKILLS[`x${g}_${kid}`] = { ...k, name: names[i], grade: g, pow: Math.round(k.pow * XK[g] * 100) / 100, boss: undefined }; });
+}
+// 靈寶：六種新的天階等級範本（每部位兩種），再照品階放大
+for (const [ai, [slot, tpl, ...names]] of [
+  ['武器', { atk: .55, spd: 8, crit: .1 }, '追星仙刃', '流雲仙劍', '破曉仙鋒'],
+  ['武器', { atk: .5, lifesteal: .08, critDmg: .4 }, '飲霞仙鉞', '噬虹仙戟', '斷嶽仙刀'],
+  ['護甲', { hp: .5, regen: .03, def: .3 }, '青蓮仙衣', '紫綬仙袍', '玄黃仙甲'],
+  ['護甲', { def: .5, dodge: .06, spd: 4 }, '凌虛仙衣', '雲錦羽甲', '九天流光甲'],
+  ['飾品', { stone: .5, drop: .4, evRate: .15 }, '招財玉蟾', '聚寶仙盆', '萬寶如意'],
+  ['飾品', { techXp: .4, rate: .3, mp: .2 }, '悟道玉簡', '清心仙鈴', '太初玉牒'],
+].entries()) {
+  XG.forEach((g, i) => { ARTS[`x${g}_na${ai}`] = { name: names[i], slot, grade: g, ...xianScale(tpl, XF[g]) }; });
+}

@@ -1557,7 +1557,7 @@ const shopWeight = g => isXian() ? (g === 4 ? 15 / (1 + tl('qizhen')) : GRADE_WE
 function restock() {
   const s = L(), slots = [], per = SHOP_PER + tl('huojia'), tj = !!s.flags.tianji;
   s.flags.tianji = 0;
-  const grades = (isXian(s) ? [4, 6, 7, 8] : [1, 2, 3, 4]).filter(g => s.stage >= GRADE_MIN_STAGE[g]);
+  const grades = (isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => s.stage >= GRADE_MIN_STAGE[g]);   // 仙界只賣仙階
   // 功法、術法、法寶各擺 per 格，各有自己的圖鑑和價格表；抽到的品階沒貨就從其他品階補
   const kinds = { tech: [TECHS, s.techs, TECH_PRICE], skill: [SKILLS, s.skills, SKILL_PRICE], art: [ARTS, s.arts, ART_PRICE] };
   for (const k in kinds) {
