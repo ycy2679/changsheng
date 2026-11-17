@@ -212,7 +212,7 @@ const nameTag = (s = L()) => s.name ? ` · ${s.name}` : '';
 function newMortal(start) { return { phase: 'birth', origins: drawOrigins(), origin: null, act: 'farm', start, acts: Object.fromEntries(Object.keys(MORTAL_ACTS).map(k => [k, 0])), fates: null, fate: null, qi: 0, robT: 30 }; }
 function chooseOrigin(id) {
   const s = L(), m = s.mortal; if (m.phase !== 'birth' || !m.origins.includes(id)) return;
-  m.origin = id; m.phase = 'live'; m.start = s.age; save(); render();
+  m.origin = id; m.phase = 'live'; m.start = s.age; if (S.meta.ascends > 0) S.meta.lastStart = 'mortal'; save(); render();
 }
 function setAct(a) { L().mortal.act = a; render(); }
 function mortalTick(dt) {
@@ -284,7 +284,7 @@ function pathArtCheck(s = L()) {
   // 本命法寶直接戴上：有空格就放空格，沒有就換掉品階最低的飾品
   let put = '';
   if (!isOn(id, s)) { const k = freeKey(id, s) || swapKey(id, s); if (k) { put = s.gear[k] ? `，換下了「${ARTS[s.gear[k]].name}」` : ''; s.gear[k] = id; } }
-  log(`踏入化神，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」，隨即戴上${put}。`);
+  log(`${isXian(s) ? '成仙之後' : '踏入化神'}，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」，隨即戴上${put}。`);
 }
 // 路線專屬大招（進化型）：金丹學會基礎型，化神進化成強化型，進化後基礎型換成強化型、熟練度延續（兼修的路線也算）
 const PATH_ULT = { ti: ['santou', 'fatian'], hun: ['shenhun', 'wannian'] };
@@ -1029,7 +1029,7 @@ function enterSecret(id) {
 function renderSecret() {
   const s = L();
   return `<section class="panel card"><div class="row"><b>秘境</b><button class="mini" onclick="toggleSecret()">收起</button></div>
-    <p class="small muted">三層連戰，中間氣血、法力不回滿。前兩層是精英，第三層是頭目；打敗頭目必得高階寶物（闖的是當前境界的秘境，還會得到天材地寶），第一次通關還有頭目專屬掉落。戰敗會重傷退出，不會身死。每座秘境闖完要等 ${SECRET_CD} 年。</p>
+    <p class="small muted">三層連戰，中間氣血、法力不回滿。前兩層是精英，第三層是頭目；打敗頭目必得高階寶物${isXian(s) ? '' : '（闖的是當前境界的秘境，還會得到天材地寶）'}，第一次通關還有頭目專屬掉落。戰敗會重傷退出，不會身死。每座秘境闖完要等 ${SECRET_CD} 年。</p>
     ${SECRETS.filter(x => secretShown(x)).map(x => { const open = secretOpen(x), w = open ? secretWait(x) : 0;
       return `<div class="item"><div class="row"><b>${x.name}</b><span class="small muted">${MAJORS[x.mj].name}以上 · 頭目：${x.boss}${s.flags['sjc_' + x.id] ? ' · 已通關' : ''}</span></div>
         <div class="small muted">${x.desc}</div>
@@ -1264,6 +1264,8 @@ function autoLife() {
   const s = L();
   if (s.dead) { rebirth(); return; }
   const m = s.mortal;   // 凡人篇：挑最稀有的出身、第一個仙緣
+  // 飛升過以後：照上一次的選擇（從凡人／從仙人開始）；還沒選過就停下來等你
+  if (m && m.phase === 'birth' && S.meta.ascends > 0 && S.meta.lastStart !== 'mortal') { if (S.meta.lastStart === 'xian') chooseXianStart(); return; }
   if (m && m.phase === 'birth') chooseOrigin([...m.origins].sort((a, b) => ORIGINS[b].r - ORIGINS[a].r)[0]);
   if (m && m.phase === 'fate') chooseFate(m.fates[0]);
   if (m && m.phase === 'path') { m.pick = (S.meta.lastPaths || ['fa']).filter(id => PATHS[id]).slice(0, pathMax()); if (!m.pick.length) m.pick = ['fa']; confirmPath(); }
@@ -1674,7 +1676,7 @@ function ascend(s) {
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
   s.ascView = 1; xjOpen(s);
-  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `${PHYSIQUES[s.phys].name}在天門裡蛻變成了${physName(s)}。` : ''}凡間帶來的靈​石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；${sect ? sect + '、' : ''}洞府和陣法都留在了凡界。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
+  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}凡間帶來的靈​石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；${sect ? sect + '、' : ''}洞府和陣法都留在了凡界。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
 function renderAscend() {
@@ -1769,7 +1771,7 @@ function renderXianji() {
 // ---------- 從仙人開始：飛升過一次以後，轉世可以跳過凡界 ----------
 function chooseXianStart() {
   const s = L(), m = s.mortal; if (!m || m.phase !== 'birth' || !(S.meta.ascends > 0)) return;
-  s.xianStart = 1; m.origin = 'xian'; m.phase = 'test'; s.draw = makeDraw(S.meta);
+  s.xianStart = 1; m.origin = 'xian'; m.phase = 'test'; s.draw = makeDraw(S.meta); S.meta.lastStart = 'xian';
   save(); render();
 }
 // 擇道之後直接成為人仙一重：帶一部合得來的仙階下品主修、一門仙階下品術法、一點仙元石

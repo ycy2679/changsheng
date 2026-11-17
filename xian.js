@@ -94,7 +94,7 @@ Object.assign(ITEMS, {
   yunjin:    { name: '雲紋仙金', kind: 'mat', mat: 'ore', grade: 6, desc: '雲海島上採出的金，煉仙階下品法寶用。' },
   tianhesha: { name: '天河星砂', kind: 'mat', mat: 'ore', grade: 7, desc: '天河底下沉積的星砂，煉仙階中品法寶用。' },
   guixujing: { name: '歸墟玄晶', kind: 'mat', mat: 'ore', grade: 8, desc: '歸墟邊上結出的晶，煉仙階上品法寶用。' },
-  dujiedan:  { name: '渡劫仙丹', kind: 'dan', fx: 'jiedan', base: 1.5e5, xian: 1, desc: '下一次渡仙劫時，氣血、攻擊、防禦 +15%（服下後一直有效，直到渡劫）。' },
+  dujiedan:  { name: '渡劫仙丹', kind: 'dan', fx: 'jiedan', base: 1.5e5, xian: 1, desc: '下一次渡仙劫的成功率 +15%（服下後一直有效，直到渡劫）。' },
   xianshou:  { name: '延壽仙丹', kind: 'xlife', base: 2e5, xian: 1, desc: '仙人的延壽丹：壽元 +300 年。每一世最多吃 3 顆。' },
 });
 MAT_HERB[6] = 'xianzhi'; MAT_HERB[7] = 'pantaohua'; MAT_HERB[8] = 'jiuqiaocao';
