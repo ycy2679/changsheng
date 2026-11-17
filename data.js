@@ -13,8 +13,8 @@ const MAJORS = [
   { name: '大乘', subs: ['初期', '中期', '後期'], life: 1130, brk: .06 },
   { name: '渡劫', subs: ['初期', '中期', '後期'], life: 1330, brk: 0 },   // 渡劫後期撐過九道天雷就飛升
   // 仙界（地仙界）：每個境界分一重到九重；大境界之間要渡仙劫（brk 不用）
-  { name: '人仙', subs: NINE_CHONG, life: 3000, brk: 0 },
-  { name: '地仙', subs: NINE_CHONG, life: 5000, brk: 0 },
+  { name: '人仙', subs: NINE_CHONG, life: 4500, brk: 0 },   // 只閉關不吃丹也來得及修到九重、渡地仙劫
+  { name: '地仙', subs: NINE_CHONG, life: 6500, brk: 0 },
   { name: '真仙', subs: NINE_CHONG, life: 8000, brk: 0 },
   { name: '玄仙', subs: NINE_CHONG, life: 12000, brk: 0 },
 ];

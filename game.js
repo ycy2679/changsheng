@@ -1219,6 +1219,7 @@ function tick(dt) {
     if (pct(dt / DUNWU_SEC * (1 + tl('dunwu')))) {   // 頓悟：直接填滿這個小境界的修為；已滿就化為根基
       const g = Math.min(stg().need - s.xiu, Math.round(stg().need * Math.min(1, xianDamp(s) * 4)));   // 仙界頓悟只補一部分
       if (g > 0) { s.xiu += g; log(`閉關中豁然開朗，頓悟了，修為 +${fmt(g)}${s.xiu >= stg().need ? `，${stg().name}圓滿` : ''}。`); }
+      else if (isXian(s) && jieNext(s)) { addPress(1200); log(`閉關中頓悟，修為已滿，化為劫前淬鍊（+${Math.round((s.press || 0) * 100)}%）。`); }
       else { addFound(stg().need * .3); log('閉關中頓悟，修為已滿，化為根基。'); }
     }
   }
@@ -1309,7 +1310,7 @@ function popEvent(storyOnly) {
   // 一般事件一世只發生一次；標了 repeat 的可以重複，但一世最多 4 次，而且要隔 40 年
   if (!storyOnly) for (const e of EVENTS) {
     const seen = s.flags['ev_' + e.id], times = s.flags['evn_' + e.id] || 0;
-    if (!e.xian !== !xian || s.stage < (e.min || 0) || (e.cond && !e.cond(s)) || (seen !== undefined && !e.free && (!e.repeat || times >= 4 || s.age - seen < 40))) continue;
+    if (!e.xian !== !xian || s.stage < (e.min || 0) || (e.cond && !e.cond(s)) || (seen !== undefined && !e.free && (!e.repeat || times >= 4 || s.age - seen < (e.xian ? 400 : 40)))) continue;
     c.push({ ref: { ev: e.id }, w: 1 });
   }
   for (const e of STORY) if (e.cond(s)) c.push({ ref: { story: e.id }, w: 8 });
@@ -1729,6 +1730,7 @@ function xianJie() {
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (s.wsLog) { s.wsLog = 0; log('壽元一下子寬了，天人五衰的徵兆退去。'); }
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
+  { const np = PLACES.find(q => q.min === s.stage && q.xian); if (np) log(`以你現在的境界，已經能去${np.name}遊歷了（上方的地點選單）。那裡的妖物更強，仙元石和掉落也多得多。`); }
   pathSkillCheck(s); pathArtCheck(s);
   save(); render();
 }
@@ -2009,7 +2011,7 @@ function renderOffline() {
   const o = L().offline;
   return `<section class="panel card"><b>閉關歸來</b>
     <p>你離開了 ${dur(o.sec)}${o.off < o.sec ? `（洞府只撐得住 ${dur(o.off)}）` : ''}。這段時間修為 +${fmt(o.xiu)}${o.up ? `，突破到了${o.up}` : ''}${o.stones ? `，遊歷所得靈石 ${fmt(o.stones)}` : ''}。</p>
-    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${o.travel ? '（你離開時在遊歷，修為再減半、不吃洞府加成，但有靈石和材料）' : ''}${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園礦脈也照常運轉。</p>
+    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${o.travel ? '（你離開時在遊歷，修為再減半、不吃洞府加成，但有靈石和材料）' : ''}${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園、礦脈也照常運轉。</p>
     <div class="choices"><button onclick="closeOffline()">知道了</button></div></section>`;
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
@@ -2272,7 +2274,7 @@ function renderArt() {
   };
   const owned = Object.keys(s.arts);
   return renderBatch('art') + ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
-    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，會直接戴上，只有那條路線能裝備，也不能賣。飾品欄滿了可以直接「替換」品階最低的那件。鎖定的不會被批量賣出。</p>';
+    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。' + (isXian() ? '仙階下品法寶要人仙、中品要地仙、上品要真仙才驅使得動；凡界帶上來的照樣能用。' : '玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。') + '祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，會直接戴上，只有那條路線能裝備，也不能賣。飾品欄滿了可以直接「替換」品階最低的那件。鎖定的不會被批量賣出。</p>';
 }
 // 行囊小分頁：丹藥、寶物（天材地寶、五行之精）、材料
 let bagTab = 'dan';
@@ -2329,7 +2331,7 @@ function renderShop() {
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
-    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；跟主修同五行、跟修行路線對得上的功法、術法比較常上架。</p>`;
+    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、術法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的功法、術法比較常上架。</p>`;
 }
 // ---------- 百藝・煉丹：丹方（跨世保留）、開爐、出爐 ----------
 const matGrade = (s = L()) => majorGrade(stg(s).major);

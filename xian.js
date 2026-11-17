@@ -110,7 +110,7 @@ RECIPES.dujiedan = { g: 6, n: 5 }; RECIPES.xianshou = { g: 7, n: 5 };
 
 // ---------- 遊歷地點、秘境 ----------
 PLACES.push(
-  { id: 'fuyun', name: '浮雲殘島', min: 33, lv: 36, mult: 1, foes: [['雲中蜃獸', '風'], ['墮仙殘魂', '無'], ['風雷雕', '雷']], grades: [4, 6], xian: 1 },
+  { id: 'fuyun', name: '浮雲殘島', min: 33, lv: 36, mult: 1, foes: [['雲中蜃獸', '風'], ['墮仙殘魂', '無'], ['風雷雕', '雷']], grades: [6], xian: 1 },
   { id: 'wanyao', name: '萬藥仙谷', min: 42, lv: 45, mult: 1.05, foes: [['千年藥靈', '木'], ['守谷仙傀', '土'], ['毒霧蛟', '水']], grades: [6, 7], xian: 1 },
   { id: 'tianhe', name: '天河古渡', min: 51, lv: 54, mult: 1.1, foes: [['天河水妖', '水'], ['擺渡陰靈', '冰'], ['星砂巨蟹', '金']], grades: [7, 8], xian: 1 },
   { id: 'guixu', name: '歸墟之畔', min: 60, lv: 63, mult: 1.15, foes: [['歸墟古獸', '土'], ['吞仙蜃', '火'], ['迷失的真仙', '無']], grades: [8], xian: 1 },
@@ -276,3 +276,33 @@ const XIAN_ARR_NAME = { juling: '聚元陣', yaoyuan: '仙藥園', kuangmai: '�
 ARRAY_GROW.push(25, 20, 15);
 ARRAY_STONE.push(5e5, 1.5e6, 4.5e6);
 const arrLvGrade = l => l <= 4 ? l : l + 1;   // 陣法等級對應的材料品階（5 級起是仙階 6～8）
+
+// ---------- 仙界奇遇（第二批）＋可以重複的奇遇 ----------
+// 仙界一世很長，大部分奇遇可以重複（一世最多 4 次，至少隔 400 年；給道心、永久屬性的不重複）
+EVENTS.push(
+  { id: 'xj_stall', xian: 1, repeat: 1, title: '雲市擺攤', text: '雲市裡空出一個攤位，旁邊的攤主說：「不用錢，擺一天試試？」', choices: [
+    { t: '擺一天', run() { return `你把用不到的小東西擺出來，一天下來，賺了仙元石 ${addStone(stoneUnit(topPlace().lv) * 6)}。`; } },
+    { t: '幫隔壁顧攤', run() { return `隔壁攤主去喝酒，你替他顧了一天。他回來塞給你仙元石 ${addStone(stoneUnit(topPlace().lv) * 3)}，還有一句「改天請你喝」。`; } }] },
+  { id: 'xj_downward', xian: 1, repeat: 1, title: '下凡的請託', text: '一個年輕仙人求你幫忙：他在凡間的老母親快不行了，他自己下不去，想託你帶一句話。', choices: [
+    { t: '替他走一趟', run() { addLife(60); return '你偷偷下了一趟凡間，把話帶到了。老太太笑著閉上了眼。回來的路上，你覺得自己也年輕了一些，壽元 +60 年。'; } },
+    { t: '勸他別掛念', run() { return `「仙凡有別。」你說。他沉默了很久，最後向你道謝。你自己卻有點靜不下心，修為只長了 ${fmt(addXiu(.05))}。`; } }] },
+  { id: 'xj_sword', xian: 1, repeat: 1, title: '天河漂來的劍', text: '天河上漂來一柄斷劍，劍身上還刻著半個名字，另外半個被水磨掉了。', choices: [
+    { t: '撈起來', run() { return pct(.4) ? `你把劍撈上來，劍匣裡還藏著一件東西：${giftArt(xgr(), '武器')}。` : '只是一柄普通的斷劍。你把它插在岸邊，當作一座小小的墳。'; } },
+    { t: '讓它漂走', run() { return '劍順著天河漂遠了，不知道要漂到哪裡去。'; } }] },
+  { id: 'xj_child', xian: 1, repeat: 1, title: '迷路的仙童', text: '一個扎著雙髻的仙童蹲在路邊哭，說他師父讓他去採仙草，他找不到路了。', choices: [
+    { t: '帶他去採', run() { addMat(matGrade(), 'herb', 2); return '你陪他採了一籃仙草，他分了你兩份，還說長大要拜你當師父。'; } },
+    { t: '送他回去', run() { return `他師父是一位脾氣很好的老仙，留你喝了一壺茶，記了你仙功 ${addGong(8)}。`; } }] },
+  { id: 'xj_chess', xian: 1, repeat: 1, title: '仙棋殘局', text: '松樹下擺著一盤沒下完的棋，兩邊的棋手都不見了，棋子上落滿了松針。', choices: [
+    { t: '坐下來推演', run() { return `你對著殘局想了一整天，竟從裡面悟出一點東西，《${addTechXp(900)}》精進了不少。`; } },
+    { t: '替他們收好', run() { return '你把棋子一顆顆收進棋盒。走的時候，好像聽見背後有人說了聲謝謝。'; } }] },
+  { id: 'xj_watch', xian: 1, repeat: 1, title: '觀人渡劫', text: '遠處的山頭上，有人在渡仙劫。劫雲壓得很低，看得你心頭髮緊。', choices: [
+    { t: '在旁邊看完', run(s) { if (jieNext(s) && s.xiu >= stg(s).need) { s.press = Math.min(PRESS_CAP + .1 * tl('dujie'), (s.press || 0) + .05); return '你把每一道雷都看在眼裡，心裡對自己那一劫多了幾分底，劫前淬鍊 +5%。'; } return `你看完了整場仙劫。他撐過去了，你也跟著鬆了一口氣，修為 +${fmt(addXiu(.15))}。`; } },
+    { t: '遠遠避開', run() { return '劫雲的事，還是少沾為妙。你繞了一大圈。'; } }] },
+  { id: 'xj_cellar', xian: 1, repeat: 1, title: '仙酒窖', text: '你在一座廢棄的仙府底下，找到一個酒窖，裡面還有幾罈沒開封的仙釀。', choices: [
+    { t: '開一罈嚐嚐', run(s) { s.tox = Math.min(100, s.tox + 15); return `酒勁很足，你醉了三天三夜，醒來修為 +${fmt(addXiu(.25))}，丹毒 +15。`; } },
+    { t: '搬去賣', run() { return `酒鋪掌櫃眼睛都亮了，仙元石 ${addStone(stoneUnit(topPlace().lv) * 8)}。`; } }] },
+  { id: 'xj_oldfriend', xian: 1, title: '凡間的舊識', text: '仙界的路上，你遇見一個面熟的人。想了很久才想起來：他是你某一世在凡間認識的修士，原來他也飛升了。', choices: [
+    { t: '敘敘舊', run() { addLife(100); return '你們聊了很久，聊到凡間的那些年，他說：「那時候真好。」你也這麼覺得。壽元 +100 年。'; } },
+    { t: '點頭致意', run() { return '你們點了點頭，各自走了。仙界很大，也許不會再見。'; } }] },
+);
+for (const e of EVENTS) if (['xj_bottle', 'xj_star', 'xj_feast', 'xj_fallen', 'xj_peach', 'xj_gamble', 'xj_patrol', 'xj_oldcave', 'xj_prayer', 'xj_cub', 'xj_leichi', 'xj_echo'].includes(e.id)) e.repeat = 1;
