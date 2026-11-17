@@ -1715,7 +1715,7 @@ const PRESS_CAP = .3;   // 劫前淬鍊上限
 // 仙劫成功率：基本 ＋ 劫前淬鍊 ＋ 渡劫仙丹 15%，天人五衰每個 -5%、負傷減半（不擲戰鬥，免得某些流派怎麼準備都過不了）
 function jieChance(s = L()) {
   const p = (JIE_BASE[stg(s).major] || 0) + (s.press || 0) + .15 * (s.flags.jiedan || 0) + .025 * tl('pojing') - .05 * wuShuai(s);   // 破境如竹在仙界減半；海量可以吃兩顆渡劫仙丹
-  return Math.max(.01, Math.min(.98, p * (s.injury > 0 ? .5 : 1)));
+  return Math.max(.01, Math.min(.9, p * (s.injury > 0 ? .5 : 1)));   // 上限 90%：準備再足也有一成風險
 }
 // 停在大圓滿時繼續修煉：修為化為劫前淬鍊，閉關約一個半小時到上限（遊歷減半）
 const PRESS_SEC = 5400;
