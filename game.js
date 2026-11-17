@@ -357,6 +357,9 @@ const speedCtl = () => tl('guangyin') ? `<select class="mini" onchange="setSpeed
 const L = () => S.life;
 const stg = (s = L()) => STAGES[s.stage];
 const isXian = (s = L()) => s.stage > MORTAL_TOP;                       // 已經成仙（地仙界）
+let XIAN_RATE = 30, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008 };
+// 照修為百分比給的東西（頓悟、擊殺得修為、奇遇給的修為）在仙界跟仙丹一樣打折，不然九重一下就衝完
+const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   // 仙丹每顆補幾成修為：越往上越補不動   // 仙界吐納的是仙靈之氣：修煉速度 ×30（仙界的修為需求也大得多）
 const yearSec = (s = L()) => isXian(s) ? 6 : YEAR_SEC;                   // 仙界歲月流得快：線上 6 秒一年
 // 下一步要渡劫：渡劫後期 → 九道天雷；仙界每個大境界 → 仙劫。自動突破、離線都不會碰
 const jieNext = (s = L()) => s.stage === MORTAL_TOP || (isXian(s) && s.stage < STAGES.length - 1 && STAGES[s.stage + 1].major !== stg(s).major);
@@ -653,7 +656,7 @@ function rate(s = L(), mode = s.mode) {
   return (1 + .2 * s.stage) * rootRate(s) * (mainAff(s) ? 1.15 : 1)
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
-    * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
+    * (isXian(s) ? XIAN_RATE : 1) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
 }
 // 靈根後期路線的修煉倍率
 function pathRate(s = L()) {
@@ -663,7 +666,7 @@ function pathRate(s = L()) {
 // 靈根化道、萬法歸空：同路線屬性的術法、神通威力
 const pathElem = (s = L()) => { const p = pathOn(s); return p === 'pure' ? s.root.elems[0] : p === 'void' ? '無' : null; };
 function stats(s = L()) {
-  const k = 1 + .5 * s.stage, b = (1 + s.body) * (1 + qualBonus(s)) * (pathOn(s) === 'five' ? 1.2 : 1) * (1 + jieBoost) * (1 - .05 * wuShuai(s));   // jieBoost 只在渡仙劫時有值   // 突破品質也加氣血、攻擊、防禦
+  const k = 1 + .5 * s.stage, b = (1 + s.body) * (1 + qualBonus(s)) * (pathOn(s) === 'five' ? 1.2 : 1) * (1 - .05 * wuShuai(s));   // 突破品質也加氣血、攻擊、防禦
   return {
     hp: Math.round(100 * k * (1 + eff('hp')) * b), mp: Math.round(50 * k * techMul(s.tech, s) * (1 + eff('mp'))), atk: 10 * k * (1 + eff('atk')) * b, def: 5 * k * (1 + eff('def')) * b,
     spd: Math.max(1, Math.round(10 + 2 * s.stage + eff('spd'))), crit: .05 + eff('crit'), critDmg: 1.5 + eff('critDmg'),
@@ -742,7 +745,7 @@ function elemMul(a, d, mine = true) {
 function addStone(n) { const s = L(); n = Math.max(0, n); if (isXian(s)) { s.xyFrac = (s.xyFrac || 0) + n / XY_RATE; n = Math.floor(s.xyFrac); s.xyFrac -= n; } else n = Math.round(n); s.stone += n; return n; }
 // 厚積薄發：修為滿了還在閉關，多出來的修為化為根基；多修出一整個境界的量就攢滿 +30% 突破率
 function addFound(amount) { const s = L(); s.found = Math.min(.3, (s.found || 0) + amount / stg().need * .3); }
-function addXiu(frac) { const s = L(), need = stg().need, g = Math.min(need - s.xiu, Math.round(need * frac * .35)); s.xiu += Math.max(0, g); return Math.max(0, g); }
+function addXiu(frac) { const s = L(), need = stg().need, g = Math.min(need - s.xiu, Math.round(need * frac * .35 * xianDamp(s))); s.xiu += Math.max(0, g); return Math.max(0, g); }
 // 給當前境界用得上的突破丹（化神期沒有突破丹，改給修為丹），回傳丹名
 function addPill(n) { const m = stg().major, id = BRK_PILLS[m] || XIU_PILLS[m]; addItem(id, n); return ITEMS[id].name; }
 function addHeal(n) { addItem('heal', n); }
@@ -1148,7 +1151,7 @@ function battle(name, lv, mult = 1, loot = false, elem = '無') {
     s.wins++; S.meta.wins++;
     let msg = `擊敗${name}（${how}）`;
     const kx = eff('killXiu') + shenSum('winXiu');
-    if (kx) { const g = Math.min(stg().need - s.xiu, Math.round(stg().need * kx)); s.xiu += Math.max(0, g); }
+    if (kx) { const g = Math.min(stg().need - s.xiu, Math.round(stg().need * kx * xianDamp(s))); s.xiu += Math.max(0, g); }
     let rare = false;   // 掉了功法、法寶、丹藥這類稀有東西，就不算日常
     if (loot) {
       const drop = tryDrop(.04 * (1 + shenSum('dropUp'))); rare = !!drop;
@@ -1197,7 +1200,7 @@ function tick(dt) {
   // 目前氣血、法力（比例），下一場戰鬥從這裡開始；戰鬥外約 40 秒回滿，閉關快一倍
   s.hpNow = Math.min(1, (s.hpNow ?? 1) + dt / 40 * heal); s.mpNow = Math.min(1, (s.mpNow ?? 1) + dt / 40 * heal); s.snNow = Math.min(1, (s.snNow ?? 1) + dt / 60 * heal);   // 神識回得慢
   if (s.xiu < stg().need) s.xiu = Math.min(stg().need, s.xiu + rate() * dt);
-  else if (isXian(s) && jieNext(s)) addPress(rate() * dt);   // 停在大圓滿等渡仙劫：修為化為劫前淬鍊
+  else if (isXian(s) && jieNext(s)) addPress(dt * (s.mode === 'travel' ? .5 : 1));   // 停在大圓滿等渡仙劫：繼續修煉化為劫前淬鍊
   else if (s.mode === 'closed') addFound(rate() * dt);
   growTechs(dt * (s.mode === 'travel' ? .5 : 1));
   const evGap = () => (90 + Math.random() * 90) / (1 + eff('evRate'));
@@ -1208,8 +1211,8 @@ function tick(dt) {
   } else {
     if (!s.ev) { s.evT -= dt * .5; if (s.evT <= 0) { s.evT = evGap(); popEvent(true); } }
     if (pct(dt / DUNWU_SEC * (1 + tl('dunwu')))) {   // 頓悟：直接填滿這個小境界的修為；已滿就化為根基
-      const g = stg().need - s.xiu;
-      if (g > 0) { s.xiu = stg().need; log(`閉關中豁然開朗，頓悟了，修為 +${fmt(g)}，${stg().name}圓滿。`); }
+      const g = Math.min(stg().need - s.xiu, Math.round(stg().need * Math.min(1, xianDamp(s) * 4)));   // 仙界頓悟只補一部分
+      if (g > 0) { s.xiu += g; log(`閉關中豁然開朗，頓悟了，修為 +${fmt(g)}${s.xiu >= stg().need ? `，${stg().name}圓滿` : ''}。`); }
       else { addFound(stg().need * .3); log('閉關中頓悟，修為已滿，化為根基。'); }
     }
   }
@@ -1479,9 +1482,10 @@ function usePill(id) {
     if (s.xiu >= need) return;
     const diff = stg().major - it.major;
     const low = diff === 1 && tl('danxin') ? .5 : Math.pow(.25, diff);   // 丹心通明：低一階也有一半效果
-    let amt = .25 * pe * tf * (diff > 0 ? low : 1);
+    const xp = it.major >= XIAN_MJ;   // 仙丹：每顆只補一成，丹毒也重
+    let amt = (xp ? XIAN_PILL[it.major] : .25) * pe * tf * (diff > 0 ? low : 1);
     if (diff < 0) { amt = .5 * tf; injure(150); }
-    const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(20);
+    const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 35 : 20);
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
   } else if (it.kind === 'xlife') { if (danBlock(id, s)) return; const n = Math.round(300 * pe * tf); s.lifeBonus += n; s.xlifeN = (s.xlifeN || 0) + 1; addTox(30); msg = `服下延壽仙丹，壽元 +${n}。`; }
   else if (it.kind === 'life') { const n = Math.round(15 * pe * tf); s.lifeBonus += n; addTox(30); msg = `服下延壽丹，壽元 +${n}。`; }
@@ -1664,7 +1668,7 @@ function ascend(s) {
   // 靈石、丹藥、材料帶不上去，一起折成仙元石；洞府、陣法、宗門、爐子留在凡界
   let v = s.stone; for (const id in s.items) v += sellItemPrice(id) * s.items[id];
   const sect = s.sect && SECTS[s.sect.id].name;
-  s.items = {}; s.stone = Math.max(10, Math.round(v / XY_RATE / 20));   // 帶不上去的東西只折二十分之一 s.sect = null; s.cave = 0; s.arrays = {}; s.arrOn = {}; s.furnace = null; s.anvil = null; s.shop = null; s.found = 0; s.tox = 0; s.buffs = {};
+  s.items = {}; s.stone = Math.max(10, Math.round(Math.sqrt(v) * .75));   // 帶不上去的東西只折一點：一億靈石約七千五仙元石，剛好一兩件仙階下品 s.sect = null; s.cave = 0; s.arrays = {}; s.arrOn = {}; s.furnace = null; s.anvil = null; s.shop = null; s.found = 0; s.tox = 0; s.buffs = {};
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
@@ -1685,45 +1689,33 @@ function renderAscend() {
 // ---------- 仙劫：仙界每個大境界都要渡，連戰幾道、中間不回滿，失敗就隕落 ----------
 const JIE_N = { 9: 3, 10: 5, 11: 7 };   // 從哪個大境界往上：人仙→地仙 三道、地仙→真仙 五道、真仙→玄仙 七道
 const JIE_NAME = { 9: '地仙劫', 10: '真仙劫', 11: '玄仙劫' };
-const JIE_HARD = 1;     // 仙劫強度（機器人調）
+const JIE_BASE = { 9: .5, 10: .45, 11: .4 };   // 修為剛滿就渡的成功率
 const PRESS_CAP = .3;   // 劫前淬鍊上限
-let jieBoost = 0;       // 渡劫時的加成：劫前淬鍊＋仙劫丹（只在 xianJie 和推演裡有值）
-function jieFoe(s, i) {
-  const lv = s.stage + 1 + Math.floor(i / 2), mult = (1 + TRIB_STEP * i) * JIE_HARD, k = 1 + .5 * (lv - 1);
-  return { hp: 150 * k * mult, atk: 11.5 * k * mult, def: 4.5 * k * mult, spd: 10 + 2 * (lv - 1), elem: TRIB_ELEMS[(i * 4 + s.stage) % 9] };
+// 仙劫成功率：基本 ＋ 劫前淬鍊 ＋ 渡劫仙丹 15%，天人五衰每個 -5%、負傷減半（不擲戰鬥，免得某些流派怎麼準備都過不了）
+function jieChance(s = L()) {
+  const p = (JIE_BASE[stg(s).major] || 0) + (s.press || 0) + (s.flags.jiedan ? .15 : 0) - .05 * wuShuai(s);
+  return Math.max(.01, Math.min(.98, p * (s.injury > 0 ? .5 : 1)));
 }
-// 停在大圓滿時繼續修煉：修為化為劫前淬鍊，一個小境界的修為量約 +10%
-function addPress(amount) { const s = L(); s.press = Math.min(PRESS_CAP + .1 * tl('dujie'), (s.press || 0) + amount / stg(s).need * .1); }
-// 跑完整場仙劫，回傳是否撐過；sim 推演時不寫紀事
-function runJie(s, sim) {
-  const n = JIE_N[stg(s).major];
-  jieBoost = (s.press || 0) + (s.flags.jiedan ? .15 : 0);
-  try {
-    s.hpNow = s.mpNow = s.snNow = 1;
-    for (let i = 0; i < n; i++) {
-      const res = fight(jieFoe(s, i));
-      s.hpNow = res.hp; s.mpNow = res.mp;
-      if (!res.win || res.fled) return { ok: false, i, res };
-      if (!sim) log(`第${NUM9[i]}道劫雷，你撐過去了（${res.rounds} 回合，剩氣血 ${Math.round(res.hp * 100)}%）。`);
-    }
-    return { ok: true };
-  } finally { jieBoost = 0; }
+// 停在大圓滿時繼續修煉：修為化為劫前淬鍊，閉關約一個半小時到上限（遊歷減半）
+const PRESS_SEC = 5400;
+function addPress(sec) { const s = L(), cap = PRESS_CAP + .1 * tl('dujie'); s.press = Math.min(cap, (s.press || 0) + sec * cap / PRESS_SEC); }
+// 一道一道落：總成功率攤到每一道
+function runJie(s) {
+  const n = JIE_N[stg(s).major], q = Math.pow(jieChance(s), 1 / n);
+  for (let i = 0; i < n; i++) {
+    if (!pct(q)) return { ok: false, i };
+    log(`第${NUM9[i]}道劫雷，${['你咬牙撐住了', '你硬生生扛了下來', '雷光散去，你還站著'][i % 3]}。`);
+  }
+  return { ok: true };
 }
-// 推演：在副本上偷偷模擬 30 次，不動到真的存檔
-function jieSimP(n = 30) {
-  const real = S; let win = 0;
-  try { for (let k = 0; k < n; k++) { S = JSON.parse(JSON.stringify(real)); if (runJie(S.life, true).ok) win++; } } finally { S = real; }
-  return win / n;
-}
-function jieSim() { const s = L(); s.jieSim = { p: jieSimP(), st: s.stage, press: s.press || 0, dan: s.flags.jiedan ? 1 : 0 }; save(); render(); }
 function xianJie() {
   const s = L(); if (!isXian(s) || !jieNext(s) || s.xiu < stg(s).need) return;
   if (armed !== 'xjie') { armed = 'xjie'; render(); return; }
   armed = ''; const name = JIE_NAME[stg(s).major];
   log(`你引動了${name}。劫雲從四面八方湧來——仙界的天，也會降劫。`);
-  const r = runJie(s, false); s.flags.jiedan = 0;
-  if (!r.ok) { log(`第${NUM9[r.i]}道劫雷落下，你沒能撐住${r.res.fled ? '——仙劫之下，無處可逃' : ''}。`); s.jieFail = 1; die(); save(); render(); return; }
-  s.press = 0; s.jieSim = null;
+  const r = runJie(s); s.flags.jiedan = 0;
+  if (!r.ok) { log(`第${NUM9[r.i]}道劫雷落下，你沒能撐住。`); s.jieFail = 1; die(); save(); render(); return; }
+  s.press = 0;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (s.wsLog) { s.wsLog = 0; log('壽元一下子寬了，天人五衰的徵兆退去。'); }
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
@@ -1782,7 +1774,7 @@ function chooseXianStart() {
 // 擇道之後直接成為人仙一重：帶一部合得來的仙階下品主修、一門仙階下品術法、一點仙元石
 function xianEnter(s) {
   s.mortal = null; s.stage = MORTAL_TOP + 1; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
-  s.age = 900 + Math.floor(Math.random() * 300); s.place = topPlace(s).id;
+  s.age = 300 + Math.floor(Math.random() * 200); s.place = topPlace(s).id;   // 剛成仙的年紀：比飛升上來的人年輕，壽元才夠走得遠
   const tech = Object.keys(TECHS).filter(id => TECHS[id].grade === 6 && canMain(id, s)), tid = tech.length ? pick(tech) : null;
   if (tid) { learnTech(tid); s.tech = tid; }
   const sk = Object.keys(SKILLS).filter(id => SKILLS[id].grade === 6 && ownSch(id, s) && (SKILLS[id].elem === '無' || skillFits(SKILLS[id].elem, s))), kid = sk.length ? pick(sk) : null;
@@ -1840,7 +1832,7 @@ function applyOffline(sec) {
     const r = rate(s), t = (stg().need - s.xiu) / r;   // 照離開時的模式算：遊歷跟線上一樣修為減半、不吃洞府
     if (t > left) { s.xiu += r * left; gained += r * left; break; }
     left -= t; gained += stg().need - s.xiu; s.xiu = stg().need;
-    if (s.stage >= STAGES.length - 1 || jieNext()) { if (isXian(s) && jieNext()) addPress(left * r); break; }   // 渡劫一定等你回來
+    if (s.stage >= STAGES.length - 1 || jieNext()) { if (isXian(s) && jieNext()) addPress(left * (s.mode === 'travel' ? .5 : 1)); break; }   // 渡劫一定等你回來
     // 不能自動突破就停在這裡，剩下的時間化為根基
     if (isMajorNext() ? !(autoOn('a_major') && realChance(s, 'safe') >= S.meta.autoMajor) : !autoOn('a_minor')) { addFound(left * r); break; }
     const res = tryBreak(true);
@@ -1934,7 +1926,7 @@ function render() {
           ${PLACES.filter(p => s.stage >= p.min && !p.xian === !isXian(s)).map(p => `<option value="${p.id}" ${p.id === s.place ? 'selected' : ''}>${p.name}</option>`).join('')}
         </select>
         <span style="margin-left:auto;display:flex;gap:8px;align-items:center">${isMajorNext() ? `<select class="mini" onchange="setBrkMode(this.value)" title="大境界突破方式">${[['safe', '穩紮穩打'], ['all', '全力一搏']].map(([k, n]) => `<option value="${k}" ${(s.brkMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}
-        ${isXian(s) && jieNext(s) ? '<button class="mini" onclick="jieSim()" title="偷偷模擬 30 次，看這一劫有幾成把握">推演</button>' : ''}<button id="brk" class="primary" onclick="breakthrough()"></button></span>
+        <button id="brk" class="primary" onclick="breakthrough()"></button></span>
       </div>
       <ul class="recent" id="recent"></ul>
     </section>
@@ -1974,9 +1966,9 @@ function updateDyn() {
     $('mptxt').textContent = ps.map((k, i) => `${i ? RES_NAME[k] + ' ' : ''}${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}`).join(' · ');
     $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
-    const xj = isXian(s) && jieNext(s), sim = s.jieSim && s.jieSim.st === s.stage ? s.jieSim : null, ws = wuShuai(s);
+    const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
     const tip = atTop ? (w.length ? '飛升還差：' + w.join('、') + (noDao ? '（道心在坐化或兵解時才會增加，這一世多半飛升不了）' : '') : '九道天雷之後就能飛升，但失敗就會身死。') : noDao ? `道心 ${S.meta.dao}/${ASCEND_DAO}，這一世多半飛升不了`
-      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗即隕落 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= PRESS_CAP + .1 * tl('dujie') - 1e-9 ? '（已滿）' : ''} · ${sim ? `推演勝算 ${Math.round(sim.p * 100)}%${Math.abs(sim.press - (s.press || 0)) > .005 || sim.dan !== (s.flags.jiedan ? 1 : 0) ? '（淬鍊或藥效變了，可再推演）' : ''}` : '還沒推演'}`
+      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗即隕落 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= PRESS_CAP + .1 * tl('dujie') - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ' · 渡劫仙丹 +15%' : ''}`
       : s.stage >= STAGES.length - 1 ? '玄仙圓滿。再往上是登天——仙界篇下半部製作中。' : '';
     $('buffs').textContent = cur(bt + (tip ? (bt ? '　' : '') + tip : '') + (ws ? `　天人五衰 ${ws}/5（修煉、氣血、攻擊 -${5 * ws}%）` : '')); } $('realm').textContent = realmName(s);
   $('res').innerHTML = `${cur('靈石')} ${fmt(s.stone)}${s.found >= .01 ? ` · <span class="same">根基 +${Math.round(s.found * 100)}%</span>` : ''}${s.tox >= 1 ? ` · <span class="${s.tox > 50 ? 'hurt' : ''}">丹毒 ${Math.ceil(s.tox)}%</span>` : ''}`;
@@ -1985,7 +1977,7 @@ function updateDyn() {
   const why = last ? ascendWhy(s) : [];
   b.disabled = end || (last ? why.length > 0 : s.xiu < need);
   b.className = 'primary' + (armed === 'trib' || armed === 'xjie' ? ' danger' : '');
-  b.textContent = end ? '登天（製作中）' : xj ? (armed === 'xjie' ? '確定渡劫？失敗即隕落' : `渡${JIE_NAME[stg().major]}`) : last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
+  b.textContent = end ? '登天（製作中）' : xj ? (armed === 'xjie' ? `確定渡劫？${Math.round(jieChance() * 100)}%，失敗即隕落` : `渡${JIE_NAME[stg().major]} ${Math.round(jieChance() * 100)}%`) : last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
   b.textContent = cur(b.textContent);
   $('recent').innerHTML = s.log.slice(0, 4).map(l => `<li>${l.text}</li>`).join('');
   if ($('shopT')) { if (ensureShop()) { render(); return; } $('shopT').textContent = dur2(Math.max(0, (s.shop.next - Date.now()) / 1000)); }
