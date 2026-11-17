@@ -346,13 +346,14 @@ const FORGE_RANK = ['學徒', '器師', '大師', '宗師'];
 // 陣法：佈在洞府裡，洞府 0／3／5／8 級各開一座陣位；每座最多 4 級，第 N 級要 N 階材料 5 份（藥園用靈草，其他用礦材）和靈石
 const ARRAYS = {
   juling:   { name: '聚靈陣', desc: l => `修煉速度 +${8 * l}%` },
-  yaoyuan:  { name: '藥園陣', desc: l => `每 ${ARRAY_GROW[l]} 秒長出一份靈草，最高${GRADES[l]}` },
-  kuangmai: { name: '礦脈陣', desc: l => `每 ${ARRAY_GROW[l]} 秒採出一份礦材，最高${GRADES[l]}` },
-  danshi:   { name: '丹室陣', desc: l => `煉丹成功率 +${5 * l}%，出爐快 ${15 * l}%` },
-  dihuo:    { name: '地火陣', desc: l => `煉器成功率 +${5 * l}%，出爐快 ${15 * l}%` },
+  yaoyuan:  { name: '藥園', desc: l => `每 ${ARRAY_GROW[l]} 秒長出一份靈草，最高${GRADES[arrLvGrade(l)]}` },
+  kuangmai: { name: '礦脈', desc: l => `每 ${ARRAY_GROW[l]} 秒採出一份礦材，最高${GRADES[arrLvGrade(l)]}` },
+  danshi:   { name: '煉丹室', desc: l => `煉丹成功率 +${5 * l}%，出爐快 ${Math.round(arrSpeed(l) * 100)}%` },
+  dihuo:    { name: '地火陣', desc: l => `煉器成功率 +${5 * l}%，出爐快 ${Math.round(arrSpeed(l) * 100)}%` },
   hushan:   { name: '護山陣', desc: l => `離線修煉效率 +${10 * l}%` },
 };
 const ARRAY_SLOT_CAVE = [0, 3, 5, 8];
+const arrSpeed = l => l <= 4 ? .15 * l : .6 + .05 * (l - 4);   // 丹室、地火的出爐加速（仙階每級只多 5%，最多 75%）
 const ARRAY_GROW = [0, 90, 60, 40, 30];
 const ARRAY_STONE = [0, 250, 3000, 30000, 180000];
 const BRK_PILL_PRICE = [600, 6000, 40000, 120000, 400000, 1.2e6, 4e6, 1.2e7];

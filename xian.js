@@ -243,3 +243,36 @@ const XIAN_STORY = [
       { t: '把這行字留著', run() { xsMark('n10c'); storyMark('n10'); return '這是你留給自己的話。你還想不起來，是什麼時候寫的。（仙界篇下半部：登天之後，會再見到他。）'; } },
       { t: '劃掉它', run() { xsMark('n10c'); storyMark('n10'); return '你一筆劃掉那行字。劃痕底下，墨跡又慢慢浮了出來。（仙界篇下半部：登天之後，會再見到他。）'; } }] },
 ];
+
+// ---------- 仙版雜丹：成仙以後只煉得了仙丹，凡界雜丹各有一個仙階版本（效果加倍或更強） ----------
+// [凡界丹, 仙丹 id, 名字, 品階, 價格（靈石計，換算仙元石除以 100）, 說明, 額外欄位]
+const XIAN_DAN = [
+  ['julingdan', 'x_julingdan', '聚元丹', 6, 3e4, '接下來 10 分鐘修煉速度 +100%。'],
+  ['qizhidan', 'x_qizhidan', '開明仙丹', 6, 3e4, '接下來 10 分鐘功法精進 ×3。'],
+  ['kuangxue', 'x_kuangxue', '戰仙丹', 6, 2.5e4, '接下來 10 分鐘攻擊 +60%，但防禦 -10%。'],
+  ['jingangdan', 'x_jingangdan', '不壞仙丹', 6, 2.5e4, '接下來 10 分鐘防禦 +80%。'],
+  ['ningshendan', 'x_ningshendan', '凝元仙丹', 6, 2.5e4, '接下來 10 分鐘法力上限 +100%。'],
+  ['huichundan', 'x_huichundan', '回天丹', 6, 2e4, '立刻回滿氣血和法力。'],
+  ['qingxindan', 'x_qingxindan', '淨塵丹', 6, 2.5e4, '丹毒 -60%，本身沒有丹毒。', { amt: 60 }],
+  ['wudao', 'x_wudao', '悟真仙丹', 6, 4e4, '主修功法立刻精進 30 分鐘的進度（主修圓滿了就平分給輔修）。', { amt: 1800 }],
+  ['yinyuan', 'x_yinyuan', '牽緣仙丹', 7, 4e4, '接下來 10 分鐘奇遇頻率 ×3。'],
+  ['xunbaodan', 'x_xunbaodan', '探寶仙丹', 7, 4e4, '接下來 10 分鐘掉落機率 ×3。'],
+  ['xisui', 'x_xisui', '脫胎仙丹', 7, 8e4, '這一世氣血、攻擊、防禦永久 +6%，有丹毒。', { amt: .06 }],
+  ['pozhang', 'x_pozhang', '破關仙丹', 7, 6e4, '下一次小境界突破必定成功。'],
+  ['xingshen', 'x_xingshen', '通神丹', 8, 1e5, '下一場戰鬥，每門神通可以發動兩次。'],
+  ['zhuyan', 'x_zhuyan', '還童仙丹', 8, 1.2e5, '年齡 -150 歲。', { amt: 150 }],
+  ['tianjidan', 'x_tianjidan', '天機仙丹', 8, 1e5, '下一次坊市換貨，功法、術法、法寶的第一格都保證中品以上。'],
+];
+for (const [src, id, name, g, base, desc, ex] of XIAN_DAN) {
+  const o = ITEMS[src];
+  ITEMS[id] = { ...o, name, base, desc, xian: 1, ...(ex || {}) };
+  RECIPES[id] = { g, n: RECIPES[src].n + 2 };
+}
+const X_DAN_COMMON = XIAN_DAN.filter(x => !ITEMS[x[0]].rare).map(x => x[1]);
+const X_DAN_RARE = XIAN_DAN.filter(x => ITEMS[x[0]].rare).map(x => x[1]);
+
+// ---------- 陣法：成仙以後可以從天階再升三級（仙階下、中、上品），升到仙階的那座換成仙界的名字 ----------
+const XIAN_ARR_NAME = { juling: '聚元陣', yaoyuan: '仙藥園', kuangmai: '仙礦', danshi: '仙丹室', dihuo: '天火陣', hushan: '護山大陣' };
+ARRAY_GROW.push(25, 20, 15);
+ARRAY_STONE.push(5e5, 1.5e6, 4.5e6);
+const arrLvGrade = l => l <= 4 ? l : l + 1;   // 陣法等級對應的材料品階（5 級起是仙階 6～8）
