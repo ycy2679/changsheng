@@ -206,7 +206,7 @@ const ORIGIN_W = { 1: 6, 2: 3, 3: 1.5, 4: .5 };
 function drawOrigins() { const ids = []; while (ids.length < 4) ids.push(pickW(Object.keys(ORIGINS).filter(id => !ids.includes(id)), id => ORIGIN_W[ORIGINS[id].r])); return ids; }
 const mortalYears = () => tl('xianyuan') >= 2 ? 0 : MORTAL_YEARS / (1 + tl('xianyuan'));
 // 感氣要幾秒：靈根越好越快
-const qiNeed = (s = L()) => tl('xianyuan') >= 2 ? 0 : Math.max(5, Math.round(40 / rootRate(s) / (s.mortal && ORIGINS[s.mortal.origin]?.fastQi ? 2 : 1)));
+const qiNeed = (s = L()) => tl('xianyuan') >= 2 ? 0 : Math.max(5, Math.round(40 / rootRate(s) / (s.mortal && ORIGINS[s.mortal.origin]?.fastQi ? 2 : 1) / (1 + tl('xianyuan'))));   // 仙緣早至 1 級：感氣快一倍
 // ---------- 名字：每一世出身時取一個，預先隨機帶入 ----------
 const NAME_SUR = '林沈蘇顧陸江葉韓秦許謝白程方魏宋孟岳溫柳衛蕭杜唐莊石紀沐殷'.split('');
 const NAME_GIVEN = '青雲遠山清禾安然寧川玄墨行舟知微晚照長歌明月星河子衡疏影丹心若虛南星'.split('');
