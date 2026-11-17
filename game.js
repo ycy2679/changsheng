@@ -991,11 +991,12 @@ const SECRETS = [
 ];
 SECRETS.push(...XIAN_SECRETS);
 const SECRET_CD = 30;   // 冷卻（遊戲年）
+const secretCd = (s = L()) => isXian(s) ? 300 : SECRET_CD;   // 仙界歲月快十倍，冷卻也拉長，一樣約 30 分鐘
 // 各秘境的難度倍率：前期角色弱、後期角色強，所以前低後高
 const SECRET_SCALE = [0, .58, .75, .9, 1.2, 1.4, 1.6, 1.85, 2.1, 1.6, 1.8, 2, 2.2];   // 9 以後是仙界秘境（機器人調）   // 築基、金丹兩座調低：剛開的時候第一次闖大約一半到七成能過
 const secretOpen = (x, s = L()) => stg(s).major >= x.mj;
 const secretShown = (x, s = L()) => (x.mj >= XIAN_MJ) === isXian(s);   // 仙界只看得到仙界的秘境
-const secretWait = (x, s = L()) => { const t = s.flags['sj_' + x.id]; return t === undefined ? 0 : Math.max(0, Math.ceil(t + SECRET_CD - s.age)); };
+const secretWait = (x, s = L()) => { const t = s.flags['sj_' + x.id]; return t === undefined ? 0 : Math.max(0, Math.ceil(t + secretCd(s) - s.age)); };
 // 第 floor 層（0、1 精英，2 頭目）的強度
 function secretFoe(x, floor, s = L()) {
   const lv = s.stage + 1 + floor, mult = [1.1, 1.2, 1.4][floor] * SECRET_SCALE[x.mj], k = 1 + .5 * (lv - 1), hpX = floor === 2 ? 1.8 : 1;
@@ -1035,7 +1036,7 @@ function enterSecret(id) {
 function renderSecret() {
   const s = L();
   return `<section class="panel card"><div class="row"><b>秘境</b><button class="mini" onclick="toggleSecret()">收起</button></div>
-    <p class="small muted">三層連戰，中間氣血、法力不回滿。前兩層是精英，第三層是頭目；打敗頭目必得高階寶物${isXian(s) ? '' : '（闖的是當前境界的秘境，還會得到天材地寶）'}，第一次通關還有頭目專屬掉落。戰敗會重傷退出，不會身死。每座秘境闖完要等 ${SECRET_CD} 年。</p>
+    <p class="small muted">三層連戰，中間氣血、法力不回滿。前兩層是精英，第三層是頭目；打敗頭目必得高階寶物${isXian(s) ? '' : '（闖的是當前境界的秘境，還會得到天材地寶）'}，第一次通關還有頭目專屬掉落。戰敗會重傷退出，不會身死。每座秘境闖完要等 ${secretCd(s)} 年。</p>
     ${SECRETS.filter(x => secretShown(x)).map(x => { const open = secretOpen(x), w = open ? secretWait(x) : 0;
       return `<div class="item"><div class="row"><b>${x.name}</b><span class="small muted">${MAJORS[x.mj].name}以上 · 頭目：${x.boss}${s.flags['sjc_' + x.id] ? ' · 已通關' : ''}</span></div>
         <div class="small muted">${x.desc}</div>
@@ -1220,6 +1221,7 @@ function tick(dt) {
       const g = Math.min(stg().need - s.xiu, Math.round(stg().need * Math.min(1, xianDamp(s) * 4)));   // 仙界頓悟只補一部分
       if (g > 0) { s.xiu += g; log(`閉關中豁然開朗，頓悟了，修為 +${fmt(g)}${s.xiu >= stg().need ? `，${stg().name}圓滿` : ''}。`); }
       else if (isXian(s) && jieNext(s)) { addPress(1200); log(`閉關中頓悟，修為已滿，化為劫前淬鍊（+${Math.round((s.press || 0) * 100)}%）。`); }
+      else if (s.stage >= STAGES.length - 1) log('閉關中頓悟，可往上已經沒有路了。登天的門，還沒有為你打開。', true);
       else { addFound(stg().need * .3); log('閉關中頓悟，修為已滿，化為根基。'); }
     }
   }
@@ -1737,7 +1739,7 @@ function xianJie() {
 // ---------- 仙籍（取代宗門）：名冊、差事、仙功兌換 ----------
 let showXj = false;
 function toggleXj() { showXj = !showXj; render(); }
-const xjGain = (s = L()) => Math.round(10 * (1 + xs() / 9) * (1 + .25 * tl('jiyi')));
+const xjGain = (s = L()) => Math.round(40 * (1 + xs() / 9) * (1 + .25 * tl('jiyi')));   // 差事約 10 分鐘一次，一次給多一點
 function xjOpen(s = L()) { if (!s.xj) { s.xj = { gong: 0, task: 0, shop: null }; xjRestock(s); } }
 // 兌換清單：渡劫仙丹、延壽仙丹、當前境界修為丹、三部沒學過的仙階功法（優先挑當得了主修的）
 function xjRestock(s = L()) {
@@ -1749,6 +1751,8 @@ function xjRestock(s = L()) {
 }
 function xjList(s = L()) {
   const rc = unknownRecipes().filter(id => RECIPES[id].g >= 6 && RECIPES[id].g <= matGrade(s)).sort()[0];
+  s.xj.shop = (s.xj.shop || []).filter(o => !(o.id in s.techs));   // 已經從別處學會的仙法就拿掉
+  if (!s.xj.shop.length) xjRestock(s);
   return [{ k: 'item', id: 'dujiedan', cost: 60 }, { k: 'item', id: 'xianshou', cost: 80 }, { k: 'item', id: XIU_PILLS[stg(s).major], cost: 25 }, ...(rc ? [{ k: 'recipe', id: rc, cost: 40 * RECIPES[rc].g }] : []), ...(s.xj.shop || [])];
 }
 function xjBuy(i) {

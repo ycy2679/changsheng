@@ -142,7 +142,7 @@ const XJ_TASKS = [
   { id: 'dang', name: '整理仙籍', desc: '幫接引仙官整理仙籍舊檔，不用打架，仙功少一點。', run(s, g) { return g * .7; } },
   { id: 'ya', name: '押送仙材', desc: '把一批仙材送去萬藥仙谷，路上可能遇到劫道的散仙；自己能分到兩份材料。', run(s, g) { if (Math.random() < .5 || battle('劫道的散仙', placeLv(), 1)) { addMat(matGrade(s), Math.random() < .5 ? 'herb' : 'ore', 2); return g; } return 0; } },
 ];
-const XJ_TASK_CD = 20;   // 差事冷卻（仙界的年，線上約 2 分鐘）
+const XJ_TASK_CD = 100;   // 差事冷卻（仙界的年，線上約 10 分鐘）
 const XJ_TECH_COST = { 6: 150, 7: 400, 8: 1000 };
 
 // ---------- 仙界遊歷事件（e.xian：只在仙界出現；凡界的事件在仙界不會出現） ----------
@@ -189,7 +189,7 @@ EVENTS.push(
     { t: '送牠回家', run() { if (battle('護崽的仙獸', placeLv(), 1)) return `大仙獸把你當成了壞人，打了一架才說清楚。牠們臨走前留下${giftArt(xgr(), '飾品')}。`; return '大仙獸把你揍了一頓，叼著小的走了。'; } },
     { t: '讓牠自己找', run() { return '小仙獸在原地坐了一會兒，搖搖晃晃地走了。'; } }] },
   { id: 'xj_leichi', xian: 1, title: '天雷池', text: '山頂有一池雷水，水面上滾著細細的電光。據說泡過的人，渡仙劫時會從容一些。', choices: [
-    { t: '泡進去', run(s) { if (jieNext(s) && s.xiu >= stg(s).need) { s.press = Math.min(PRESS_CAP + .1 * tl('dujie'), (s.press || 0) + .1); return '電流在經脈裡亂竄，你咬牙撐了一炷香，劫前淬鍊 +10%。'; } injure(120); return '你泡了一炷香，全身發麻。修為還沒到大圓滿，這池雷水對你來說只是受罪。'; } },
+    { t: '泡進去', run(s) { if (jieNext(s) && s.xiu >= stg(s).need) { s.press = Math.min(PRESS_CAP + .1 * tl('dujie'), (s.press || 0) + .1); return '電流在經脈裡亂竄，你咬牙撐了一炷香，劫前淬鍊 +10%。'; } if (s.stage >= STAGES.length - 1) return '你泡了一炷香。上面已經沒有劫可以渡了，雷水只讓你精神一振。'; injure(120); return '你泡了一炷香，全身發麻。修為還沒到大圓滿，這池雷水對你來說只是受罪。'; } },
     { t: '看看就好', run() { return '池子裡有個人泡得滿臉通紅，對你招手。你搖搖頭走了。'; } }] },
   { id: 'xj_echo', xian: 1, min: 51, title: '歸墟回聲', text: '風從歸墟的方向吹來，裡面夾雜著很多人說話的聲音，有哭有笑，聽不清在說什麼。', choices: [
     { t: '停下來聽', run() { return `你聽了很久，聽出其中一句是：「別讓他們忘了我。」你把這句話記在心裡，修為 +${fmt(addXiu(.3))}。`; } },
@@ -296,7 +296,7 @@ EVENTS.push(
     { t: '坐下來推演', run() { return `你對著殘局想了一整天，竟從裡面悟出一點東西，《${addTechXp(900)}》精進了不少。`; } },
     { t: '替他們收好', run() { return '你把棋子一顆顆收進棋盒。走的時候，好像聽見背後有人說了聲謝謝。'; } }] },
   { id: 'xj_watch', xian: 1, repeat: 1, title: '觀人渡劫', text: '遠處的山頭上，有人在渡仙劫。劫雲壓得很低，看得你心頭髮緊。', choices: [
-    { t: '在旁邊看完', run(s) { if (jieNext(s) && s.xiu >= stg(s).need) { s.press = Math.min(PRESS_CAP + .1 * tl('dujie'), (s.press || 0) + .05); return '你把每一道雷都看在眼裡，心裡對自己那一劫多了幾分底，劫前淬鍊 +5%。'; } return `你看完了整場仙劫。他撐過去了，你也跟著鬆了一口氣，修為 +${fmt(addXiu(.15))}。`; } },
+    { t: '在旁邊看完', run(s) { if (jieNext(s) && s.xiu >= stg(s).need) { s.press = Math.min(PRESS_CAP + .1 * tl('dujie'), (s.press || 0) + .05); return '你把每一道雷都看在眼裡，心裡對自己那一劫多了幾分底，劫前淬鍊 +5%。'; } return s.stage >= STAGES.length - 1 ? '你看完了整場仙劫。他撐過去了。你想起自己頭頂那扇還沒打開的門。' : `你看完了整場仙劫。他撐過去了，你也跟著鬆了一口氣，修為 +${fmt(addXiu(.15))}。`; } },
     { t: '遠遠避開', run() { return '劫雲的事，還是少沾為妙。你繞了一大圈。'; } }] },
   { id: 'xj_cellar', xian: 1, repeat: 1, title: '仙酒窖', text: '你在一座廢棄的仙府底下，找到一個酒窖，裡面還有幾罈沒開封的仙釀。', choices: [
     { t: '開一罈嚐嚐', run(s) { s.tox = Math.min(100, s.tox + 15); return `酒勁很足，你醉了三天三夜，醒來修為 +${fmt(addXiu(.25))}，丹毒 +15。`; } },
