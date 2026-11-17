@@ -1,6 +1,7 @@
 // 長生閒記：境界、靈根、功法、丹藥、地點、坊市（術法、法寶、體質在 gear.js）
 
 // 大境界：life 壽元（年）、brk 突破到下一個大境界的基礎成功率
+const NINE_CHONG = ['一重', '二重', '三重', '四重', '五重', '六重', '七重', '八重', '九重'];
 const MAJORS = [
   { name: '練氣', subs: ['一層', '二層', '三層', '四層', '五層', '六層', '七層', '八層', '九層'], life: 100, brk: .5 },
   { name: '築基', subs: ['初期', '中期', '後期'], life: 200, brk: .38 },
@@ -10,13 +11,21 @@ const MAJORS = [
   { name: '煉虛', subs: ['初期', '中期', '後期'], life: 730, brk: .12 },
   { name: '合體', subs: ['初期', '中期', '後期'], life: 930, brk: .09 },
   { name: '大乘', subs: ['初期', '中期', '後期'], life: 1130, brk: .06 },
-  { name: '渡劫', subs: ['初期', '中期', '後期'], life: 1330, brk: 0 },   // 渡劫後期之後是飛升，等成仙時再做
+  { name: '渡劫', subs: ['初期', '中期', '後期'], life: 1330, brk: 0 },   // 渡劫後期撐過九道天雷就飛升
+  // 仙界（地仙界）：每個境界分一重到九重；大境界之間要渡仙劫（brk 不用）
+  { name: '人仙', subs: NINE_CHONG, life: 3000, brk: 0 },
+  { name: '地仙', subs: NINE_CHONG, life: 5000, brk: 0 },
+  { name: '真仙', subs: NINE_CHONG, life: 8000, brk: 0 },
+  { name: '玄仙', subs: NINE_CHONG, life: 12000, brk: 0 },
 ];
+const XIAN_MJ = 9;   // 第一個仙界大境界
 
-// 攤平成 33 個小境界，need = 修為上限
+// 攤平成小境界（凡界 33 個、地仙界 36 個），need = 修為上限
 const STAGES = [];
 MAJORS.forEach((m, mi) => m.subs.forEach(sub => STAGES.push({ major: mi, name: m.name + sub })));
-STAGES.forEach((s, i) => { s.need = Math.round(80 * Math.pow(1.72, i)); });
+const MORTAL_TOP = STAGES.findIndex(x => x.major === XIAN_MJ) - 1;   // 渡劫後期
+// 仙界每重只 ×1.2（九重約 ×5，跟凡界一個大境界的漲幅差不多），照凡界的 ×1.72 會爆掉
+STAGES.forEach((s, i) => { s.need = Math.round(i <= MORTAL_TOP ? 80 * Math.pow(1.72, i) : 80 * Math.pow(1.72, MORTAL_TOP) * 1.5 * Math.pow(1.2, i - MORTAL_TOP - 1)); });
 
 const GRADES = ['', '黃階', '玄階', '地階', '天階', '傳說'];
 
@@ -244,6 +253,10 @@ const ITEMS = {
   hedao:    { name: '合道丹', kind: 'xiu', major: 6, desc: '合體期的修為丹。' },
   wanxiangdan: { name: '萬象丹', kind: 'xiu', major: 7, desc: '大乘期的修為丹。' },
   due:      { name: '渡厄丹', kind: 'xiu', major: 8, desc: '渡劫期的修為丹。' },
+  ningxian: { name: '凝仙丹', kind: 'xiu', major: 9, desc: '人仙的修為丹。' },
+  diling:   { name: '地靈丹', kind: 'xiu', major: 10, desc: '地仙的修為丹。' },
+  zhenyi:   { name: '真一丹', kind: 'xiu', major: 11, desc: '真仙的修為丹。' },
+  xuanyuan: { name: '玄元丹', kind: 'xiu', major: 12, desc: '玄仙的修為丹。' },
   zhuji:    { name: '築基丹', kind: 'brk', major: 0, desc: '練氣九層突破築基時自動服用。' },
   ningyuan: { name: '凝元丹', kind: 'brk', major: 1, desc: '築基後期突破金丹時自動服用。' },
   huaying:  { name: '化嬰丹', kind: 'brk', major: 2, desc: '金丹後期突破元嬰時自動服用。' },
@@ -318,9 +331,9 @@ const DAN_COMMON = ['yanshou', 'xisui', 'wudao', 'guben', 'julingdan', 'qizhidan
 const DAN_RARE = ['pozhang', 'humai', 'zhuyan', 'xingshen', 'tianjidan'];
 const ROOT_ITEMS = ['gengjing', 'yimujing', 'guishuijing', 'binghuojing', 'wutujing'];
 const TC_ITEMS = ['xuanhuang', 'chiyang', 'ninghun', 'shenmu', 'xukong', 'liangyi', 'jiujie', 'tianxin'];
-const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due'];
+const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due', 'ningxian', 'diling', 'zhenyi', 'xuanyuan'];
 const BRK_PILLS = ['zhuji', 'ningyuan', 'huaying', 'tongxuan', 'poxu', 'heyuan', 'dacheng', 'yinjie'];
-for (let i = 0; i < XIU_PILLS.length; i++) RECIPES[XIU_PILLS[i]] = { g: majorGrade(i), n: 3 };
+for (let i = 0; i < XIAN_MJ; i++) RECIPES[XIU_PILLS[i]] = { g: majorGrade(i), n: 3 };
 for (let i = 0; i < BRK_PILLS.length; i++) RECIPES[BRK_PILLS[i]] = { g: majorGrade(i), n: 6 };
 const BREW_SEC = [0, 10, 20, 40, 60];          // 出爐時間（秒）
 const BREW_RATE = [0, .8, .65, .5, .35];       // 基礎成功率
