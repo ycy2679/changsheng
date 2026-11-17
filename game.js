@@ -1602,7 +1602,7 @@ function buySlot(i) {
 // ---------- 死亡與轉世 ----------
 function daoGain(s = L()) { const p = Math.min(s.peak, MORTAL_TOP), x = 2 * Math.max(0, s.peak - MORTAL_TOP); return s.xianStart ? Math.max(1, x) : Math.max(1, Math.round((p + 1) * (p + 1) / 20)) + x; }   // 仙界每重 +2；從仙人開始的那一世只算仙界   // 仙界改成每重 +2，不再平方暴漲
 // ---------- 主線（碑與名）：節點記在 meta.story，也收進輪迴錄「主線」 ----------
-const STORY_NODES = [['n1', '殘夢'], ['n2', '似曾相識'], ['n3', '碑的傳說'], ['n4', '守碑人'], ['n4a', '被劃掉的名字'], ['n5', '第九道天雷'], ['n6', '刻名']];
+const STORY_NODES = [['n1', '殘夢'], ['n2', '似曾相識'], ['n3', '碑的傳說'], ['n4', '守碑人'], ['n4a', '被劃掉的名字'], ['n5', '第九道天雷'], ['n6', '刻名'], ['n7', '仙籍'], ['n8', '隕落'], ['n9', '舊檔'], ['n10', '誰藏了你']];
 function storyMark(id) { const m = S.meta; m.story = m.story || {}; if (!m.story[id]) { m.story[id] = 1; codexAdd('m', id); } }
 // 主線事件：n1 每一世一次（夢會越來越清楚），n2、n3 整個遊戲一次；閉關時也會出現
 const STORY = [
@@ -1624,6 +1624,7 @@ const STORY = [
       { t: '請他喝酒，聽他說完', run(s) { s.stone = Math.max(0, s.stone - stoneUnit() * 2); return '老散修喝乾了酒，只說了一句：「被劃掉的，就回來了。」然後醉倒在桌上，再也叫不醒。'; } },
       { t: '一笑置之', run() { return '你付了茶錢離開。身後傳來他含糊的聲音：「你身上……有碑的味道。」'; } }] },
 ];
+STORY.push(...XIAN_STORY);
 // 守碑人「碑上的名字」那段：第 3 世起多一句（節點 4a）
 function beiNameExtra() { if (S.meta.lives < 3) return ''; storyMark('n4a'); return '其中一個被劃掉的名字，筆跡跟你自己寫字一模一樣。'; }
 
