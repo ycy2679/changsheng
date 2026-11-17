@@ -107,11 +107,15 @@ body.xian::before { opacity: 1; }
 .panel, button, select, nav button { transition: background-color 1.2s ease, border-color 1.2s ease, color 1.2s ease; }
 body.xian {
   background: var(--bg); transition: background-color 1.2s ease;
-  --bg: #0d0b1e; --panel: rgba(25, 21, 50, .86); --ink: #ece8ff; --muted: #a49cc8; --line: #3a3466;
-  --accent: #c9a6ff; --xiu: #7fa8ff; --life: #7fd6b0; --warn: #ff8a7a; --heart: #ff9ac6;
-  --g1: #b7b0d6; --g2: #7ab8e6; --g3: #c49bf0; --g4: #f0c060; --g5: #ff7a6a; --g6: #6fdccb; --g7: #7cb8ff; --g8: #f080d0;
+  --bg: #0d0b1e; --panel: rgba(22, 18, 44, .94); --ink: #f2efff; --muted: #c2bbe6; --line: #4a4380;
+  --accent: #d2b4ff; --xiu: #8db2ff; --life: #86e0b8; --warn: #ff9a8c; --heart: #ffa8cf;
+  --g1: #cfc9ec; --g2: #8fc6ef; --g3: #d2adf7; --g4: #f5c96c; --g5: #ff8c7d; --g6: #7ee6d6; --g7: #94c6ff; --g8: #f593da;
 }
 body.xian .panel { backdrop-filter: blur(2px); }
+/* 仙界：亮底按鈕上的字用實色深紫（原本是半透明面板色，疊在星雲上會變淡）；停用的按鈕不要淡到看不見 */
+body.xian button.on, body.xian button.primary, body.xian .deal { color: #1a1433; }
+body.xian button:disabled, body.xian select:disabled { opacity: .6; }
+body.xian select option { background: #1a1630; color: var(--ink); }
 /* 星星：位置、大小、顏色、閃爍都是進入仙界時隨機產生的 */
 #stars { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity 1.6s ease; overflow: hidden; }
 body.xian #stars { opacity: 1; }
