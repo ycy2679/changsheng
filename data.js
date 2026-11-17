@@ -326,7 +326,8 @@ const RECIPES = {
   xisui: { g: 3, n: 4 }, pozhang: { g: 3, n: 4 }, humai: { g: 3, n: 5 }, xingshen: { g: 3, n: 4 }, tianjidan: { g: 3, n: 4 }, zhuyan: { g: 4, n: 5 },
 };
 // 修為丹、突破丹：品階跟著大境界（練氣黃、築基金丹玄、元嬰化神地、煉虛以上天）
-const majorGrade = mj => mj === 0 ? 1 : mj <= 2 ? 2 : mj <= 4 ? 3 : 4;
+const XIAN_GRADE = { 9: 6, 10: 7, 11: 8, 12: 8 };   // 仙界：人仙下品、地仙中品、真仙玄仙上品
+const majorGrade = mj => mj >= XIAN_MJ ? XIAN_GRADE[mj] : mj === 0 ? 1 : mj <= 2 ? 2 : mj <= 4 ? 3 : 4;
 const DAN_COMMON = ['yanshou', 'xisui', 'wudao', 'guben', 'julingdan', 'qizhidan', 'kuangxue', 'jingangdan', 'ningshendan', 'huichundan', 'qingxindan', 'yinyuan', 'xunbaodan'];
 const DAN_RARE = ['pozhang', 'humai', 'zhuyan', 'xingshen', 'tianjidan'];
 const ROOT_ITEMS = ['gengjing', 'yimujing', 'guishuijing', 'binghuojing', 'wutujing'];
