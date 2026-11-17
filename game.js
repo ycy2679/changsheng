@@ -1937,9 +1937,28 @@ function renderDraw() {
     </section>`;
 }
 
+// 仙界配色（星河深空）：成仙後整個畫面換成仙界風格，背景淡入；星星每次進來隨機撒
+function setXianTheme(s) {
+  const on = !!(s && !title && isXian(s));
+  if (on && !document.getElementById('stars')) makeStars();
+  if (document.body.classList.contains('xian') !== on) document.body.classList.toggle('xian', on);
+}
+function makeStars() {
+  const box = document.createElement('div'); box.id = 'stars';
+  const colors = ['#ffffff', '#ffffff', '#dfe6ff', '#ffe9c4', '#e8d8ff', '#cfeaff'];
+  const n = Math.round(Math.min(220, Math.max(90, innerWidth * innerHeight / 6000)));   // 螢幕越大星星越多
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    const big = Math.random() < .06, size = big ? 2.2 + Math.random() * 1.3 : .6 + Math.random() * 1.3, c = colors[Math.floor(Math.random() * colors.length)];
+    const o = (big ? .8 : .35) + Math.random() * .5, tw = Math.random() < .45;
+    h += `<i class="${tw ? 'tw' : ''}" style="left:${(Math.random() * 100).toFixed(2)}%;top:${(Math.random() * 100).toFixed(2)}%;width:${size.toFixed(1)}px;height:${size.toFixed(1)}px;background:${c};${big ? `box-shadow:0 0 ${(size * 2).toFixed(1)}px ${c};` : ''}--o:${o.toFixed(2)};--d:${(2 + Math.random() * 5).toFixed(1)}s;--dl:-${(Math.random() * 6).toFixed(1)}s"></i>`;
+  }
+  box.innerHTML = h; document.body.appendChild(box);
+}
 function render() {
   dirty = false;
   const s = L(), app = $('app');
+  setXianTheme(s);
   if (title) { app.innerHTML = renderTitle(); return; }
   if (s.dead) { app.innerHTML = renderDeath(); return; }
   if (s.draw) { app.innerHTML = renderDraw(); return; }
