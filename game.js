@@ -357,9 +357,9 @@ const speedCtl = () => tl('guangyin') ? `<select class="mini" onchange="setSpeed
 const L = () => S.life;
 const stg = (s = L()) => STAGES[s.stage];
 const isXian = (s = L()) => s.stage > MORTAL_TOP;                       // 已經成仙（地仙界）
-let XIAN_RATE = 30, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008 };
+let XIAN_RATE = 20, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008 };
 // 照修為百分比給的東西（頓悟、擊殺得修為、奇遇給的修為）在仙界跟仙丹一樣打折，不然九重一下就衝完
-const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   // 仙丹每顆補幾成修為：越往上越補不動   // 仙界吐納的是仙靈之氣：修煉速度 ×30（仙界的修為需求也大得多）
+const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   // 仙丹每顆補幾成修為：越往上越補不動   // 仙界吐納的是仙靈之氣：修煉速度 ×20（洞府、陣法帶上來以後從 ×30 調低；仙界的修為需求也大得多）
 const yearSec = (s = L()) => isXian(s) ? 6 : YEAR_SEC;                   // 仙界歲月流得快：線上 6 秒一年
 // 下一步要渡劫：渡劫後期 → 九道天雷；仙界每個大境界 → 仙劫。自動突破、離線都不會碰
 const jieNext = (s = L()) => s.stage === MORTAL_TOP || (isXian(s) && s.stage < STAGES.length - 1 && STAGES[s.stage + 1].major !== stg(s).major);
