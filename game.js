@@ -723,7 +723,7 @@ function skillPow(id, s = L()) {
   return sk.pow * (1 + .25 * skillLv(id, s)) * (same ? 1.2 : 1) * (1 + (skillFits(sk.elem, s) ? (pathOn(s) === 'five' ? .3 : rootType(s).aff) : 0)) * boost * (pathElem(s) === sk.elem ? 1.5 : 1) * (1 + eff('skillUp', s)) * schPow(id, s);
 }
 // 術法耗法力：看品階和境界（法力上限 50×境界係數×主修層數，每回合回 8%）
-const SKILL_COST = [0, 1, 1.5, 2, 2.6];
+const SKILL_COST = [0, 1, 1.5, 2, 2.6, 2.6, 3.2, 3.8, 4.5];   // 5 傳說、6～8 仙階下中上品
 // 路數：本路（有那條路線）耗本路資源，神魂術耗費 ×0.5；別路的從主路資源轉換，耗費 ×1.5、威力 ×0.6
 const schOf = id => skillSchool(SKILLS[id]);
 const ownSch = (id, s = L()) => myPaths(s).includes(schOf(id));
@@ -1528,15 +1528,15 @@ function useDan(id, it, addTox) {
   const s = L();
   switch (it.fx) {
     case 'buff': (s.buffs = s.buffs || {})[id] = it.dur; addTox(it.tox); return `服下${it.name}，${it.desc.replace('接下來', '接下來的')}`;
-    case 'guben': if ((s.found || 0) >= .3) return ''; s.found = Math.min(.3, (s.found || 0) + .1); addTox(it.tox); return `服下固本丹，根基更加穩固（根基 +${Math.round(s.found * 100)}%）。`;
-    case 'huichun': if ((s.hpNow ?? 1) >= 1 && (s.mpNow ?? 1) >= 1) return ''; s.hpNow = s.mpNow = s.snNow = 1; return '服下回春丹，氣血、法力都回滿了。';
+    case 'guben': if ((s.found || 0) >= .3) return ''; s.found = Math.min(.3, (s.found || 0) + .1); addTox(it.tox); return `服下${it.name}，根基更加穩固（根基 +${Math.round(s.found * 100)}%）。`;
+    case 'huichun': if ((s.hpNow ?? 1) >= 1 && (s.mpNow ?? 1) >= 1) return ''; s.hpNow = s.mpNow = s.snNow = 1; return `服下${it.name}，氣血、法力都回滿了。`;
     case 'qingxin': if (s.tox < 1) return ''; s.tox = Math.max(0, s.tox - (it.amt || 30)); return `服下${it.name}，體內的丹毒散去不少。`;
-    case 'pozhang': if (s.flags.pozhang) return ''; s.flags.pozhang = 1; return '服下破障丹，下一次小境界突破必定成功。';
+    case 'pozhang': if (s.flags.pozhang) return ''; s.flags.pozhang = 1; return `服下${it.name}，下一次小境界突破必定成功。`;
     case 'jiedan': if (!isXian(s) || s.flags.jiedan) return ''; s.flags.jiedan = 1; return '服下渡劫仙丹，藥力沉在丹田，等著劫雷落下。';
-    case 'humai': if (s.flags.humai) return ''; s.flags.humai = 1; return '服下護脈丹，經脈被一層藥力護住。';
+    case 'humai': if (s.flags.humai) return ''; s.flags.humai = 1; return `服下${it.name}，經脈被一層藥力護住。`;
     case 'zhuyan': if (s.age < 26) return ''; s.age -= it.amt || 10; addTox(it.tox); return `服下${it.name}，鬢角的白髮轉黑，年齡 -${it.amt || 10} 歲。`;
-    case 'xingshen': if (s.flags.xingshen) return ''; s.flags.xingshen = 1; return '服下醒神丹，神魂清明，下一場戰鬥神通可以再發動一次。';
-    case 'tianji': if (s.flags.tianji) return ''; s.flags.tianji = 1; return '服下天機丹，隱約算到坊市下一批貨裡有好東西。';
+    case 'xingshen': if (s.flags.xingshen) return ''; s.flags.xingshen = 1; return `服下${it.name}，神魂清明，下一場戰鬥神通可以再發動一次。`;
+    case 'tianji': if (s.flags.tianji) return ''; s.flags.tianji = 1; return `服下${it.name}，隱約算到坊市下一批貨裡有好東西。`;
   }
   return '';
 }
