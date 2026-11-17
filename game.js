@@ -993,7 +993,7 @@ const SECRETS = [
 ];
 SECRETS.push(...XIAN_SECRETS);
 const SECRET_CD = 30;   // 冷卻（遊戲年）
-const secretCd = (s = L()) => isXian(s) ? 300 : SECRET_CD;   // 仙界歲月快十倍，冷卻也拉長，一樣約 30 分鐘
+const secretCd = (s = L()) => isXian(s) ? Math.round(300 * (1 - .25 * tl('mijing'))) : SECRET_CD;   // 仙界歲月快十倍，冷卻也拉長，一樣約 30 分鐘
 // 各秘境的難度倍率：前期角色弱、後期角色強，所以前低後高
 const SECRET_SCALE = [0, .58, .75, .9, 1.2, 1.4, 1.6, 1.85, 2.1, 1.6, 1.8, 2, 2.2];   // 9 以後是仙界秘境（機器人調）   // 築基、金丹兩座調低：剛開的時候第一次闖大約一半到七成能過
 const secretOpen = (x, s = L()) => stg(s).major >= x.mj;
@@ -1497,7 +1497,7 @@ function usePill(id) {
     const diff = stg().major - it.major;
     const low = diff === 1 && tl('danxin') ? .5 : Math.pow(.25, diff);   // 丹心通明：低一階也有一半效果
     const xp = it.major >= XIAN_MJ;   // 仙丹：每顆只補一成，丹毒也重
-    let amt = (xp ? XIAN_PILL[it.major] : .25) * pe * tf * (diff > 0 ? low : 1);
+    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) : .25) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨
     if (diff < 0) { amt = .5 * tf; injure(150); }
     const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 35 : 20);
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
@@ -1750,7 +1750,7 @@ function xjRestock(s = L()) {
   const gs = [6, 7, 8].filter(g => s.stage >= GRADE_MIN_STAGE[g]);
   const ids = Object.keys(TECHS).filter(id => gs.includes(TECHS[id].grade) && !(id in s.techs));
   const main = ids.filter(id => canMain(id, s)), list = [];
-  for (let i = 0; i < 3 && (main.length || ids.length); i++) { const pool = main.length && i < 2 ? main : ids, id = pick(pool); list.push({ k: 'tech', id, cost: XJ_TECH_COST[TECHS[id].grade] }); main.splice(main.indexOf(id), 1); ids.splice(ids.indexOf(id), 1); }
+  for (let i = 0; i < 3 + tl('xjshop') && (main.length || ids.length); i++) { const pool = main.length && i < 2 ? main : ids, id = pick(pool); list.push({ k: 'tech', id, cost: XJ_TECH_COST[TECHS[id].grade] }); main.splice(main.indexOf(id), 1); ids.splice(ids.indexOf(id), 1); }
   s.xj.shop = list;
 }
 function xjList(s = L()) {
@@ -1805,13 +1805,14 @@ function xianEnter(s) {
   const kid = 'xs_' + (s.paths[0] || 'fa');
   s.skills = {}; s.equip = []; learnSkill(kid);
   s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu');
+  const bao = tl('xianbao') ? randomUnowned('art', [6]) : null; if (bao) gainArt(bao);   // 仙家遺寶
   pathSkillCheck(s); pathArtCheck(s); xjOpen(s);
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
-  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}一本《${SKILLS[kid].name}》，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
+  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}一本《${SKILLS[kid].name}》${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
 // ---------- 天人五衰：仙人壽元過八成，每過 4% 出現一個徵兆，修煉、氣血、攻擊各 -5% ----------
 const WU_SHUAI = ['衣上生了塵垢，怎麼拂也拂不掉', '頭上的花冠開始枯萎', '腋下無端滲出汗來', '身上隱隱有了濁氣', '坐在哪裡都覺得不自在'];
-const wuShuai = (s = L()) => isXian(s) && !s.dead ? Math.max(0, Math.min(5, Math.floor((s.age / lifespan(s) - .8) / .04) + 1)) : 0;
+const wuShuai = (s = L()) => isXian(s) && !s.dead ? Math.max(0, Math.min(5, Math.floor((s.age / lifespan(s) - .8 - .03 * tl('wushuai')) / .04) + 1)) : 0;   // 五衰遲來：每級晚 3%
 function wuShuaiCheck(s) {
   const n = wuShuai(s), was = s.wsLog || 0;
   if (n < was) s.wsLog = n;
@@ -2719,6 +2720,7 @@ function buyTalent(id) {
 const pendingTalents = () => Object.keys(S.meta.talents).filter(id => TAL[id] && talLv(id) > tl(id));
 let treeTab = TALENT_BRANCHES[0];   // 悟道樹目前顯示的分類
 function setTreeTab(b) { treeTab = b; render(); }
+function toggleTreeFull() { S.meta.treeHideFull = !S.meta.treeHideFull; save(); render(); }
 function toggleAuto(id) { S.meta.auto[id] = !autoOn(id); save(); render(); }
 function setAutoMajor(v) { S.meta.autoMajor = +v; save(); }
 // 天賦在樹上的深度：沒有前置是 0，否則是前置裡最深的 +1（顯示時由淺到深排）
@@ -2736,6 +2738,7 @@ function renderTree() {
     return `<div class="node ${lv ? 'got' : ''} ${ok && condOk ? '' : 'locked'}">
       <div class="row"><b>${t.name}</b><span class="small muted">${lv}/${t.max}</span></div>
       <div class="small">${t.d(Math.max(1, lv))}${lv && !full ? `<span class="muted"> → ${t.d(lv + 1)}</span>` : ''}</div>
+      ${t.noXian && m.ascends > 0 ? '<div class="small muted">從仙人開始的那一世無效</div>' : ''}
       ${lv > eff ? `<div class="small same">已點到 ${lv} 級，這一世仍按 ${eff} 級生效，下一世開局才會套用到 ${lv} 級</div>` : ''}
       ${t.req.length ? `<div class="small ${ok ? 'muted' : 'hurt'}">前置：${t.req.map(r => TAL[r].name).join('、')}</div>` : ''}
       ${next(t).length ? `<div class="small muted">通往：${next(t).map(x => x.name).join('、')}</div>` : ''}
@@ -2743,12 +2746,15 @@ function renderTree() {
   };
   // 這個天賦是哪些天賦的前置
   const next = t => TALENTS.filter(x => x.req.includes(t.id));
-  const list = TALENTS.filter(t => t.branch === treeTab), maxD = Math.max(...list.map(talDepth));
-  const tiers = Array.from({ length: maxD + 1 }, (_, d) => list.filter(t => talDepth(t) === d));
-  return `<div class="row"><h3>悟道樹</h3><span>道果 <b>${m.guo}</b></span></div>
+  const all = TALENTS.filter(t => t.branch === treeTab), maxD = Math.max(...all.map(talDepth));
+  // 只看還能點的：點滿的收起來（化身類點滿了還要能開關，照樣顯示）
+  const hidden = t => m.treeHideFull && talLv(t.id) >= t.max && t.branch !== '化身', nHid = all.filter(hidden).length, list = all.filter(t => !hidden(t));
+  const tiers = Array.from({ length: maxD + 1 }, (_, d) => list.filter(t => talDepth(t) === d)).filter(r => r.length);
+  return `<div class="row"><h3>悟道樹</h3><span><button class="mini ${m.treeHideFull ? 'on' : ''}" onclick="toggleTreeFull()">只看還能點的</button> 道果 <b>${m.guo}</b></span></div>
     <p class="muted small">每一世結束時，依到過的最高境界得到道心和道果。道心自動生效，道果用來點天賦，天賦永久保留。</p>
     <nav>${TALENT_BRANCHES.map(b => `<button class="${treeTab === b ? 'on' : ''}" onclick="setTreeTab('${b}')">${b}</button>`).join('')}</nav>
-    ${tiers.map((row, d) => `<div class="small muted" style="margin:10px 0 4px">第 ${d + 1} 層${d ? '' : '（不用前置）'}</div><div class="tal">${row.map(node).join('')}</div>`).join('')}`;
+    ${nHid ? `<p class="small muted">已點滿 ${nHid} 個，已收起：${all.filter(hidden).map(t => t.name).join('、')}</p>` : ''}
+    ${tiers.map(row => { const d = talDepth(row[0]); return `<div class="small muted" style="margin:10px 0 4px">第 ${d + 1} 層${d ? '' : '（不用前置）'}</div><div class="tal">${row.map(node).join('')}</div>`; }).join('') || '<p class="small same">這個分支都點滿了。</p>'}`;
 }
 
 // ---------- 啟動 ----------
