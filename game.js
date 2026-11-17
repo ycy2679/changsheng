@@ -76,7 +76,8 @@ function load() {
   for (const id in s.skills) if (!SKILLS[id]) delete s.skills[id];
   s.equip = s.equip.filter(id => id in s.skills);
   s.arts = s.arts || {}; s.gear = s.gear || {};
-  if (!s.phys && !s.draw) s.draw = makeDraw(S.meta, s.root);   // 舊存檔補抽體質（原本的靈根留在選項裡）
+  if (!s.phys && !s.draw && !s.mortal) s.draw = makeDraw(S.meta, s.root);   // 舊存檔補抽體質（原本的靈根留在選項裡）；凡人篇還沒測靈根的不算
+  if (s.mortal && s.draw && s.mortal.phase !== 'test') s.draw = null;   // 修掉上面那行以前在凡人篇重新整理造成的卡死
   s.tox = s.tox || 0; s.body = s.body || 0;
   if (s.draw && !s.draw.rr) { s.draw.rr = { r: s.draw.rerolls, p: s.draw.rerolls }; delete s.draw.rerolls; }
   for (const k in s.gear) if (s.gear[k] && !artOk(s.gear[k], s)) s.gear[k] = null;   // 境界不夠的法寶先卸下
@@ -294,8 +295,19 @@ function pathArtCheck(s = L()) {
 }
 // 路線專屬大招（進化型）：金丹學會基礎型，化神進化成強化型，進化後基礎型換成強化型、熟練度延續（兼修的路線也算）
 const PATH_ULT = { ti: ['santou', 'fatian'], hun: ['shenhun', 'wannian'] };
+// 大道至簡：仙界的術法只剩路線那一招；refund＝舊存檔已經學的仙階仙術照賣價退成仙元石
+const YI = { fa: 'yi_fa', ti: 'yi_ti', hun: 'yi_hun' };
+function yiForm(s, refund) {
+  const ids = myPaths(s).map(p => YI[p]).filter(Boolean);
+  if (ids.every(id => id in s.skills) && Object.keys(s.skills).every(id => ids.includes(id)) && !s.equip.length) return;
+  let back = 0;
+  for (const id in s.skills) if (!ids.includes(id)) { if (refund && SKILLS[id].grade >= 6) back += skillSellPrice(id, s); delete s.skills[id]; }
+  s.equip = []; for (const id of ids) if (!(id in s.skills)) { s.skills[id] = 0; codexAdd('k', id); }
+  if (refund) { s.stone += back; log(`大道至簡：仙界的術法反璞歸真，只剩「${ids.map(id => SKILLS[id].name).join('」「')}」${back ? `；原本學會的仙術折成仙元石 ${back} 枚` : ''}。`); }
+}
 function pathSkillCheck(s = L()) {
   if (!s.paths) return;
+  if (isXian(s)) { yiForm(s, true); return; }
   for (const p of s.paths) {
     const pair = PATH_ULT[p]; if (!pair) continue;
     const [base, evo] = pair, mj = stg(s).major;
@@ -774,7 +786,7 @@ function addTechXp(sec) {
 function addLife(n) { L().lifeBonus += n; }
 function injure(sec) { const s = L(); s.injury = Math.max(s.injury, sec); }
 function learnTech(id) { const s = L(); if (!(id in s.techs)) s.techs[id] = 0; codexAdd('t', id); }
-function learnSkill(id) { const s = L(); if (!(id in s.skills)) { s.skills[id] = 0; if (!SKILLS[id].only && s.equip.length < maxEquip()) s.equip.push(id); } codexAdd('k', id); }
+function learnSkill(id) { const s = L(); if (isXian(s) && !SKILLS[id].yi) return; if (!(id in s.skills)) { s.skills[id] = 0; if (!SKILLS[id].only && s.equip.length < maxEquip()) s.equip.push(id); } codexAdd('k', id); }
 // 路線大招：自成一欄，不佔出招欄位，學會就自動施展
 const ultList = (s = L()) => Object.keys(s.skills).filter(id => SKILLS[id].only);
 // ---------- 輪迴錄：歷世見過的東西都記在 meta.codex；每收錄 20 項給 2 道果 ----------
@@ -838,6 +850,7 @@ function renderCodex() {
 }
 function randomUnowned(kind, grades, filter) {
   const s = L(), pool = { tech: TECHS, skill: SKILLS, art: ARTS }[kind], owned = { tech: s.techs, skill: s.skills, art: s.arts }[kind];
+  if (kind === 'skill' && isXian(s)) return null;   // 仙界只有一招，不再得到仙術
   const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && (!filter || filter(pool[id])));
   return ids.length ? (kind === 'tech' ? pickTech(ids, s) : pick(ids)) : null;
 }
@@ -1028,7 +1041,7 @@ function enterSecret(id) {
   const lv = s.stage + 3, gr = x.mj >= XIAN_MJ ? [XIAN_GRADE[x.mj]] : x.mj >= 4 ? [4] : [3, 4], got = [];
   const tc = x.mj === stg().major ? addTc() : ''; if (tc) got.push(tc);   // 天材地寶只有當前境界的秘境才給，免得低階秘境被反覆刷
   // 高階寶物都有了會改給靈石：併進頭目的靈石裡，不要寫成兩筆
-  const st0 = s.stone, gift = pick([giftArt, giftTech, giftSkill])(gr), extra = gift.startsWith('靈石') ? s.stone - st0 : 0;
+  const st0 = s.stone, gift = pick(isXian(s) ? [giftArt, giftTech] : [giftArt, giftTech, giftSkill])(gr), extra = gift.startsWith('靈石') ? s.stone - st0 : 0;
   if (!extra) got.push(gift);
   got.push(`靈石 ${addStone(stoneUnit(lv) * 30) + extra}`, `${addPill(2)} 2 顆`, addMat(matGrade(), 'herb', 3), addMat(matGrade(), 'ore', 3));
   { const r = randomRecipe((isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => g <= matGrade() + 1)); if (r) got.push(r); }
@@ -1555,13 +1568,14 @@ function setTab(t) { tab = t; armed = ''; render(); }
 const shopWeight = g => isXian() ? (g === 4 ? 15 / (1 + tl('qizhen')) : GRADE_WEIGHT[g] * (g === 7 ? 1 + .5 * tl('qizhen') : g === 8 ? 1 + tl('qizhen') : 1))   // 仙界：中品、上品變多，天階變少
   : GRADE_WEIGHT[g] * (g === 3 ? 1 + .5 * tl('qizhen') : g === 4 ? 1 + tl('qizhen') : 1);
 function restock() {
-  const s = L(), slots = [], per = SHOP_PER + tl('huojia'), tj = !!s.flags.tianji;
+  const s = L(), slots = [], per0 = SHOP_PER + tl('huojia'), per = per0, tj = !!s.flags.tianji;
   s.flags.tianji = 0;
   const grades = (isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => s.stage >= GRADE_MIN_STAGE[g]);   // 仙界只賣仙階
   // 功法、術法、法寶各擺 per 格，各有自己的圖鑑和價格表；抽到的品階沒貨就從其他品階補
   const kinds = { tech: [TECHS, s.techs, TECH_PRICE], skill: [SKILLS, s.skills, SKILL_PRICE], art: [ARTS, s.arts, ART_PRICE] };
+  if (isXian(s)) delete kinds.skill;   // 仙界沒有仙術可賣：空出來的格子給仙法和靈寶
   for (const k in kinds) {
-    const [pool, owned, prices] = kinds[k];
+    const [pool, owned, prices] = kinds[k], per = isXian(s) ? (k === 'art' ? Math.ceil(per0 * 1.5) : per0 + Math.floor(per0 / 2)) : per0;
     const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
     for (let i = 0; i < per; i++) {
       // 第一格保證玄階以上（玄階還沒解鎖就照常抽）
@@ -1604,8 +1618,9 @@ function shelfRank(o) {
 let shopTab = 'tech';
 function setShopTab(k) { shopTab = k; render(); }
 function shelf(slots, render1) {
+  if (isXian(L()) && shopTab === 'skill') shopTab = 'tech';
   const list = slots.map((o, i) => [o, i]).filter(([o]) => o.k === shopTab).sort(([a], [b]) => (a.sold ? 1 : 0) - (b.sold ? 1 : 0) || shelfRank(b) - shelfRank(a));
-  return `<nav>${SHELF_GROUPS.map(([k, name]) => `<button class="${shopTab === k ? 'on' : ''}" onclick="setShopTab('${k}')">${name}</button>`).join('')}</nav>`
+  return `<nav>${SHELF_GROUPS.filter(([k]) => !(k === 'skill' && isXian(L()))).map(([k, name]) => `<button class="${shopTab === k ? 'on' : ''}" onclick="setShopTab('${k}')">${name}</button>`).join('')}</nav>`
     + (list.map(([o, i]) => render1(o, i)).join('') || '<p class="muted small">這一類已經沒有你還沒有的貨了。</p>');
 }
 function buySlot(i) {
@@ -1693,8 +1708,8 @@ function ascend(s) {
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
-  s.ascView = 1; xjOpen(s); giftXiuPills(s);
-  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。`)}仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
+  s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false);
+  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了一招`)}「${myPaths(s).map(p => SKILLS[YI[p]].name).join('」「')}」。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
 function renderAscend() {
@@ -1814,14 +1829,13 @@ function xianEnter(s) {
   const keep = S.meta.keepTech && S.meta.keepTech.id, kept = keep && keep in s.techs && canMain(keep, s);
   const tech = kept ? [] : Object.keys(TECHS).filter(id => TECHS[id].grade === 6 && canMain(id, s)), tid = tech.length ? pick(tech) : null;
   if (kept) s.tech = keep; else if (tid) { learnTech(tid); s.tech = tid; }
-  // 凡界帶來的入門術法在仙界沒用：換成這條路線的專屬仙術
-  const kid = 'xs_' + (s.paths[0] || 'fa');
-  s.skills = {}; s.equip = []; learnSkill(kid);
+  // 大道至簡：凡界帶來的入門術法化成這條路線的那一招
+  s.skills = {}; s.equip = []; yiForm(s, false);
   s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu') + 100 * tl('kaijushi') * tl('kaijushi');   // 仙府家底、祖蔭
   const bao = tl('xianbao') ? randomUnowned('art', [6]) : null; if (bao) gainArt(bao);   // 仙家遺寶
   pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
-  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}一本《${SKILLS[kid].name}》${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
+  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}一招「${myPaths(s).map(p => SKILLS[YI[p]].name).join('」「')}」${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
 // ---------- 天人五衰：仙人壽元過八成，每過 4% 出現一個徵兆，修煉、氣血、攻擊各 -5% ----------
 const WU_SHUAI = ['衣上生了塵垢，怎麼拂也拂不掉', '頭上的花冠開始枯萎', '腋下無端滲出汗來', '身上隱隱有了濁氣', '坐在哪裡都覺得不自在'];
@@ -2187,9 +2201,12 @@ function renderSkill() {
   const all = Object.keys(s.skills).filter(id => !s.equip.includes(id) && !SKILLS[id].only);
   const ult = ultList(s);
   const ultRow = id => { const k = SKILLS[id], lv = skillLv(id), nx = MASTERY_USES[lv + 1];
-    return `<div class="item"><div class="row"><b>${k.name}</b>${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
+    return `<div class="item"><div class="row"><b>${k.name}</b>${k.yi ? `<span class="small muted">${SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}</div>
       <div class="small">${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
+  if (isXian(s)) return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}`).join('；')}。</p>
+    <h3>仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這一招：自動施展，用得越多越熟練（入門、小成、大成、圓滿），威力跟著境界一起長。</p>
+    ${ult.map(ultRow).join('')}`;
   const elems = SKILL_ELEMS.filter(e => all.some(id => SKILLS[id].elem === e));
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
   const list = all.filter(id => (skillTab === '全部' || SKILLS[id].elem === skillTab) && (skillKind === '全部' || KIND_GROUP[SKILLS[id].kind] === skillKind))
@@ -2207,7 +2224,7 @@ function renderSkill() {
 }
 // ---------- 參悟、賣出用不到的功法和術法 ----------
 const techSellPrice = id => px(Math.round(TECH_PRICE[TECHS[id].grade] * SELL_RATE * (1 + .2 * techLayer(id))));   // 每一層 +20%
-const skillSellPrice = id => px(Math.round(SKILL_PRICE[SKILLS[id].grade] * SELL_RATE * (1 + .5 * skillLv(id))));   // 小成、大成、圓滿各 +50%
+const skillSellPrice = (id, s = L()) => px(Math.round(SKILL_PRICE[SKILLS[id].grade] * SELL_RATE * (1 + .5 * skillLv(id, s))));   // 小成、大成、圓滿各 +50%
 // 參悟功法：化為精進（約 5 分鐘 × 品階平方，加上它原本一半的進度）；主修七成、其他輔修平分三成，圓滿的不分
 const techStudyGain = id => Math.round(300 * TECHS[id].grade ** 2 + (L().techs[id] || 0) * .5);
 // 參悟術法：出招中的每個術法熟練度 +5 × 品階平方

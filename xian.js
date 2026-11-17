@@ -82,6 +82,8 @@ for (const [aid, ...names] of XIAN_ART) {
 }
 // 仙界秘境頭目專屬
 ARTS.yunhai = { name: '雲海鎮魂鈴', slot: '飾品', grade: 8, hp: .6, def: .4, rate: .6, shenUp: .5 };
+ARTS.wanyaohu = { name: '萬藥葫', slot: '飾品', grade: 8, hp: .8, def: .4, rate: .5, boss: 1 };   // 藥王洞天頭目專屬（原本給仙術，仙界改成只有一招）
+ARTS.baiduji = { name: '擺渡古槳', slot: '武器', grade: 8, atk: .8, crit: .15, rate: .5, boss: 1 };   // 星河斷渡頭目專屬
 ARTS.guixudeng = { name: '歸墟引魂燈', slot: '飾品', grade: 8, atk: .6, crit: .2, lifesteal: .08, rate: .5 };
 SKILLS.yaowang = K('萬藥回春', 8, '木', 'heal', 6, 5, { boss: 1 });
 SKILLS.tianheduan = K('一劍斷天河', 8, '水', 'dmg', 9, 6, { pierce: 1, boss: 1 });
@@ -117,8 +119,8 @@ PLACES.push(
 );
 const XIAN_SECRETS = [
   { id: 'yunhai', mj: 9, name: '雲海仙宮', elem: '風', elites: ['仙宮金甲衛', '雲海巡天使'], boss: '仙宮殘靈', uniq: ['art', 'yunhai'], desc: '雲海深處的一座空宮，宮主早就隕落了，宮裡的禁制還記得他。' },
-  { id: 'yaowang', mj: 10, name: '藥王洞天', elem: '木', elites: ['藥人', '洞天藥傀'], boss: '萬年藥王', uniq: ['skill', 'yaowang'], desc: '一株藥草修成了仙，把整座洞天都種成了它的藥園。' },
-  { id: 'xingdu', mj: 11, name: '星河斷渡', elem: '水', elites: ['斷渡水鬼', '星河守橋將'], boss: '斷渡擺渡人', uniq: ['skill', 'tianheduan'], desc: '天河在這裡斷了一截，擺渡人還在等最後一個客人。' },
+  { id: 'yaowang', mj: 10, name: '藥王洞天', elem: '木', elites: ['藥人', '洞天藥傀'], boss: '萬年藥王', uniq: ['art', 'wanyaohu'], desc: '一株藥草修成了仙，把整座洞天都種成了它的藥園。' },
+  { id: 'xingdu', mj: 11, name: '星河斷渡', elem: '水', elites: ['斷渡水鬼', '星河守橋將'], boss: '斷渡擺渡人', uniq: ['art', 'baiduji'], desc: '天河在這裡斷了一截，擺渡人還在等最後一個客人。' },
   { id: 'guixuyan', mj: 12, name: '歸墟深淵', elem: '無', elites: ['淵底殘仙', '吞名之影'], boss: '歸墟守淵者', uniq: ['art', 'guixudeng'], desc: '被劃掉名字的仙人，最後都沉到了這裡。' },
 ];
 
@@ -311,6 +313,10 @@ for (const e of EVENTS) if (['xj_bottle', 'xj_star', 'xj_feast', 'xj_fallen', 'x
 SKILLS.xs_fa = K('接引仙光', 6, '無', 'dmg', 6, 4, { sch: 'fa', brk: .2, xs: 1 });
 SKILLS.xs_ti = K('仙軀擎嶽', 6, '無', 'multi', 1.15, 5, { hits: 4, sch: 'ti', xs: 1 });
 SKILLS.xs_hun = K('照神仙念', 6, '無', 'dmg', 5.2, 5, { stun: .35, sch: 'hun', xs: 1 });
+// ---------- 大道至簡：成仙後一身術法反璞歸真，按修行路線化成一招（仙界唯一的仙術，自動施展，越用越熟練） ----------
+SKILLS.yi_fa = K('一法通玄', 6, '無', 'dmg', 8, 2, { brk: .3, sch: 'fa', only: 'fa', yi: 1 });
+SKILLS.yi_ti = K('一力破萬法', 6, '無', 'dmg', 8, 2, { pierce: 1, sch: 'ti', only: 'ti', yi: 1 });
+SKILLS.yi_hun = K('一念鎮仙', 6, '無', 'dmg', 7, 3, { pierce: 1, stun: 1, sch: 'hun', only: 'hun', yi: 1 });
 
 // ---------- 仙界坊市只賣仙階：多補一批靈寶、仙術，免得人仙時貨架很快就空 ----------
 // 仙術：照天階的輔助、範圍型術法放大
