@@ -366,8 +366,10 @@ const jieNext = (s = L()) => s.stage === MORTAL_TOP || (isXian(s) && s.stage < S
 // 成仙之後的用詞：畫面和紀事一律換掉。飛升前的舊紀事、道途分頁（跨世共用）用 keepWords 加隔字，就不會被換
 const XIAN_WORDS = { 靈石: '仙元石', 法力: '仙元', 根骨: '仙骨', 功法: '仙法', 術法: '仙術', 法寶: '靈寶', 行囊: '須彌戒', 百藝: '仙藝', 洞府: '洞天', 陣法: '仙陣', 丹爐: '仙丹爐', 器爐: '靈器爐', 煉丹: '煉仙丹', 煉器: '煉靈器', 丹藥: '仙丹' };
 const XW_RE = new RegExp(Object.keys(XIAN_WORDS).join('|'), 'g');
-const cur = (t, s = L()) => s && isXian(s) ? t.replace(XW_RE, m => XIAN_WORDS[m]) : t;
-const keepWords = t => t.replace(XW_RE, m => m[0] + '\u200b' + m.slice(1));
+// 只換畫面上的文字，不動 HTML 標籤裡的東西（onclick 的參數、屬性），不然按鈕會壞掉
+const textOnly = (t, f) => t.replace(/(<[^>]*>)|([^<]+)/g, (m, tag, txt) => tag || f(txt));
+const cur = (t, s = L()) => s && isXian(s) ? textOnly(t, x => x.replace(XW_RE, m => XIAN_WORDS[m])) : t;
+const keepWords = t => textOnly(t, x => x.replace(XW_RE, m => m[0] + '\u200b' + m.slice(1)));
 const pct = p => Math.random() < p;
 const pick = a => a[Math.floor(Math.random() * a.length)];
 function pickW(list, w) { let x = Math.random() * list.reduce((a, o) => a + w(o), 0); return list.find(o => (x -= w(o)) < 0) || list[list.length - 1]; }
