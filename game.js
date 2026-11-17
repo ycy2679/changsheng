@@ -1996,7 +1996,7 @@ function render() {
     ${s.ev ? renderEvent() : ''}
     ${curTip() ? renderTip() : ''}
     <nav>${TABS.map(([k, n]) => `<button class="${tab === k ? 'on' : ''} ${curTip() && curTip().tab === k ? 'glow' : ''}" onclick="setTab('${k}')">${n}</button>`).join('')}</nav>
-    <section class="panel">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, craft: renderCraft, shop: renderShop, log: renderLogTab, dao: () => isXian(s) ? keepWords(renderDao()) : renderDao() })[tab]()}</section>`);
+    <section class="panel${tab === 'cult' ? ' mortal-ink' : ''}">${({ cult: renderCult, skill: renderSkill, art: renderArt, bag: renderBag, craft: renderCraft, shop: renderShop, log: renderLogTab, dao: () => isXian(s) ? keepWords(renderDao()) : renderDao() })[tab]()}</section>`);
   updateDyn();
 }
 

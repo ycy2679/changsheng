@@ -123,3 +123,9 @@ body.xian #stars { opacity: 1; }
 #stars i.tw { animation: twinkle var(--d) ease-in-out var(--dl) infinite; }
 @keyframes twinkle { 0%, 100% { opacity: var(--o); } 50% { opacity: .1; } }
 @media (prefers-reduced-motion: reduce) { #stars i.tw { animation: none; } }
+
+/* 仙界的修行頁：靈根、境界品質、親和這些字維持凡界（深色模式）的顏色 */
+body.xian .mortal-ink h3, body.xian .mortal-ink .same, body.xian .mortal-ink .root { color: #d9a35f; }
+body.xian .mortal-ink .g1 { color: #a59a88; } body.xian .mortal-ink .g2 { color: #67acd6; } body.xian .mortal-ink .g3 { color: #b884dc; }
+body.xian .mortal-ink .g4 { color: #e6b450; } body.xian .mortal-ink .g5 { color: #ef6b5e; } body.xian .mortal-ink .g6 { color: #5cc4b5; }
+body.xian .mortal-ink .g7 { color: #6aaeea; } body.xian .mortal-ink .g8 { color: #e26fc0; }
