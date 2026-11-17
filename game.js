@@ -22,7 +22,7 @@ function newLife(meta) {
   meta.lives++;
   const t = id => meta.talentsEff[id] || 0;   // 這一世的效果一律看 talentsEff（已套用、凍結的那份）
   const s = {
-    name: randName(), stage: 0, xiu: 0, age: 12 - 2 * t('tongyan'), stone: 300 * t('kaijushi') * t('kaijushi'), items: { heal: t('kaijudan'), juqi: 3 * t('kaijudan') }, mode: 'closed', place: 'bamboo',
+    name: randName(), stage: 0, xiu: 0, age: 12 - 2 * t('tongyan'), stone: Math.round(300 * t('kaijushi') * t('kaijushi') * (1 + meta.dao / 50)), items: { heal: t('kaijudan') }, mode: 'closed', place: 'bamboo',
     tech: 'yinqi', subs: [], techs: { yinqi: 0 }, skills: { qijin: 0 }, equip: ['qijin'], cave: 0, injury: 0,
     root: null, phys: null, draw: null, mortal: newMortal(12 - 2 * t('tongyan')), arts: {}, gear: {}, tox: 0, body: 0, shop: null,
     lifeBonus: 0, brkBonus: 0, flags: {}, arcs: {}, encT: 15, evT: 100, ev: null, log: [], wins: 0, peak: 0,
@@ -55,6 +55,12 @@ function load() {
   for (const k of ['talents', 'auto', 'autoMajor', 'wins', 'pills', 'keepTech']) if (m[k] === undefined) m[k] = d[k];
   if (m.guo === undefined) m.guo = m.dao;
   if (m.talents.a_place) { m.guo += 4; delete m.talents.a_place; delete m.auto.a_place; }   // 自動選地點拿掉了，退還道果
+  // v1.7.0 拿掉的戰鬥類天賦：照當初花的道果全數退還（[第一級價格, 每級倍率]）
+  for (const [id, base, gr] of [['zhanyi', 1, 1.5], ['shenqing', 2, 1.6], ['kanpo', 12, 1], ['liaoshang', 5, 2], ['slot6', 60, 1]]) {
+    const lv = m.talents[id]; if (!lv) continue;
+    let back = 0; for (let l = 0; l < lv; l++) back += Math.round(base * Math.pow(gr, l));
+    m.guo += back; delete m.talents[id]; delete m.talentsEff[id]; m.refunded = (m.refunded || 0) + back;
+  }
   // 天賦延後生效上線前的存檔：已經點的天賦當作本來就生效，不受影響；之後新點的才要等下一世
   if (!m.talentsEff) m.talentsEff = { ...m.talents };
   if (m.best === undefined) m.best = Math.max(s.peak || 0, ...m.history.map(h => STAGES.findIndex(x => x.name === h.stageName)));
@@ -639,8 +645,6 @@ function talentEff(key) {
   const fu = tl('tianming');
   switch (key) {
     case 'rate': return .05 * tl('suhui');
-    case 'atk': case 'hp': return .05 * tl('zhanyi');
-    case 'dodge': return .02 * tl('shenqing');
     case 'stone': return .1 * tl('caiyun') + fu;
     case 'drop': return .2 * tl('diaoluo') + fu;
     case 'evRate': return .25 * tl('qiyu');
@@ -650,7 +654,7 @@ function talentEff(key) {
   }
   return 0;
 }
-const maxEquip = () => 4 + tl('slot5') + tl('slot6');
+const maxEquip = () => 4 + tl('slot5');
 const maxSubs = () => 2 + tl('fuxiu');
 const maxBrkPills = () => 3 + tl('sidan');
 function lifespan(s = L()) { return (MAJORS[stg(s).major].life + eff('life', s) + s.lifeBonus) * (1 + eff('lifePct', s) + (isXian(s) ? (s.phys ? .05 * PHYSIQUES[s.phys].r : 0) + .1 * tl('xshou') : 0)); }   // 仙體越稀有，仙壽越長
@@ -742,11 +746,10 @@ function ctrlMul(id, s = L()) {
 // 各資源上限：主路線全額，兼修六成
 function resMax(p, s = L(), st = stats(s)) { const ps = myPaths(s), i = ps.indexOf(p); return i < 0 ? 0 : Math.round(st.mp * (i ? .6 : 1)); }
 // 屬性相剋倍率：a 攻、d 守
-// mine：是不是你在出手（看破五行只強化你這一方）
+// mine：是不是你在出手
 function elemMul(a, d, mine = true) {
   if (!a || !d || a === '無' || d === '無') return 1;
-  const k = mine && tl('kanpo');
-  return COUNTERS[a] && COUNTERS[a].includes(d) ? (k ? 1.6 : 1.3) : COUNTERS[d] && COUNTERS[d].includes(a) ? (k ? .9 : .75) : 1;
+  return COUNTERS[a] && COUNTERS[a].includes(d) ? 1.3 : COUNTERS[d] && COUNTERS[d].includes(a) ? .75 : 1;
 }
 
 // ---------- 給事件用的獎懲 ----------
@@ -769,7 +772,7 @@ function addTechXp(sec) {
   return subs.map(x => TECHS[x].name).join('》《');
 }
 function addLife(n) { L().lifeBonus += n; }
-function injure(sec) { const s = L(); s.injury = Math.max(s.injury, sec * (1 - .25 * tl('liaoshang'))); }
+function injure(sec) { const s = L(); s.injury = Math.max(s.injury, sec); }
 function learnTech(id) { const s = L(); if (!(id in s.techs)) s.techs[id] = 0; codexAdd('t', id); }
 function learnSkill(id) { const s = L(); if (!(id in s.skills)) { s.skills[id] = 0; if (!SKILLS[id].only && s.equip.length < maxEquip()) s.equip.push(id); } codexAdd('k', id); }
 // 路線大招：自成一欄，不佔出招欄位，學會就自動施展
@@ -1424,6 +1427,7 @@ function tryBreak(offline = false) {
       if (mj === 4 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '踏入化神，元神與天地相合'); }
       pathSkillCheck(s);
       pathArtCheck(s);
+      giftXiuPills(s);
       if (mj === 7 && S.meta.dao < ASCEND_DAO) log(`道心只有 ${S.meta.dao}/${ASCEND_DAO}。道心主要在坐化或兵解時才會增加，這一世就算渡劫圓滿，多半也飛升不了；不想空等的話，可以考慮兵解轉世。`);
     }
     return { ok: true, major, msg: `突破成功${used ? `（服下${pill} ${used} 顆）` : ''}，晉入${stg().name}！` + (major ? `${ql}壽元增至 ${Math.floor(lifespan())} 年。` : '') };
@@ -1495,15 +1499,15 @@ function usePill(id) {
   else if (it.kind === 'xiu') {
     if (s.xiu >= need) return;
     const diff = stg().major - it.major;
-    const low = diff === 1 && tl('danxin') ? .5 : Math.pow(.25, diff);   // 丹心通明：低一階也有一半效果
+    const low = Math.pow(.25, diff);
     const xp = it.major >= XIAN_MJ;   // 仙丹：每顆只補一成，丹毒也重
-    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) : .25) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨
+    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) : .25) * (1 + .2 * tl('danxin')) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨、丹心通明   // 仙丹入骨
     if (diff < 0) { amt = .5 * tf; injure(150); }
     const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 35 : 20);
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
   } else if (it.kind === 'xlife') { if (danBlock(id, s)) return; const n = Math.round(300 * pe * tf); s.lifeBonus += n; s.xlifeN = (s.xlifeN || 0) + 1; addTox(30); msg = `服下延壽仙丹，壽元 +${n}。`; }
   else if (it.kind === 'life') { const n = Math.round(15 * pe * tf); s.lifeBonus += n; addTox(30); msg = `服下延壽丹，壽元 +${n}。`; }
-  else if (it.kind === 'body') { s.body += (it.amt || .03) * tf; if (!tl('xisuiwudu')) addTox(30); msg = `服下${it.name}，`; msg += '筋骨一陣劇痛，氣血、攻擊、防禦永久提升。'; }
+  else if (it.kind === 'body') { s.body += (it.amt || .03) * tf * (tl('xisuiwudu') ? 1.5 : 1); if (!tl('xisuiwudu')) addTox(30); msg = `服下${it.name}，`; msg += '筋骨一陣劇痛，氣血、攻擊、防禦永久提升。'; }
   else if (it.kind === 'dan') { msg = useDan(id, it, addTox); if (!msg) return; }
   else if (it.kind === 'tech') { if (danBlock(id, s)) return; msg = `服下${it.name}，對《${addTechXp((it.amt || 600) * pe)}》的領悟更深一層。`; }
   else return;
@@ -1688,7 +1692,7 @@ function ascend(s) {
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
-  s.ascView = 1; xjOpen(s);
+  s.ascView = 1; xjOpen(s); giftXiuPills(s);
   log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。`)}仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
@@ -1737,9 +1741,11 @@ function xianJie() {
   if (s.wsLog) { s.wsLog = 0; log('壽元一下子寬了，天人五衰的徵兆退去。'); }
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
   { const np = PLACES.find(q => q.min === s.stage && q.xian); if (np) log(`以你現在的境界，已經能去${np.name}遊歷了（上方的地點選單）。那裡的妖物更強，仙元石和掉落也多得多。`); }
-  pathSkillCheck(s); pathArtCheck(s);
+  pathSkillCheck(s); pathArtCheck(s); giftXiuPills(s);
   save(); render();
 }
+// 藥囊傳家：突破大境界（成仙、渡仙劫也算）送幾顆新境界的修為丹
+function giftXiuPills(s) { const n = 2 * tl('kaijudan'), id = XIU_PILLS[stg(s).major]; if (n && id) { addItem(id, n); log(`藥囊裡多了 ${n} 顆${ITEMS[id].name}。`, true); } }
 // ---------- 仙籍（取代宗門）：名冊、差事、仙功兌換 ----------
 let showXj = false;
 function toggleXj() { showXj = !showXj; render(); }
@@ -1804,9 +1810,9 @@ function xianEnter(s) {
   // 凡界帶來的入門術法在仙界沒用：換成這條路線的專屬仙術
   const kid = 'xs_' + (s.paths[0] || 'fa');
   s.skills = {}; s.equip = []; learnSkill(kid);
-  s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu');
+  s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu') + 100 * tl('kaijushi') * tl('kaijushi');   // 仙府家底、祖蔭
   const bao = tl('xianbao') ? randomUnowned('art', [6]) : null; if (bao) gainArt(bao);   // 仙家遺寶
-  pathSkillCheck(s); pathArtCheck(s); xjOpen(s);
+  pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
   log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}一本《${SKILLS[kid].name}》${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
