@@ -670,7 +670,8 @@ const maxEquip = () => 4 + tl('slot5');
 const maxSubs = () => 2 + tl('fuxiu');
 const maxBrkPills = () => 3 + tl('sidan');
 function lifespan(s = L()) { return (MAJORS[stg(s).major].life + eff('life', s) + s.lifeBonus) * (1 + eff('lifePct', s) + (isXian(s) ? (s.phys ? .05 * PHYSIQUES[s.phys].r : 0) + .1 * tl('xshou') : 0)); }   // 仙體越稀有，仙壽越長
-function skillLv(id, s = L()) { const u = s.skills[id] || 0; return MASTERY_USES.filter(x => u >= x).length - 1; }
+function skillLv(id, s = L()) { if (SKILLS[id] && SKILLS[id].yi) return Math.max(0, Math.min(3, stg(s).major - XIAN_MJ));   // 大道至簡那一招跟著境界：人仙入門、地仙小成、真仙大成、玄仙圓滿
+  const u = s.skills[id] || 0; return MASTERY_USES.filter(x => u >= x).length - 1; }
 const toxFactor = (s = L()) => Math.max(.1, 1 - s.tox / 100);
 const toxRes = () => Math.min(.8, eff('toxRes'));
 // 主修親和：主修屬性和靈根相合；空靈根什麼屬性的主修都算
@@ -2203,9 +2204,9 @@ function renderSkill() {
   const ultRow = id => { const k = SKILLS[id], lv = skillLv(id), nx = MASTERY_USES[lv + 1];
     return `<div class="item"><div class="row"><b>${k.name}</b>${k.yi ? `<span class="small muted">${SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}</div>
-      <div class="small">${MASTERY[lv]}${nx ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
+      <div class="small">${MASTERY[lv]}${nx && !k.yi ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
   if (isXian(s)) return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}`).join('；')}。</p>
-    <h3>仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這一招：自動施展，用得越多越熟練（入門、小成、大成、圓滿），威力跟著境界一起長。</p>
+    <h3>仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這一招：自動施展，跟著境界精進：人仙入門、地仙小成、真仙大成、玄仙圓滿。</p>
     ${ult.map(ultRow).join('')}`;
   const elems = SKILL_ELEMS.filter(e => all.some(id => SKILLS[id].elem === e));
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
