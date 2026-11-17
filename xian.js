@@ -339,3 +339,22 @@ for (const [ai, [slot, tpl, ...names]] of [
 ].entries()) {
   XG.forEach((g, i) => { ARTS[`x${g}_na${ai}`] = { name: names[i], slot, grade: g, ...xianScale(tpl, XF[g]) }; });
 }
+
+// ---------- 體修、魂修術法補充：仙界每個品階各 3 門，魂修玄階 4 門 ----------
+// [下品名, 中品名, 上品名, 種類, 下品威力, 冷卻, 額外]；中品、上品威力照 XK 比例放大
+for (const [i, [n6, n7, n8, kind, pow, cd, ex]] of [
+  ['飲血仙拳', '吞天血掌', '萬劫血拳', 'multi', 1, 5, { hits: 5, drain: .15, sch: 'ti' }],
+  ['透骨仙指', '破天一指', '寂滅一指', 'dmg', 5, 5, { pierce: 1, sch: 'ti' }],
+  ['金剛仙軀', '不壞仙身', '混沌仙軀', 'shield', 3.2, 6, { reflect: .4, sch: 'ti' }],
+  ['攝魂仙音', '鎮魄仙鐘', '九幽攝魂', 'dmg', 5.6, 5, { brk: .3, stun: .25, sch: 'hun' }],
+  ['奪魄仙念', '噬魂仙念', '太虛奪魄', 'dmg', 5.2, 5, { drain: .3, freeze: .25, sch: 'hun' }],
+  ['千念仙刺', '萬念飛刺', '億念穿心', 'multi', 1, 6, { hits: 4, stun: .15, sch: 'hun' }],
+].entries()) {
+  [n6, n7, n8].forEach((name, j) => { const g = XG[j]; SKILLS[`x${g}_tihun${i}`] = K(name, g, '無', kind, Math.round(pow * XK[g] / XK[6] * 100) / 100, cd, ex); });
+}
+Object.assign(SKILLS, {
+  hun2a: K('攝心術', 2, '無', 'dmg', 2.2, 4, { stun: .3, sch: 'hun' }),
+  hun2b: K('魂鎖', 2, '無', 'dmg', 2, 4, { freeze: .3, brk: .1, sch: 'hun' }),
+  hun2c: K('心魔幻境', 2, '無', 'multi', .8, 5, { hits: 3, stun: .15, sch: 'hun' }),
+  hun2d: K('定神護魂', 2, '無', 'shield', 1.6, 5, { sch: 'hun' }),
+});
