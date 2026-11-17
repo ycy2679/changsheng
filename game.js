@@ -297,6 +297,8 @@ function pathArtCheck(s = L()) {
 const PATH_ULT = { ti: ['santou', 'fatian'], hun: ['shenhun', 'wannian'] };
 // 大道至簡：仙界的術法只剩路線那一招；refund＝舊存檔已經學的仙階仙術照賣價退成仙元石
 const YI = { fa: 'yi_fa', ti: 'yi_ti', hun: 'yi_hun' };
+const yiNum = (s = L()) => '一兩三'[myPaths(s).length - 1] || '幾';   // 兼修幾條路就有幾招
+const yiNames = (s = L()) => myPaths(s).map(p => `「${SKILLS[YI[p]].name}」`).join('');
 function yiForm(s, refund) {
   const ids = myPaths(s).map(p => YI[p]).filter(Boolean);
   if (ids.every(id => id in s.skills) && Object.keys(s.skills).every(id => ids.includes(id)) && !s.equip.length) return;
@@ -1710,7 +1712,7 @@ function ascend(s) {
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
   s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false);
-  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了一招`)}「${myPaths(s).map(p => SKILLS[YI[p]].name).join('」「')}」。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
+  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了`)}${yiNum(s)}招${yiNames(s)}。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
 function renderAscend() {
@@ -1836,7 +1838,7 @@ function xianEnter(s) {
   const bao = tl('xianbao') ? randomUnowned('art', [6]) : null; if (bao) gainArt(bao);   // 仙家遺寶
   pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
-  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}一招「${myPaths(s).map(p => SKILLS[YI[p]].name).join('」「')}」${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
+  log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}${yiNum(s)}招${yiNames(s)}${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
 // ---------- 天人五衰：仙人壽元過八成，每過 4% 出現一個徵兆，修煉、氣血、攻擊各 -5% ----------
 const WU_SHUAI = ['衣上生了塵垢，怎麼拂也拂不掉', '頭上的花冠開始枯萎', '腋下無端滲出汗來', '身上隱隱有了濁氣', '坐在哪裡都覺得不自在'];
@@ -2206,7 +2208,7 @@ function renderSkill() {
       <div class="small">${skillDesc(k)}</div>
       <div class="small">${MASTERY[lv]}${nx && !k.yi ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
   if (isXian(s)) return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}`).join('；')}。</p>
-    <h3>仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這一招：自動施展，跟著境界精進：人仙入門、地仙小成、真仙大成、玄仙圓滿。</p>
+    <h3>仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這${yiNum(s)}招：自動施展，跟著境界精進：人仙入門、地仙小成、真仙大成、玄仙圓滿。</p>
     ${ult.map(ultRow).join('')}`;
   const elems = SKILL_ELEMS.filter(e => all.some(id => SKILLS[id].elem === e));
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
@@ -2401,7 +2403,7 @@ function renderShop() {
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
-    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、術法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的功法、術法比較常上架。</p>`;
+    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的功法、術法比較常上架。</p>`;
 }
 // ---------- 百藝・煉丹：丹方（跨世保留）、開爐、出爐 ----------
 const matGrade = (s = L()) => majorGrade(stg(s).major);
@@ -2632,7 +2634,7 @@ const TIPS = [
   { id: 'fight', title: '戰鬥', when: s => !!s.flags.fought, text: '戰鬥是自動打的：會照「術法」分頁的出招順序放招，資源不夠就普通攻擊。氣血、法力打完不會馬上回滿，連戰會越打越虛。' },
   { id: 'injury', title: '負傷', when: s => s.injury > 0, text: '負傷時修煉減半，遊歷時也會避開妖獸。可以服療傷丹，或乾脆閉關，閉關養傷快一倍。' },
   { id: 'tech', title: '功法', tab: 'cult', when: s => Object.keys(s.techs).length > 1, text: '你學到了新功法。「修行」→「功法」可以換主修（主修決定修煉速度，換掉要散功，修為減半），或拿來輔修疊加效果。用不到的可以參悟或賣掉。' },
-  { id: 'skill', title: '術法', tab: 'skill', when: s => Object.keys(s.skills).length > 1, text: '你學到了新術法。到「術法」分頁裝上並排好出招順序。法術、體術、神魂術三種路數，自己這條路的最划算，別條路的攻擊術法威力打折、耗費變多，輔助術法則不受影響。' },
+  { id: 'skill', title: '術法', tab: 'skill', when: s => !isXian(s) && Object.keys(s.skills).length > 1, text: '你學到了新術法。到「術法」分頁裝上並排好出招順序。法術、體術、神魂術三種路數，自己這條路的最划算，別條路的攻擊術法威力打折、耗費變多，輔助術法則不受影響。' },
   { id: 'art', title: '法寶', tab: 'art', when: s => Object.keys(s.arts).length > 0, text: '你得到了法寶。到「法寶」分頁裝備；花靈石祭煉，每重效果 +15%。高階法寶要到一定境界才驅使得動。' },
   { id: 'event', title: '奇遇', when: s => !!(s.ev && (s.ev.ev || s.ev.arc)), text: '遇到事情了，選一個選項。不同的選擇收穫不同，有些有風險。有名字的人物會跟你結下羈絆，前世的緣分還會延續到之後的輪迴。' },
   { id: 'mat', title: '材料與百藝', tab: 'craft', when: s => Object.keys(s.items).some(id => ITEMS[id] && ITEMS[id].kind === 'mat' && s.items[id] > 0), text: '你採到了材料。靈草可以到「百藝」照丹方煉丹，礦材可以煉器或祭煉法寶。煉得越多越熟練，成功率越高。' },

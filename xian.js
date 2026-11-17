@@ -263,7 +263,7 @@ const XIAN_DAN = [
   ['pozhang', 'x_pozhang', '破關仙丹', 7, 6e4, '下一次小境界突破必定成功。'],
   ['xingshen', 'x_xingshen', '通神丹', 8, 1e5, '下一場戰鬥，每門神通可以發動兩次。'],
   ['zhuyan', 'x_zhuyan', '還童仙丹', 8, 1.2e5, '年齡 -150 歲。', { amt: 150 }],
-  ['tianjidan', 'x_tianjidan', '天機仙丹', 8, 1e5, '下一次坊市換貨，功法、術法、法寶的第一格都保證中品以上。'],
+  ['tianjidan', 'x_tianjidan', '天機仙丹', 8, 1e5, '下一次坊市換貨，功法、法寶的第一格都保證中品以上。'],
 ];
 for (const [src, id, name, g, base, desc, ex] of XIAN_DAN) {
   const o = ITEMS[src];
@@ -313,7 +313,7 @@ for (const e of EVENTS) if (['xj_bottle', 'xj_star', 'xj_feast', 'xj_fallen', 'x
 SKILLS.xs_fa = K('接引仙光', 6, '無', 'dmg', 6, 4, { sch: 'fa', brk: .2, xs: 1 });
 SKILLS.xs_ti = K('仙軀擎嶽', 6, '無', 'multi', 1.15, 5, { hits: 4, sch: 'ti', xs: 1 });
 SKILLS.xs_hun = K('照神仙念', 6, '無', 'dmg', 5.2, 5, { stun: .35, sch: 'hun', xs: 1 });
-// ---------- 大道至簡：成仙後一身術法反璞歸真，按修行路線化成一招（仙界唯一的仙術，自動施展，越用越熟練） ----------
+// ---------- 大道至簡：成仙後一身術法反璞歸真，按修行路線化成一招（仙界唯一的仙術，自動施展，熟練度跟著境界） ----------
 SKILLS.yi_fa = K('一法通玄', 6, '無', 'dmg', 8, 2, { brk: .3, sch: 'fa', only: 'fa', yi: 1 });
 SKILLS.yi_ti = K('一力破萬法', 6, '無', 'dmg', 8, 2, { pierce: 1, sch: 'ti', only: 'ti', yi: 1 });
 SKILLS.yi_hun = K('一念鎮仙', 6, '無', 'dmg', 7, 3, { pierce: 1, stun: 1, sch: 'hun', only: 'hun', yi: 1 });
