@@ -316,7 +316,7 @@ function choosePathLate(id) {
 }
 function renderMortal() {
   const s = L(), m = s.mortal;
-  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 凡人${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 凡人${speedCtl()}${themeBtn()}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
   if (m.phase === 'birth') return `${head}<section class="panel card"><b>出身</b>
     <p>${S.meta.lives === 1 ? '你降生在山腳下的一個小鎮。聽說山裡住著會飛的仙人，但沒有人真的見過。' : '你又一次生在凡人家裡，前世的事像一場記不清的夢。'}這一世，你生在什麼樣的人家？</p>
     <div class="namerow small">名字：<input class="nameinput" maxlength="8" value="${s.name || ''}" onchange="setName(this.value)"><button class="mini" onclick="rerollName()">換一個</button></div>
@@ -1924,7 +1924,7 @@ function renderDraw() {
   const kid = S.meta.keepTech && S.meta.keepTech.id, kt = kid && kid !== 'yinqi' && kid in s.techs ? TECHS[kid] : null;
   const needEl = kt && kt.grade >= 3 && kt.elem !== '無' && kt.type !== '鍛體' ? kt.elem : null;
   const rootCls = r => ({ heaven: 'g4', mutant: 'g4', void: 'g4', dual: 'g3', triple: 'g2', quad: 'g1', five: 'g1' })[r.type];
-  return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
+  return `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}${themeBtn()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel card"><b>${s.mortal ? '測靈根' : '測根骨'}</b>
       <p>${intro}</p>
       ${needEl ? `<p class="small">前世功法《${kt.name}》要${needEl}屬性靈根才能當主修，合得上的靈根標了「合前世功法」。</p>` : ''}
@@ -1938,9 +1938,16 @@ function renderDraw() {
 }
 
 // 仙界配色（星河深空）：成仙後整個畫面換成仙界風格，背景淡入；星星每次進來隨機撒
+// 亮／暗模式：自動（跟系統）、亮、暗，記在這台裝置（不跟著存檔）
+const THEME_KEY = 'changsheng_theme', THEME_NAME = { auto: '自動', light: '亮', dark: '暗' };
+function themePref() { try { return localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) { return 'auto'; } }
+function applyTheme() { const p = themePref(), dark = p === 'dark' || (p === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.classList.toggle('dark', dark); }
+function cycleTheme() { const order = ['auto', 'light', 'dark'], p = order[(order.indexOf(themePref()) + 1) % 3]; try { localStorage.setItem(THEME_KEY, p); } catch (e) {} applyTheme(); render(); }
+const themeBtn = () => `<button class="mini" onclick="cycleTheme()" title="切換亮／暗模式">${THEME_NAME[themePref()]}</button>`;
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch (e) {}
 function setXianTheme(s) {
   const on = !!(s && !title && isXian(s));
-  if (on && !document.getElementById('stars')) makeStars();
+  if (on && document.documentElement.classList.contains('dark') && !document.getElementById('stars')) makeStars();
   if (document.body.classList.contains('xian') !== on) document.body.classList.toggle('xian', on);
 }
 function makeStars() {
@@ -1965,7 +1972,7 @@ function render() {
   if (s.mortal) { app.innerHTML = renderMortal(); updateMortal(); return; }
   if (tab === 'shop') ensureShop();
   app.innerHTML = cur(`
-    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
+    <header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}${speedCtl()}${themeBtn()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel">
       <div class="row"><span><b class="realm" id="realm">${realmName()}</b> <span class="root">${rootName()}</span></span><span class="muted" id="age"></span></div>
       ${bar('life', 0, 'lifebar')}
@@ -2666,7 +2673,7 @@ function renderDao() {
 function renderDeath() {
   const s = L(), h = S.meta.history[S.meta.history.length - 1];
   const fall = isXian(s), old = s.ascended && !fall;   // old：v1.6 以前飛升就結束的存檔
-  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag(s)} · ${fall ? '隕落' : old ? '飛升' : '坐化'}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  const head = `<header><h1>長生閒記</h1><span class="muted">第 ${S.meta.lives} 世${nameTag(s)} · ${fall ? '隕落' : old ? '飛升' : '坐化'}${themeBtn()}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
   if (deathView === 'tree') return `${head}<section class="panel card">
     <div class="row"><b>悟道</b><span>可用道果 <b class="same">${S.meta.guo}</b></span></div>
     <p class="small muted">天賦永久保留，下一世開始就生效。點好了就轉世，重新抽根骨。</p>
