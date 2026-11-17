@@ -70,6 +70,13 @@ nav button { flex: 1; padding: 6px 0; min-width: 0; }
 .g6 { color: var(--g6); } .g7 { color: var(--g7); } .g8 { color: var(--g8); font-weight: 600; }
 .title { text-align: center; padding: 48px 0 24px; }
 .title h1 { font-size: 2.4rem; letter-spacing: .4em; margin-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-right: 8px; }
+.brand h1 { white-space: nowrap; }
+.title .brand { justify-content: center; margin-bottom: 16px; }
+.title .brand h1 { margin-bottom: 0; }
+.theme-sw { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; gap: 2px; }
+.theme-sw button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 24px; padding: 0; margin: 0; border: none; border-radius: 999px; background: transparent; color: var(--muted); }
+.theme-sw button.on { background: var(--accent); color: var(--panel); }
 .title .lead { color: var(--muted); line-height: 2; margin-bottom: 24px; }
 button.big { font-size: 1.1rem; padding: 10px 40px; margin: 0 auto 8px; }
 summary { cursor: pointer; color: var(--accent); }
