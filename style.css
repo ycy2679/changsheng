@@ -16,7 +16,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Noto S
 main { max-width: 640px; margin: 0 auto; padding: 16px; }
 header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 h1 { font-size: 1.5rem; margin: 0; letter-spacing: .2em; }
-h3 { font-size: 1rem; margin: 16px 0 6px; color: var(--accent); }
+h3 { font-size: 1rem; margin: 16px 0 6px; color: var(--main); }   /* 小標題一律金色（本命法寶標題另用 .gben 赤紅） */
 h3:first-child { margin-top: 0; }
 p { margin: 6px 0; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
@@ -143,11 +143,11 @@ html.dark body.xian #stars { opacity: 1; }
 @keyframes twinkle { 0%, 100% { opacity: var(--o); } 50% { opacity: .1; } }
 @media (prefers-reduced-motion: reduce) { #stars i.tw { animation: none; } }
 /* 仙界的修行頁：靈根、境界品質、親和這些字維持凡界的顏色（亮模式本來就是凡界色，暗模式改回凡界暗色） */
-body.xian .mortal-ink h3, body.xian .mortal-ink .same, body.xian .mortal-ink .root { color: #7a4b1f; }
+body.xian .mortal-ink .same, body.xian .mortal-ink .root { color: #7a4b1f; }
 body.xian .mortal-ink .g1 { color: #8a7f6f; } body.xian .mortal-ink .g2 { color: #3d7fa8; } body.xian .mortal-ink .g3 { color: #8a4fb0; }
 body.xian .mortal-ink .g4 { color: #c08a1e; } body.xian .mortal-ink .g5 { color: #c0392f; } body.xian .mortal-ink .g6 { color: #2f8f83; }
 body.xian .mortal-ink .g7 { color: #2a73b8; } body.xian .mortal-ink .g8 { color: #b0368f; }
-html.dark body.xian .mortal-ink h3, html.dark body.xian .mortal-ink .same, html.dark body.xian .mortal-ink .root { color: #d9a35f; }
+html.dark body.xian .mortal-ink .same, html.dark body.xian .mortal-ink .root { color: #d9a35f; }
 html.dark body.xian .mortal-ink .g1 { color: #a59a88; } html.dark body.xian .mortal-ink .g2 { color: #67acd6; } html.dark body.xian .mortal-ink .g3 { color: #b884dc; }
 html.dark body.xian .mortal-ink .g4 { color: #e6b450; } html.dark body.xian .mortal-ink .g5 { color: #ef6b5e; } html.dark body.xian .mortal-ink .g6 { color: #5cc4b5; }
 html.dark body.xian .mortal-ink .g7 { color: #6aaeea; } html.dark body.xian .mortal-ink .g8 { color: #e26fc0; }
