@@ -75,7 +75,7 @@ function load() {
   if (!m.talentsEff) m.talentsEff = { ...m.talents };
   if (m.best === undefined) m.best = Math.max(s.peak || 0, ...m.history.map(h => STAGES.findIndex(x => x.name === h.stageName)));
   if (!s.items) { s.items = { heal: s.heal || 0 }; if (s.pill) s.items[BRK_PILLS[Math.min(3, stg(s).major)]] = s.pill; delete s.pill; delete s.heal; }
-  for (const id in s.custom || {}) TECHS[id] = s.custom[id];   // 自創功法
+  for (const id in s.custom || {}) TECHS[id] = s.custom[id];   // 自創功法、仙界流派功法
   m.codex = m.codex || {}; m.codexPaid = m.codexPaid || 0;
   for (const id in s.techs) if (!TECHS[id]) delete s.techs[id];
   s.subs = (s.subs || []).filter(id => id in s.techs);
@@ -106,6 +106,7 @@ function load() {
   if (s.root) pathSkillCheck(s);
   if (s.phys && PHYS_SHEN[s.phys] && !s.flags.physShen) { s.flags.physShen = 1; gainShen(PHYS_SHEN[s.phys], `${PHYSIQUES[s.phys].name}血脈甦醒`, s); }
   if (s.root && s.stage >= 18 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
+  if (!s.dead && !s.mortal && !s.draw) xpathForm(s);   // 已經在仙界的存檔：主修改成流派功法
   pathArtCheck(s);
 }
 
@@ -602,9 +603,9 @@ function dualFactor(id, main = L().tech) {
   if (a !== '無' && b !== '無' && clash(a, b)) return 0;
   return SHENG[a] === b || SHENG[b] === a ? .5 : .3;
 }
-const dualOn = (s = L()) => s.tech2 && tl('liangyi') ? s.tech2 : null;
+const dualOn = (s = L()) => s.tech2 && tl('liangyi') && !xpOn(s) ? s.tech2 : null;
 // 兼修：主路以外，每條路再一個主修欄（法修吐納、體修鍛體、魂修觀想），效果、修煉、精進都五折
-const pathSlots = (s = L()) => [...new Set(myPaths(s).map(p => PATH_MAIN[p]))].filter(ty => !TECHS[s.tech] || ty !== TECHS[s.tech].type);
+const pathSlots = (s = L()) => xpOn(s) ? [] : [...new Set(myPaths(s).map(p => PATH_MAIN[p]))].filter(ty => !TECHS[s.tech] || ty !== TECHS[s.tech].type);
 const pathMains = (s = L()) => pathSlots(s).map(ty => (s.ptech || {})[ty]).filter(id => id && TECHS[id] && id in s.techs && id !== s.tech && id !== s.tech2 && canMain(id, s));
 function setPathMain(id) {
   const s = L(), ty = TECHS[id].type, nm = PATHS[MAIN_PATH[ty]].name; s.ptech = s.ptech || {};
@@ -619,7 +620,33 @@ function setPathMain(id) {
 }
 // ---------- 自創功法：化神後主修、副主修都圓滿，融合成一部 ----------
 // 效果是兩部相加打八折，直接從第 9 層開始；自創的功法存在 s.custom，讀檔時再登記回 TECHS
-const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom'];
+const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom', 'xpath'];
+// ---------- 仙界流派功法：成仙時主修依修行路線改成固定名字，繼承原本主修（含兼修主修五折、副主修）的效果，隨大境界變強；仙界主修不能再換 ----------
+const XPATH_TECH = { fa: ['天衍法章', '太衍經'], ti: ['九極鑄身篇', '太初經'], hun: ['太虛守神錄', '太虛經'], 'fa,ti': ['萬法鑄體訣', '混元典'], 'fa,hun': ['陰陽觀想法', '衍天經'], 'hun,ti': ['形神同鑄錄', '神魔經'], 'fa,hun,ti': ['三元歸真錄', '鴻蒙經'] };   // [地仙界, 天仙界進化（之後才用）]
+const XPATH_LABEL = { fa: '法修', ti: '體修', hun: '魂修', 'fa,ti': '法體雙修', 'fa,hun': '法魂雙修', 'hun,ti': '體魂雙修', 'fa,hun,ti': '三修' };
+const pathKey = (s = L()) => [...myPaths(s)].sort().join(',');
+const xpOn = (s = L()) => !!(TECHS[s.tech] && TECHS[s.tech].xpath);
+const xpMul = (s = L()) => 1 + .25 * Math.max(0, stg(s).major - XIAN_MJ);   // 人仙 ×1、地仙 ×1.25、真仙 ×1.5、玄仙 ×1.75
+function xpathForm(s = L()) {
+  if (!isXian(s) || !TECHS[s.tech] || xpOn(s)) return;
+  const key = pathKey(s), main = TECHS[s.tech], parts = [[s.tech, 1], ...pathMains(s).map(id => [id, .5]), ...(dualOn(s) ? [[s.tech2, dualFactor(s.tech2, s.tech)]] : [])];
+  const d = { name: XPATH_TECH[key][0], grade: 6, type: main.type, elem: main.elem, xpath: key };
+  // 照原本實際生效的量折算：流派功法是圓滿（×2），所以會被放大的效果先除以 2
+  for (const [id, f] of parts) for (const k in TECHS[id]) if (!FUSE_SKIP.includes(k) && typeof TECHS[id][k] === 'number') d[k] = +((d[k] || 0) + TECHS[id][k] * f * (NO_SCALE.includes(k) ? 1 : techMul(id, s) / 2)).toFixed(3);
+  const id = 'xpt' + Date.now().toString(36);
+  TECHS[id] = d; (s.custom = s.custom || {})[id] = d; s.techs[id] = techNeed(id, 9);
+  s.xpFrom = s.tech; s.tech = id; s.tech2 = null; s.ptech = {};
+  log(`成仙之後，${parts.map(([x]) => `《${TECHS[x].name}》`).join('')}化入了${XPATH_LABEL[key]}的根本功法《${d.name}》，往後隨境界一同精進。`);
+}
+// 輔修圓滿了，可以像自創功法一樣融進流派功法（效果八成）
+function fuseIntoPath(id) {
+  const s = L(), d = TECHS[s.tech]; if (!xpOn(s) || !s.subs.includes(id) || techLayer(id, s) < 9) return;
+  if (armed !== 'xf:' + id) { armed = 'xf:' + id; render(); return; }
+  armed = ''; const t = TECHS[id];
+  for (const k in t) if (!FUSE_SKIP.includes(k) && typeof t[k] === 'number') d[k] = +((d[k] || 0) + t[k] * .8).toFixed(3);
+  s.custom[s.tech] = d; s.subs = s.subs.filter(x => x !== id); delete s.techs[id];
+  log(`《${t.name}》融進了《${d.name}》。`); save(); render();
+}
 const FUSE_TAIL = /[訣經錄法功典篇圖心術譜]+$/;
 const canFuse = (s = L()) => !!dualOn(s) && s.stage >= PATH_STAGE && techLayer(s.tech, s) >= 9 && techLayer(s.tech2, s) >= 9;
 function fuseName(a, b) {
@@ -654,7 +681,7 @@ function setDual(id) {
 function techNeed(id, l) { return l * l * 60 * TECHS[id].grade; }
 function techLayer(id, s = L()) { return Math.min(9, Math.floor(Math.sqrt((s.techs[id] || 0) / (60 * TECHS[id].grade)))); }
 function techMul(id, s = L()) { const l = techLayer(id, s); return 1 + .1 * l + (l >= 9 ? .1 : 0); }
-function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return NO_SCALE.includes(key) ? v : v * techMul(id, s); }
+function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return NO_SCALE.includes(key) ? v : v * techMul(id, s) * (TECHS[id].xpath ? xpMul(s) : 1); }   // 仙界流派功法隨大境界變強
 // 法寶祭煉倍率
 // 本命法寶隨大境界變強：化神 ×1，之後每個大境界 +25%（渡劫 ×2、人仙 ×2.25、玄仙 ×3）
 const benMul = (s = L()) => 1 + .25 * Math.max(0, stg(s).major - 4);
@@ -842,7 +869,7 @@ const ultList = (s = L()) => Object.keys(s.skills).filter(id => SKILLS[id].only)
 const CODEX_STEP = 20, CODEX_GUO = 2;
 function codexAdd(kind, id) {
   const m = S.meta; m.codex = m.codex || {}; const c = m.codex[kind] = m.codex[kind] || {};
-  if ((kind === 't' && (!TECHS[id] || TECHS[id].custom)) || c[id]) return;
+  if ((kind === 't' && (!TECHS[id] || TECHS[id].custom || TECHS[id].xpath)) || c[id]) return;
   c[id] = 1; codexPay();
 }
 const codexCount = (m = S.meta) => Object.values(m.codex || {}).reduce((a, c) => a + Object.keys(c).length, 0) + Object.keys(m.arcDone || {}).length;
@@ -876,8 +903,8 @@ function renderCodex() {
   // 有品階的：依第二排分組，再照天地玄黃分段
   const graded = (P, key, keys, ok = () => true) => {
     if (!keys.includes(codexSub)) codexSub = keys[0];
-    const ids = Object.keys(P).filter(id => P[id][key] === codexSub && !P[id].custom && ok(id));
-    return nav(keys.map(g => { const l = Object.keys(P).filter(id => P[id][key] === g && !P[id].custom && ok(id)); return [g, `${g} ${l.filter(id => has(codexTab, id)).length}/${l.length}`]; }), codexSub, 'sub')
+    const ids = Object.keys(P).filter(id => P[id][key] === codexSub && !P[id].custom && !P[id].xpath && ok(id));
+    return nav(keys.map(g => { const l = Object.keys(P).filter(id => P[id][key] === g && !P[id].custom && !P[id].xpath && ok(id)); return [g, `${g} ${l.filter(id => has(codexTab, id)).length}/${l.length}`]; }), codexSub, 'sub')
       + [8, 7, 6, 4, 3, 2, 1].map(g => section(GRADE_NAMES[g], 'g' + g, codexTab, ids.filter(id => P[id].grade === g), id => P[id].name)).join('');
   };
   let body = '';
@@ -1326,7 +1353,7 @@ function autoActs() {
   if (autoOn('a_xiu') && s.tox < 30 && s.xiu < need && count(xp)) usePill(xp);
   // 仙官代勞：仙籍差事冷卻好、沒負傷就自動接選好的差事
   if (autoOn('a_xj') && isXian(s) && s.xj && !(s.injury > 0) && s.xj.task <= s.age) doXjTask(S.meta.xjAuto || 'dang');
-  if (autoOn('a_main') && !s.flags.mainManual) {   // 這一世自己換過主修，化身就不再自動換
+  if (autoOn('a_main') && !s.flags.mainManual && !xpOn(s)) {   // 這一世自己換過主修，化身就不再自動換
     // 比潛力（圓滿後的修煉速度，也就是基礎速度），不看目前層數；沒當主修的功法不會長層數，看層數會永遠換不上高階功法
     const pot = id => TECHS[id].rate || 0;
     const best = Object.keys(s.techs).filter(id => canMain(id) && id !== s.tech2 && !pathMains(s).includes(id)).sort((a, b) => pot(b) - pot(a))[0];   // 副主修交給玩家自己安排
@@ -1521,7 +1548,7 @@ function tryBreak(offline = false) {
 }
 // 換主修要散功：目前修為折半（各功法自己的層數保留）。手動換要按兩次確認
 function switchTech(id, force) {
-  const s = L(); if (!canMain(id) || id === s.tech) return;
+  const s = L(); if (xpOn(s) || !canMain(id) || id === s.tech) return;   // 仙界主修固定是流派功法
   if (!force && armed !== 'tech:' + id) { armed = 'tech:' + id; render(); return; }
   armed = ''; s.xiu /= 2; s.tech = id; s.subs = s.subs.filter(x => x !== id);
   if (s.ptech) for (const k in s.ptech) if (s.ptech[k] === id) delete s.ptech[k];   // 原本是兼修路線的主修，改當主修
@@ -1633,7 +1660,7 @@ function restock() {
   if (isXian(s)) delete kinds.skill;   // 仙界沒有仙術可賣：空出來的格子給仙法和靈寶
   for (const k in kinds) {
     const [pool, owned, prices] = kinds[k], per = isXian(s) ? (k === 'art' ? Math.ceil(per0 * 1.5) : per0 + Math.floor(per0 / 2)) : per0;
-    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
+    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && !(k === 'tech' && isXian(s) && !subOk(pool[id])) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
     for (let i = 0; i < per; i++) {
       // 第一格保證玄階以上（玄階還沒解鎖就照常抽）
       const low = isXian(s) ? (tj && grades.includes(7) ? 7 : 6) : tj && grades.some(g => g >= 3) ? 3 : 2;   // 天機丹：保證地階以上（仙界：中品以上）
@@ -1766,7 +1793,7 @@ function ascend(s) {
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
-  s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false);
+  s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false); xpathForm(s);
   if (!s.flags.xn7) s.ev = { story: 'n7' };   // 一進仙界，主線「仙籍」馬上跳出來
   log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；材料都收在須彌戒裡。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了`)}${yiNum(s)}招${yiNames(s)}。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
@@ -1835,8 +1862,8 @@ function xjOpen(s = L()) { if (!s.xj) { s.xj = { gong: 0, task: 0, shop: null };
 // 兌換清單：渡劫仙丹、延壽仙丹、當前境界修為丹、三部沒學過的仙階功法（優先挑當得了主修的）
 function xjRestock(s = L()) {
   const gs = [6, 7, 8].filter(g => s.stage >= GRADE_MIN_STAGE[g]);
-  const ids = Object.keys(TECHS).filter(id => gs.includes(TECHS[id].grade) && !(id in s.techs));
-  const main = ids.filter(id => canMain(id, s)), list = [];
+  const ids = Object.keys(TECHS).filter(id => gs.includes(TECHS[id].grade) && !(id in s.techs) && subOk(TECHS[id]));   // 仙界主修固定，只換輔修類
+  const main = [], list = [];
   for (let i = 0; i < 3 + tl('xjshop') && (main.length || ids.length); i++) { const pool = main.length && i < 2 ? main : ids, id = pick(pool); list.push({ k: 'tech', id, cost: XJ_TECH_COST[TECHS[id].grade] }); main.splice(main.indexOf(id), 1); ids.splice(ids.indexOf(id), 1); }
   s.xj.shop = list;
 }
@@ -1892,7 +1919,7 @@ function xianEnter(s) {
   s.skills = {}; s.equip = []; yiForm(s, false);
   s.stone = 300 + 100 * tl('kaijushi') * tl('kaijushi');   // 祖蔭
   const bao = tl('xianbao') ? randomUnowned('art', [6]) : null; if (bao) gainArt(bao);   // 仙家遺寶
-  pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
+  xpathForm(s); pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
   if (!s.flags.xn7) s.ev = { story: 'n7' };   // 一進仙界，主線「仙籍」馬上跳出來
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
   log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}${yiNum(s)}招${yiNames(s)}${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
@@ -1915,7 +1942,7 @@ function ageShift(s, d) {
 function die() {
   const s = L(); s.dead = true;
   S.meta.history.push({ life: S.meta.lives, name: s.name || '', stageName: STAGES[s.peak].name + (s.peak > MORTAL_TOP ? '' : s.ascended ? '・飛升' : s.tribFail ? '・渡劫失敗' : ''), fall: s.peak > MORTAL_TOP ? 1 : 0, age: Math.floor(s.age), root: s.root ? rootName(s) + (s.phys ? '、' + PHYSIQUES[s.phys].name : '') : '' });
-  S.meta.keepTech = { id: s.tech, xp: s.techs[s.tech], def: TECHS[s.tech].custom ? TECHS[s.tech] : null };   // 給「前世功法」天賦用（自創的連定義一起帶）
+  { const kid = xpOn(s) && s.xpFrom && TECHS[s.xpFrom] ? s.xpFrom : s.tech; S.meta.keepTech = { id: kid, xp: s.techs[kid], def: TECHS[kid].custom ? TECHS[kid] : null }; }   // 流派功法帶不走，帶成仙前的主修   // 給「前世功法」天賦用（自創的連定義一起帶）
   S.meta.lastShen = (s.shen || []).slice();                // 給「宿世神通」天賦用
   // 坐化當下就拿到道心和道果，轉世前可以先在悟道樹上花掉
   s.daoGot = daoGain(); S.meta.dao += s.daoGot; S.meta.guo += s.daoGot;
@@ -2164,7 +2191,7 @@ function renderOffline() {
 const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem !== '無' && rootFits(t.elem)) ? ` · <span class="aff">靈根親和${isMainType(t.type) ? '（主修時修煉 +15%）' : ''}</span>` : '';
 function techCard(id, btns = '', hint = '', lock = false) {
   const s = L(), t = TECHS[id], l = techLayer(id);
-  return `<div class="item"><div class="row"><span>${lock ? lockBtn('tech', id) : ''}<b>《${t.name}》</b></span>${(x => t.custom ? `<span class="gben small">自創 · ${x}</span>` : gradeTag(t.grade, x))(`${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
+  return `<div class="item"><div class="row"><span>${lock ? lockBtn('tech', id) : ''}<b>《${t.name}》</b></span>${(x => t.xpath ? `<span class="gben small">${XPATH_LABEL[t.xpath]} · ${x}</span>` : t.custom ? `<span class="gben small">自創 · ${x}</span>` : gradeTag(t.grade, x))(`${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
     <div class="small">${effText(t, id) || '<span class="muted">沒有特別加成</span>'}</div>
     ${techAff(t) || hint ? `<div class="small">${[techAff(t).replace(/^ · /, ''), hint].filter(Boolean).join(' · ')}</div>` : ''}
     ${l < 9 ? bar('xiu thin', ((s.techs[id] || 0) - techNeed(id, l)) / (techNeed(id, l + 1) - techNeed(id, l))) : ''}
@@ -2231,6 +2258,7 @@ function renderGong() {
     const t = TECHS[id];
     const sub = !subOk(t) ? '' : s.subs.length < maxSubs() ? `<button class="mini" onclick="toggleSub('${id}')">輔修</button>` : '<span class="muted">輔修已滿</span>';
     if (isMainType(t.type)) {
+      if (xpOn(s)) return sub;   // 仙界主修固定
       if (!canMain(id)) return sub || `<span class="muted">${mainBlock(id)}</span>`;
       const pm = pathSlots(s).includes(t.type) ? `<button class="mini ${armed === 'pm:' + id ? 'danger' : ''}" onclick="setPathMain('${id}')">${armed === 'pm:' + id ? '確定散功？修為減半' : `${PATHS[MAIN_PATH[t.type]].name}主修 50%`}</button>` : '';
       const main = `<button class="mini ${armed === 'tech:' + id ? 'danger' : ''}" onclick="switchTech('${id}')">${armed === 'tech:' + id ? '確定散功？修為減半' : '改為主修'}</button>` + pm;
@@ -2248,11 +2276,12 @@ function renderGong() {
     .sort((a, b) => techSort === 'layer' ? techLayer(b) - techLayer(a) || TECHS[b].grade - TECHS[a].grade : TECHS[b].grade - TECHS[a].grade || techLayer(b) - techLayer(a));
   return `<h3>主修</h3>${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換，轉世後恢復。</p>' : ''}${techCard(s.tech)}
     ${pathSlots(s).map(ty => { const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉、精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度、精進都是五折。</p>`); }).join('')}
-    ${tl('liangyi') ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
+    ${xpOn(s) ? `<p class="muted small">仙界的根本功法：效果隨大境界變強（目前 ×${xpMul(s).toFixed(2).replace(/\.?0+$/, '')}），不能再換；圓滿的輔修可以融進來（效果八成）。</p>` : ''}
+    ${tl('liangyi') && !xpOn(s) ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
       ${s.tech2 ? (canFuse() ? `<div class="btns"><button class="mini ${armed === 'fuse' ? 'danger' : 'primary'}" onclick="fuseTech()">${armed === 'fuse' ? '確定融合？兩部功法會合為一部' : '融合自創功法'}</button></div>`
         : '<p class="muted small">踏入化神、主修和副主修都練到圓滿，就能把兩部融合成自創功法：效果兩部相加打八折，直接圓滿，副主修欄也會空出來。</p>') : ''}` : ''}
-    <h3>輔修（${s.subs.length}/${maxSubs()}）</h3>${s.subs.map(id => techCard(id, `<button class="mini on" onclick="toggleSub('${id}')">卸下</button>`, TECHS[id].rate ? '<span class="muted">輔修時不算修煉速度</span>' : '')).join('') || '<p class="muted small">空著。鍛體、身法、劍修、長生、丹道、殺伐、悟性、尋寶類功法都能輔修，精進速度是主修的一半。</p>'}
+    <h3>輔修（${s.subs.length}/${maxSubs()}）</h3>${s.subs.map(id => techCard(id, `<button class="mini on" onclick="toggleSub('${id}')">卸下</button>${xpOn(s) && techLayer(id) >= 9 ? `<button class="mini ${armed === 'xf:' + id ? 'danger' : ''}" onclick="fuseIntoPath('${id}')">${armed === 'xf:' + id ? '確定融入？這部會消失' : `融入《${TECHS[s.tech].name}》`}</button>` : ''}`, TECHS[id].rate ? '<span class="muted">輔修時不算修煉速度</span>' : '')).join('') || '<p class="muted small">空著。鍛體、身法、劍修、長生、丹道、殺伐、悟性、尋寶類功法都能輔修，精進速度是主修的一半。</p>'}
     <div class="row"><h3>已學功法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setTechView('sort', this.value)">${[['grade', '品階高的在前'], ['layer', '層數高的在前']].map(([k, n]) => `<option value="${k}" ${techSort === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <button class="mini ${techUsable ? 'on' : ''}" onclick="setTechView('usable')">只看修得了的</button></span></div>
