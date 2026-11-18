@@ -1715,15 +1715,15 @@ function ascend(s) {
   const bonus = daoGain(s); S.meta.dao += bonus; S.meta.guo += bonus; s.ascendBonus = bonus;
   log('九道天雷散去，天門洞開。你飛升了。');
   for (const l of s.log) l.text = keepWords(l.text);   // 凡界的舊紀事保留原本的用詞
-  // 靈石、丹藥、材料帶不上去，一起折成仙元石；宗門留在凡界，爐裡沒煉完的也散了；洞府、陣法跟著上去（洞府成了洞天）
-  let v = s.stone; for (const id in s.items) v += sellItemPrice(id) * s.items[id];
+  // 靈石、丹藥帶不上去，一起折成仙元石；材料留在須彌戒（仙界的陣法前四級還用得到）；宗門留在凡界，爐裡沒煉完的也散了；洞府、陣法跟著上去（洞府成了洞天）
+  const mats = {}; let v = s.stone; for (const id in s.items) { if (ITEMS[id] && ITEMS[id].kind === 'mat') { if (s.items[id] > 0) mats[id] = s.items[id]; } else v += sellItemPrice(id) * s.items[id]; }
   const sect = s.sect && SECTS[s.sect.id].name;
-  s.items = {}; s.stone = Math.max(10, Math.round(Math.sqrt(v) * .75)); s.sect = null; s.furnace = null; s.anvil = null; s.shop = null; s.found = 0; s.tox = 0; s.buffs = {};   // 帶不上去的東西只折一點：一億靈石約七千五仙元石，剛好一兩件仙階下品
+  s.items = mats; s.stone = Math.max(10, Math.round(Math.sqrt(v) * .75)); s.sect = null; s.furnace = null; s.anvil = null; s.shop = null; s.found = 0; s.tox = 0; s.buffs = {};   // 帶不上去的東西只折一點：一億靈石約七千五仙元石，剛好一兩件仙階下品
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
   s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false);
-  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了`)}${yiNum(s)}招${yiNames(s)}。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
+  log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；材料都收在須彌戒裡。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了`)}${yiNum(s)}招${yiNames(s)}。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
 function renderAscend() {
@@ -2385,7 +2385,7 @@ function renderBag() {
       return `<button class="mini ${warn ? 'danger' : ''}" onclick="useEssence('${id}')">${warn ? '確定？天靈根會失去純度' : '煉化'}</button>`;
     }
     if (k === 'tc') return `<span class="muted small">衝擊${MAJORS[ITEMS[id].major + 1].name}時自動使用</span>`;
-    if (k === 'mat') return `<span class="muted small">${ITEMS[id].mat === 'herb' ? '到百藝煉丹' : '到百藝煉器、祭煉用'}</span>`;
+    if (k === 'mat') return `<span class="muted small">${isXian(s) && ITEMS[id].grade < 6 ? '凡界材料：陣法升前四級用得到' : ITEMS[id].mat === 'herb' ? '到百藝煉丹' : '到百藝煉器、祭煉用'}</span>`;
     const why = danBlock(id, s), ok = k === 'heal' ? s.injury > 0 || (s.hpNow ?? 1) < 1 : k === 'xiu' ? s.xiu < stg().need : !why;
     return `<button class="mini" ${ok ? '' : 'disabled'} onclick="usePill('${id}')">服用</button>${why ? `<span class="muted small">${why}</span>` : ''}`;
   };
