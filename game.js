@@ -1377,7 +1377,7 @@ function choose(i) {
   if (ref.story) { storyMark(ref.story); if (ref.story === 'n1') s.flags.n1 = 1; }
   const res = ref.ev ? withStoneMul(TRAVEL_STONE, () => ch.run(s)) : ch.run(s);   // 一般奇遇只在遊歷時出現
   if (ref.arc && !arc(ref.arc).ended) arc(ref.arc).step++;
-  log(`【${e.title}】${res}`);
+  log(`【${e.title}】${res}`); if (isMainEv(ref)) s.log[0].m = 1;
   save(); render();
 }
 
@@ -2077,15 +2077,17 @@ function updateDyn() {
   b.className = 'primary' + (armed === 'trib' || armed === 'xjie' ? ' danger' : '');
   b.textContent = end ? '登天（製作中）' : xj ? (armed === 'xjie' ? `確定渡劫？${Math.round(jieChance() * 100)}%，失敗即隕落` : `渡${JIE_NAME[stg().major]} ${Math.round(jieChance() * 100)}%`) : last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
   b.textContent = cur(b.textContent);
-  $('recent').innerHTML = s.log.slice(0, 4).map(l => `<li>${l.text}</li>`).join('');
+  $('recent').innerHTML = s.log.slice(0, 4).map(l => `<li${l.m ? ' class="main"' : ''}>${l.text}</li>`).join('');
   if ($('shopT')) { if (ensureShop()) { render(); return; } $('shopT').textContent = dur2(Math.max(0, (s.shop.next - Date.now()) / 1000)); }
 }
 const dur2 = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
+// 主線劇情：碑與名的節點、守碑人（飛升條件）；隨緣應變本來就不會替這些做選擇
+const isMainEv = r => !!r && (!!r.story || r.arc === 'bei');
 function renderEvent() {
-  const e = curEvent(), s = L();
-  return `<section class="panel card">
-    <div class="row"><b>${e.title}</b>${e.who ? `<span class="who">${e.who}</span>` : ''}</div>
+  const e = curEvent(), s = L(), main = isMainEv(s.ev);
+  return `<section class="panel card${main ? ' main-ev' : ''}">
+    <div class="row"><b>${main ? '<span class="tag-main">主線</span>' : ''}${e.title}</b>${e.who ? `<span class="who">${e.who}</span>` : ''}</div>
     <p>${val(e.text, s)}</p>
     <div class="choices">${visible(e).map((c, i) => `<button onclick="choose(${i})">${val(c.t, s)}</button>`).join('')}</div>
     ${autoOn('a_event') && s.ev.ev ? `<p class="muted small">隨緣應變：30 秒內沒選，會照「${EV_MODES[S.meta.evMode || 'safe']}」自動選。</p>` : ''}
@@ -2687,7 +2689,7 @@ function renderGuide() {
 let logAll = false;
 function setLogAll(v) { logAll = v; render(); }
 const renderLogTab = () => `<nav><button class="${logAll ? '' : 'on'}" onclick="setLogAll(false)">只看大事</button><button class="${logAll ? 'on' : ''}" onclick="setLogAll(true)">全部</button></nav>` + renderLog(!logAll);
-function renderLog(story) { return `<ul class="log">${L().log.filter(l => !story || !l.r).map(l => `<li><span class="muted">${l.age} 歲</span> ${l.text}</li>`).join('')}</ul>`; }
+function renderLog(story) { return `<ul class="log">${L().log.filter(l => !story || !l.r).map(l => `<li${l.m ? ' class="main"' : ''}><span class="muted">${l.age} 歲</span> ${l.text}</li>`).join('')}</ul>`; }
 // 道途分頁：道心與悟道樹／輪迴錄／羈絆、前世、其他
 let daoTab = 'tree';
 function setDaoTab(k) { daoTab = k; armed = ''; render(); }
