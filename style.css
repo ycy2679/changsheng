@@ -167,3 +167,4 @@ button.on > span[class^="g"] { color: inherit; }
 .restock button.mini { font-size: 1rem; padding: 4px 12px; }
 /* 靈根親和：強調色 */
 .aff { color: var(--accent); }
+.res1 { margin-bottom: 8px; }   /* 單修：資源在氣血下一行 */
