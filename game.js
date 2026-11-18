@@ -668,7 +668,7 @@ function xpathForm(s = L()) {
   TECHS[id] = d; (s.custom = s.custom || {})[id] = d; s.techs[id] = techNeed(id, 9);
   s.xpFrom = s.tech; s.tech = id; s.tech2 = null; s.ptech = {};
   for (const x of Object.keys(s.techs)) xpAbsorb(x, s);   // 已經學過的體系仙階功法一起化入
-  log(`成仙之後，${parts.map(([x]) => `《${TECHS[x].name}》`).join('')}化入了${XPATH_LABEL[key]}的根本功法《${d.name}》，往後隨境界一同精進。`);
+  log(`成仙之後，${parts.map(([x]) => `《${TECHS[x].name}》`).join('')}化入了${XPATH_LABEL[key]}的根本功法《${d.name}》，往後收集同體系的仙法一同精進。`);
 }
 // 設副主修：換掉原本的副主修要散功（兩次確認）；再點一次同一部就卸下
 function setDual(id) {
