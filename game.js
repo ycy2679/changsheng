@@ -307,13 +307,16 @@ function pathArtCheck(s = L()) {
 const PATH_ULT = { ti: ['santou', 'fatian'], hun: ['shenhun', 'wannian'] };
 // 大道至簡：仙界的術法只剩路線那一招；refund＝舊存檔已經學的仙階仙術照賣價退成仙元石
 const YI = { fa: 'yi_fa', ti: 'yi_ti', hun: 'yi_hun' };
-const yiNum = (s = L()) => '一兩三'[myPaths(s).length - 1] || '幾';   // 兼修幾條路就有幾招
-const yiNames = (s = L()) => myPaths(s).map(p => `「${SKILLS[YI[p]].name}」`).join('');
+// 兼修：幾條路合成一招（看路線組合，不看順序）
+const YI_COMBO = { 'fa,ti': 'yi_fati', 'fa,hun': 'yi_fahun', 'hun,ti': 'yi_tihun', 'fa,hun,ti': 'yi_san' };
+const yiId = (s = L()) => { const ps = myPaths(s); return ps.length > 1 ? YI_COMBO[[...ps].sort().join(',')] : YI[ps[0]]; };
+const yiNum = () => '一';   // 大道至簡：不管兼修幾條路都只有一招
+const yiNames = (s = L()) => `「${SKILLS[yiId(s)].name}」`;
 function yiForm(s, refund) {
-  const ids = myPaths(s).map(p => YI[p]).filter(Boolean);
+  const ids = [yiId(s)].filter(Boolean);
   if (ids.every(id => id in s.skills) && Object.keys(s.skills).every(id => ids.includes(id)) && !s.equip.length) return;
   let back = 0;
-  for (const id in s.skills) if (!ids.includes(id)) { if (refund && SKILLS[id].grade >= 6) back += skillSellPrice(id, s); delete s.skills[id]; }
+  for (const id in s.skills) if (!ids.includes(id)) { if (refund && SKILLS[id].grade >= 6 && !SKILLS[id].yi) back += skillSellPrice(id, s); delete s.skills[id]; }
   s.equip = []; for (const id of ids) if (!(id in s.skills)) { s.skills[id] = 0; codexAdd('k', id); }
   if (refund) { s.stone += back; log(`大道至簡：仙界的術法反璞歸真，只剩「${ids.map(id => SKILLS[id].name).join('」「')}」${back ? `；原本學會的仙術折成仙元石 ${back} 枚` : ''}。`); }
 }
@@ -739,7 +742,7 @@ const QUAL_NAMES = {
   4: ['虛影法相', '凝實法相', '通明法相', '不滅法相'],
   5: ['煉虛初成', '形神漸虛', '虛實相生', '形神俱妙'],
   6: ['形神初合', '形神相融', '天人感應', '形神合一'],
-  7: ['一葉乘風', '萬法歸一', '大乘圓覺', '大乘無漏'],
+  7: ['一葉乘風', '萬法朝宗', '大乘圓覺', '大乘無漏'],
   8: ['引雷入體', '劫雲加身', '九轉淬體', '道心通天'],
 };
 const qualName = (major, q) => (QUAL_NAMES[major] || QUAL_NAMES[4])[q];
@@ -2251,7 +2254,7 @@ function renderSkill() {
   const all = Object.keys(s.skills).filter(id => !s.equip.includes(id) && !SKILLS[id].only);
   const ult = ultList(s);
   const ultRow = id => { const k = SKILLS[id], lv = skillLv(id), nx = MASTERY_USES[lv + 1];
-    return `<div class="item"><div class="row"><b>${k.name}</b>${k.yi ? `<span class="small gben">${SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
+    return `<div class="item"><div class="row"><b>${k.name}</b>${k.yi ? `<span class="small gben">${k.only === 'combo' ? { yi_fati: '法體雙修', yi_fahun: '法魂雙修', yi_tihun: '體魂雙修', yi_san: '三修' }[id] : SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}</div>
       <div class="small">${MASTERY[lv]}${nx && !k.yi ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
   if (isXian(s)) return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}`).join('；')}。</p>
