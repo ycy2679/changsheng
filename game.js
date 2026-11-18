@@ -2035,7 +2035,7 @@ function render() {
       ${bar('life', 0, 'lifebar')}
       <div class="row"><span>修為</span><span id="xtxt"></span></div>
       ${bar('xiu', 0, 'xbar')}
-      <div class="vit small"><div><div class="row"><span>氣血</span><span id="hptxt"></span></div>${bar('hp thin', 1, 'hpbar')}</div>
+      <div class="vit small" id="vit"><div><div class="row"><span>氣血</span><span id="hptxt"></span></div>${bar('hp thin', 1, 'hpbar')}</div>
         <div id="mpone"><div class="row"><span id="mplbl">法力</span><span id="mptxt"></span></div>${bar('mp thin', 1, 'mpbar')}</div></div><div id="mp2" class="res2 small"></div>
       <div class="row small"><span id="res"></span><span id="inj"></span></div>
       <div class="small same" id="buffs"></div>
@@ -2088,7 +2088,7 @@ function updateDyn() {
     $('mptxt').textContent = `${fmt(Math.round(resMax(m0, s, st) * fr(m0)))} / ${fmt(resMax(m0, s, st))}`;
     // 兼修：資源移到氣血下一行，幾條路就平分幾格，只顯示百分比
     const h2 = ps.length > 1 ? ps.map(k => `<div><div class="row"><span>${cur(RES_NAME[k])}</span><span>${Math.round(fr(k) * 100)}%</span></div>${bar('mp thin', fr(k))}</div>`).join('') : '';
-    const e2 = $('mp2'); if (e2._h !== h2) { e2.innerHTML = h2; e2._h = h2; $('mpone').style.display = h2 ? 'none' : ''; e2.style.gridTemplateColumns = h2 ? `repeat(${ps.length}, 1fr)` : ''; e2.previousElementSibling.classList.toggle('solo', !!h2); }   // 兼修：資源放到氣血下一行，幾條路就平分幾格
+    const e2 = $('mp2'); if (e2._h !== h2) { e2.innerHTML = h2; e2._h = h2; $('mpone').style.display = h2 ? 'none' : ''; e2.style.gridTemplateColumns = h2 ? `repeat(${ps.length}, 1fr)` : ''; $('vit').classList.toggle('solo', !!h2); }   // 兼修：資源放到氣血下一行，幾條路就平分幾格
     $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
