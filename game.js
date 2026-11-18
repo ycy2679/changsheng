@@ -76,6 +76,7 @@ function load() {
   for (const id in s.skills) if (!SKILLS[id]) delete s.skills[id];
   s.equip = s.equip.filter(id => id in s.skills);
   s.arts = s.arts || {}; s.gear = s.gear || {};
+  for (const k of ['飾品', '飾品2', '飾品3']) { const g = s.gear[k]; if (g && ARTS[g] && ARTS[g].path) { if (!s.gear['本命']) s.gear['本命'] = g; s.gear[k] = null; } }   // 舊存檔：本命法寶從飾品欄搬到本命欄
   if (!s.phys && !s.draw && !s.mortal) s.draw = makeDraw(S.meta, s.root);   // 舊存檔補抽體質（原本的靈根留在選項裡）；凡人篇還沒測靈根的不算
   if (s.mortal && s.draw && s.mortal.phase !== 'test') s.draw = null;   // 修掉上面那行以前在凡人篇重新整理造成的卡死
   s.tox = s.tox || 0; s.body = s.body || 0;
@@ -288,10 +289,9 @@ function pathArtCheck(s = L()) {
   const id = PATH_ARTS[myPaths(s)[0]];
   if (!id) return;
   gainArt(id);
-  // 本命法寶直接戴上：有空格就放空格，沒有就換掉品階最低的飾品
-  let put = '';
-  if (!isOn(id, s)) { const k = freeKey(id, s) || swapKey(id, s); if (k) { put = s.gear[k] ? `，換下了「${ARTS[s.gear[k]].name}」` : ''; s.gear[k] = id; } }
-  log(`${isXian(s) ? '成仙之後' : '踏入化神'}，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」，隨即戴上${put}。`);
+  // 本命法寶直接放進本命欄，不佔飾品欄
+  if (!isOn(id, s)) s.gear['本命'] = id;
+  log(`${isXian(s) ? '成仙之後' : '踏入化神'}，你悟出了屬於${PATHS[myPaths(s)[0]].name}的本命法寶「${ARTS[id].name}」，放進了本命法寶欄。它會跟著你的境界一起變強。`);
 }
 // 路線專屬大招（進化型）：金丹學會基礎型，化神進化成強化型，進化後基礎型換成強化型、熟練度延續（兼修的路線也算）
 const PATH_ULT = { ti: ['santou', 'fatian'], hun: ['shenhun', 'wannian'] };
@@ -629,7 +629,9 @@ function techLayer(id, s = L()) { return Math.min(9, Math.floor(Math.sqrt((s.tec
 function techMul(id, s = L()) { const l = techLayer(id, s); return 1 + .1 * l + (l >= 9 ? .1 : 0); }
 function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return NO_SCALE.includes(key) ? v : v * techMul(id, s); }
 // 法寶祭煉倍率
-const artMul = (id, s = L()) => 1 + .15 * (s.arts[id] || 0);
+// 本命法寶隨大境界變強：化神 ×1，之後每個大境界 +25%（渡劫 ×2、人仙 ×2.25、玄仙 ×3）
+const benMul = (s = L()) => 1 + .25 * Math.max(0, stg(s).major - 4);
+const artMul = (id, s = L()) => (1 + .15 * (s.arts[id] || 0)) * (ARTS[id] && ARTS[id].path ? benMul(s) : 1);
 // 體質數值；有 grow 的每過一個大境界再加一次（天妒之體）
 function physVal(key, s = L()) { const ph = PHYSIQUES[s.phys], v = (ph[key] || 0) + (ph.grow && ph.grow[key] || 0) * Math.min(8, stg(s).major); return isXian(s) && v > 0 ? v * 1.5 : v; }   // 仙蛻：好處 ×1.5，壞處不放大
 const physName = (s = L()) => (isXian(s) ? '仙蛻・' : '') + PHYSIQUES[s.phys].name;
@@ -847,7 +849,7 @@ function renderCodex() {
   let body = '';
   if (codexTab === 't') body = graded(TECHS, 'type', TECH_TYPES);
   else if (codexTab === 'k') body = graded(SKILLS, 'elem', SKILL_ELEMS, id => SKILLS[id].grade < 6 || SKILLS[id].yi);   // 仙界只剩大道至簡那三招，其他仙術拿不到就不列
-  else if (codexTab === 'a') body = graded(ARTS, 'slot', ART_SLOTS);
+  else if (codexTab === 'a') body = graded(ARTS, 'slot', ART_SLOTS, id => !ARTS[id].path) + section('本命法寶', 'gben', 'a', Object.keys(ARTS).filter(id => ARTS[id].path), id => ARTS[id].name);
   else if (codexTab === 's') body = [...new Set(Object.values(SHENS).map(x => x.type))].map(ty => section(ty, 'g4', 's', Object.keys(SHENS).filter(id => SHENS[id].type === ty), id => SHENS[id].name)).join('');
   else if (codexTab === 'p') body = [5, 4, 3, 2, 1].map(r => section(PHYS_RANK[r], 'g' + r, 'p', Object.keys(PHYSIQUES).filter(id => PHYSIQUES[id].r === r), id => PHYSIQUES[id].name)).join('');
   else if (codexTab === 'r') body = section('靈根種類', 'g3', 'r', ROOT_TYPES.map(x => x.id), id => ROOT_TYPES.find(x => x.id === id).name)
@@ -885,13 +887,13 @@ const artOk = (id, s = L()) => s.stage >= ART_REALM[ARTS[id].grade] && (!ARTS[id
 const artBlock = (id, s = L()) => s.stage < ART_REALM[ARTS[id].grade] ? `需${ART_REALM_NAME[ARTS[id].grade]}` : `需走${PATHS[ARTS[id].path].name}`;
 // 身上的欄位：武器、護甲各一格，飾品格數看「萬寶隨身」
 const accKeys = () => ['飾品', '飾品2', '飾品3'].slice(0, 1 + tl('wanbao'));
-const gearKeys = () => ['武器', '護甲', ...accKeys()];
+const gearKeys = () => ['本命', '武器', '護甲', ...accKeys()];   // 本命法寶有自己的一格，不佔飾品欄
 const gearIds = (s = L()) => gearKeys().map(k => s.gear[k]).filter(Boolean);
 const isOn = (id, s = L()) => gearKeys().some(k => s.gear[k] === id);
 // 這件法寶能放的空格（武器、護甲直接換掉；飾品找空著的格子，滿了就回 null）
-const freeKey = (id, s = L()) => ARTS[id].slot !== '飾品' ? ARTS[id].slot : accKeys().find(k => !s.gear[k]) || null;
+const freeKey = (id, s = L()) => ARTS[id].path ? '本命' : ARTS[id].slot !== '飾品' ? ARTS[id].slot : accKeys().find(k => !s.gear[k]) || null;
 // 飾品欄滿了：換掉品階最低（同品階看祭煉重數）的那件；本命法寶不會被換下
-const swapKey = (id, s = L()) => ARTS[id].slot !== '飾品' ? null : accKeys().filter(k => s.gear[k] && !ARTS[s.gear[k]].path)
+const swapKey = (id, s = L()) => ARTS[id].path || ARTS[id].slot !== '飾品' ? null : accKeys().filter(k => s.gear[k] && !ARTS[s.gear[k]].path)
   .sort((a, b) => ARTS[s.gear[a]].grade - ARTS[s.gear[b]].grade || s.arts[s.gear[a]] - s.arts[s.gear[b]])[0] || null;
 function gainArt(id) { const s = L(); codexAdd('a', id); if (!(id in s.arts)) { s.arts[id] = 0; const k = freeKey(id, s); if (k && !s.gear[k] && artOk(id, s)) s.gear[k] = id; } }
 function equipArt(id) {
@@ -2364,16 +2366,17 @@ function renderArt() {
   const s = L();
   const card = id => {
     const a = ARTS[id], lv = s.arts[id], on = isOn(id), full = lv >= ART_MAX_REFINE, p = refinePrice(id), locked = isLocked('art', id);
-    return `<div class="item"><div class="row"><span>${on ? '' : lockBtn('art', id)}<b>${a.name}</b></span>${gradeTag(a.legend ? 5 : a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
-      <div class="small">${effText(a, null, artMul(id))}${a.path ? ` · <span class="same">${PATHS[a.path].name}專屬</span>` : ''}</div>
+    return `<div class="item"><div class="row"><span>${on ? '' : lockBtn('art', id)}<b>${a.name}</b></span>${a.path ? `<span class="gben small">本命法寶 · 祭煉 ${lv} 重</span>` : gradeTag(a.legend ? 5 : a.grade, `${a.slot} · 祭煉 ${lv} 重`)}</div>
+      <div class="small">${effText(a, null, artMul(id))}${a.path ? ` · <span class="gben">${PATHS[a.path].name}專屬，隨境界 ×${benMul(s).toFixed(2).replace(/\.?0+$/, '')}</span>` : ''}</div>
       <div class="btnrow">
         <button class="mini" ${full || s.stone < p || (refineOre(id) && !count(refineOre(id))) ? 'disabled' : ''} onclick="refineArt('${id}')">${full ? '已祭煉圓滿' : `祭煉 ${fmt(p)} 靈石${refineOre(id) ? `＋${ITEMS[refineOre(id)].name}（有 ${count(refineOre(id))}）` : ''}`}</button>
         ${on || (artOk(id) && freeKey(id)) ? `<button class="mini ${on ? 'on' : ''}" onclick="equipArt('${id}')">${on ? '卸下' : '裝備'}</button>` : !artOk(id) ? `<span class="muted">${artBlock(id)}</span>` : swapKey(id) ? `<button class="mini" onclick="equipArt('${id}')">替換「${ARTS[s.gear[swapKey(id)]].name}」</button>` : '<span class="muted">欄位已滿</span>'}
         ${on || locked || a.path ? '' : `<button class="mini ${armed === 'sell:' + id ? 'danger' : ''}" onclick="sellArt('${id}')">${armed === 'sell:' + id ? '確定賣出？' : `賣 ${fmt(sellArtPrice(id))}`}</button>`}</div></div>`;
   };
-  const owned = Object.keys(s.arts);
-  return renderBatch('art') + ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
-    + '<p class="muted small">武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。' + (isXian() ? '仙階下品法寶要人仙、中品要地仙、上品要真仙才驅使得動；凡界帶上來的照樣能用。' : '玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。') + '祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，會直接戴上，只有那條路線能裝備，也不能賣。飾品欄滿了可以直接「替換」品階最低的那件。鎖定的不會被批量賣出。</p>';
+  const owned = Object.keys(s.arts), ben = owned.filter(id => ARTS[id].path);
+  return `<h3 class="gben">本命法寶</h3>${ben.map(card).join('') || '<p class="muted small">走上修行路線、修到化神時，會悟出屬於這條路的本命法寶，放在這一格，不佔飾品欄，而且會隨大境界變強。</p>'}`
+    + renderBatch('art') + ART_SLOTS.map(slot => `<h3>${slot}${slot === '飾品' ? `（${accKeys().filter(k => s.gear[k]).length}/${accKeys().length}）` : ''}</h3>${owned.filter(id => ARTS[id].slot === slot && !ARTS[id].path).sort((a, b) => isOn(b) - isOn(a)).map(card).join('') || '<p class="muted small">還沒有。坊市、遊歷都可能得到。</p>'}`).join('')
+    + '<p class="muted small">本命法寶另有一格；武器、護甲各一格，飾品一開始一格，悟道樹「萬寶隨身」最多加到三格。' + (isXian() ? '仙階下品法寶要人仙、中品要地仙、上品要真仙才驅使得動；凡界帶上來的照樣能用。' : '玄階法寶要築基、地階要金丹、天階要元嬰才驅使得動。') + '祭煉每重讓效果 +15%，最多 9 重；第五重起每重還要一份同階礦材。也可以到百藝自己煉法寶。化神時還會依主修路線悟出一件本命法寶，會直接戴上，只有那條路線能裝備，也不能賣。飾品欄滿了可以直接「替換」品階最低的那件。鎖定的不會被批量賣出。</p>';
 }
 // 行囊小分頁：丹藥、寶物（天材地寶、五行之精）、材料
 let bagTab = 'dan';
