@@ -2018,7 +2018,7 @@ function render() {
       <div class="row"><span>修為</span><span id="xtxt"></span></div>
       ${bar('xiu', 0, 'xbar')}
       <div class="vit small"><div><div class="row"><span>氣血</span><span id="hptxt"></span></div>${bar('hp thin', 1, 'hpbar')}</div>
-        <div><div class="row"><span id="mplbl">法力</span><span id="mptxt"></span></div>${bar('mp thin', 1, 'mpbar')}</div></div>
+        <div><div class="row"><span id="mplbl">法力</span><span id="mptxt"></span></div>${bar('mp thin', 1, 'mpbar')}<div id="mp2"></div></div></div>
       <div class="row small"><span id="res"></span><span id="inj"></span></div>
       <div class="small same" id="buffs"></div>
       <div class="btns">
@@ -2067,7 +2067,10 @@ function updateDyn() {
   $('hptxt').textContent = `${fmt(Math.round(st.hp * hp))} / ${fmt(st.hp)}`; $('hpbar').firstChild.style.width = hp * 100 + '%';
   { const ps = myPaths(s), fr = k => k === 'fa' ? mp : k === 'hun' ? s.snNow ?? 1 : .2, m0 = ps[0];
     $('mplbl').textContent = cur(RES_NAME[m0]) + (m0 === 'ti' ? '（開戰兩成）' : '');
-    $('mptxt').textContent = ps.map((k, i) => `${i ? cur(RES_NAME[k]) + ' ' : ''}${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}`).join(' · ');   // 不可拆空格：窄螢幕只在「·」換行
+    $('mptxt').textContent = `${fmt(Math.round(resMax(m0, s, st) * fr(m0)))} / ${fmt(resMax(m0, s, st))}`;
+    // 兼修：其他路線的資源在同一格，各自一行
+    const h2 = ps.slice(1).map(k => `<div class="row"><span>${cur(RES_NAME[k])}${k === 'ti' ? '（開戰兩成）' : ''}</span><span>${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}</span></div>${bar('mp thin', fr(k))}`).join('');
+    const e2 = $('mp2'); if (e2._h !== h2) { e2.innerHTML = h2; e2._h = h2; }
     $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
