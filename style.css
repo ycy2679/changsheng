@@ -157,7 +157,8 @@ nav button { white-space: nowrap; }
 /* 本命法寶：赤紅色，不標品階 */
 .gben { color: var(--ben); font-weight: bold; }
 /* 兼修：資源那格對半分 */
-.res2:not(:empty) { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.res2:not(:empty) { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+.vit.solo { grid-template-columns: 1fr; }   /* 兼修：氣血自己一行，資源在下一行平分 */
 .res2 .row { flex-wrap: nowrap; gap: 4px; white-space: nowrap; }
 /* 大道至簡：仙術頁的「仙術」標題金色（招式標籤用 .gben 赤紅） */
 .gyi { color: var(--main); }
