@@ -687,7 +687,8 @@ function rate(s = L(), mode = s.mode) {
   return (1 + .2 * s.stage) * rootRate(s) * (mainAff(s) ? 1.15 : 1)
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
-    * xianRateMul(s) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? .5 : CLOSED_XIU) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
+    * xianRateMul(s) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? 1 : CLOSED_XIU) * (1 + qualBonus(s))   // 遊歷是閉關的一半
+    * pathRate(s) * (1 + .08 * arrEff('juling', s));
 }
 // 靈根後期路線的修煉倍率
 function pathRate(s = L()) {
@@ -1236,7 +1237,7 @@ function tick(dt) {
   // 目前氣血、法力（比例），下一場戰鬥從這裡開始；戰鬥外約 40 秒回滿，閉關快一倍
   s.hpNow = Math.min(1, (s.hpNow ?? 1) + dt / 40 * heal); s.mpNow = Math.min(1, (s.mpNow ?? 1) + dt / 40 * heal); s.snNow = Math.min(1, (s.snNow ?? 1) + dt / 60 * heal);   // 神識回得慢
   if (s.xiu < stg().need) s.xiu = Math.min(stg().need, s.xiu + rate() * dt);
-  else if (isXian(s) && jieNext(s)) addPress(dt * (s.mode === 'travel' ? .5 : 1));   // 停在大圓滿等渡仙劫：繼續修煉化為劫前淬鍊
+  else if (isXian(s) && jieNext(s)) addPress(dt);   // 停在大圓滿等渡仙劫：時間化為劫前淬鍊（閉關、遊歷一樣快）
   else if (s.mode === 'closed') addFound(rate() * dt);
   growTechs(dt * (s.mode === 'travel' ? .5 : 1));
   const evGap = () => (90 + Math.random() * 90) / (1 + eff('evRate'));
@@ -1527,7 +1528,7 @@ function usePill(id) {
     const xp = it.major >= XIAN_MJ;   // 仙丹：每顆只補一成，丹毒也重
     let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) : .25) * (1 + .2 * tl('danxin')) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨、丹心通明   // 仙丹入骨
     if (diff < 0) { amt = .5 * tf; injure(150); }
-    const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 35 : 20);
+    const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 17.5 : 10);   // 修為丹丹毒（原本 35／20，減半讓遊歷賺的錢能換成修為）
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
   } else if (it.kind === 'xlife') { if (danBlock(id, s)) return; const n = Math.round(300 * pe * tf); s.lifeBonus += n; s.xlifeN = (s.xlifeN || 0) + 1; addTox(30); msg = `服下延壽仙丹，壽元 +${n}。`; }
   else if (it.kind === 'life') { const n = Math.round(15 * pe * tf); s.lifeBonus += n; addTox(30); msg = `服下延壽丹，壽元 +${n}。`; }
@@ -1743,7 +1744,7 @@ function jieChance(s = L()) {
   const p = (JIE_BASE[stg(s).major] || 0) + (s.press || 0) + .15 * (s.flags.jiedan || 0) + .025 * tl('pojing') - .05 * wuShuai(s);   // 破境如竹在仙界減半；海量可以吃兩顆渡劫仙丹
   return Math.max(.01, Math.min(.9, p * (s.injury > 0 ? .5 : 1)));   // 上限 90%：準備再足也有一成風險
 }
-// 停在大圓滿時繼續修煉：修為化為劫前淬鍊，閉關約一個半小時到上限（遊歷減半）
+// 停在大圓滿時繼續修煉：修為化為劫前淬鍊，閉關、遊歷都約一個半小時到上限
 const PRESS_SEC = 5400;
 const pressCap = () => PRESS_CAP + .05 * tl('dujie');   // 渡劫經驗每級 +5%（滿級 45%）
 function addPress(sec) { const s = L(), cap = pressCap(); s.press = Math.min(cap, (s.press || 0) + sec * cap / PRESS_SEC); }
@@ -1902,7 +1903,7 @@ function applyOffline(sec) {
     const r = rate(s), t = (stg().need - s.xiu) / r;   // 照離開時的模式算：遊歷跟線上一樣修為減半、不吃洞府
     if (t > left) { s.xiu += r * left; gained += r * left; break; }
     left -= t; gained += stg().need - s.xiu; s.xiu = stg().need;
-    if (s.stage >= STAGES.length - 1 || jieNext()) { if (isXian(s) && jieNext()) addPress(left * (s.mode === 'travel' ? .5 : 1)); break; }   // 渡劫一定等你回來
+    if (s.stage >= STAGES.length - 1 || jieNext()) { if (isXian(s) && jieNext()) addPress(left); break; }   // 渡劫一定等你回來
     // 不能自動突破就停在這裡，剩下的時間化為根基
     if (isMajorNext() ? !(autoOn('a_major') && realChance(s, 'safe') >= S.meta.autoMajor) : !autoOn('a_minor')) { addFound(left * r); break; }
     const res = tryBreak(true);
@@ -2094,7 +2095,7 @@ function renderOffline() {
   const o = L().offline;
   return `<section class="panel card"><b>閉關歸來</b>
     <p>你離開了 ${dur(o.sec)}${o.off < o.sec ? `（洞府只撐得住 ${dur(o.off)}）` : ''}。這段時間修為 +${fmt(o.xiu)}${o.up ? `，突破到了${o.up}` : ''}${o.stones ? `，遊歷所得靈石 ${fmt(o.stones)}` : ''}。</p>
-    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${o.travel ? '（你離開時在遊歷，修為只有閉關的四分之一、不吃洞府加成，但有靈石和材料）' : ''}${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園、礦脈也照常運轉。</p>
+    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${o.travel ? '（你離開時在遊歷，修為只有閉關的一半、不吃洞府加成，但有靈石和材料）' : ''}${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園、礦脈也照常運轉。</p>
     <div class="choices"><button onclick="closeOffline()">知道了</button></div></section>`;
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
@@ -2644,7 +2645,7 @@ function renderCraft() {
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
-  { id: 'rudao', title: '踏上仙途', when: s => true, text: '上面的修為條滿了就能突破。「閉關」修煉最快；「遊歷」修煉只有閉關的四分之一，但會遇到妖獸、撿到靈石和寶物，也比較常碰到奇遇。' },
+  { id: 'rudao', title: '踏上仙途', when: s => true, text: '上面的修為條滿了就能突破。「閉關」修煉最快；「遊歷」修煉只有閉關的一半，但會遇到妖獸、撿到靈石和寶物，也比較常碰到奇遇。' },
   { id: 'tupo', title: '突破', when: s => s.xiu >= stg(s).need && !isMajorNext(s), text: '修為滿了，按右邊的「突破」。小境界幾乎都會成功；每過一個大境界（築基、金丹⋯⋯）壽元會大幅增加。' },
   { id: 'fight', title: '戰鬥', when: s => !!s.flags.fought, text: '戰鬥是自動打的：會照「術法」分頁的出招順序放招，資源不夠就普通攻擊。氣血、法力打完不會馬上回滿，連戰會越打越虛。' },
   { id: 'injury', title: '負傷', when: s => s.injury > 0, text: '負傷時修煉減半，遊歷時也會避開妖獸。可以服療傷丹，或乾脆閉關，閉關養傷快一倍。' },
