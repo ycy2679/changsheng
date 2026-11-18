@@ -626,11 +626,20 @@ const pathKey = (s = L()) => [...myPaths(s)].sort().join(',');
 const xpOn = (s = L()) => !!(TECHS[s.tech] && TECHS[s.tech].xpath);
 const xpMul = (s = L()) => 1 + .25 * Math.max(0, stg(s).major - XIAN_MJ);   // 人仙 ×1、地仙 ×1.25、真仙 ×1.5、玄仙 ×1.75
 // 流派功法的境界：收齊自己體系（法修吐納、體修鍛體、魂修觀想）的仙階功法——下品收齊小成、中品大成、上品圓滿；學到就自動化入
-const XP_STAGE = ['入門', '小成', '大成', '圓滿'], XP_STAGE_MUL = [2, 2.5, 3, 4];   // 流派功法的數值是「圓滿 ×2」換算的，入門照原本、圓滿再翻倍
+const XP_STAGE = ['入門', '小成', '大成', '圓滿'];
 const xpTypes = (s = L()) => myPaths(s).map(p => PATH_MAIN[p]);
 const xpPool = (g, s = L()) => Object.keys(TECHS).filter(id => TECHS[id].grade === g && xpTypes(s).includes(TECHS[id].type) && !TECHS[id].custom && !TECHS[id].xpath && !TECHS[id].boss && !TECHS[id].xs && !TECHS[id].sect && !TECHS[id].path && !TECHS[id].char);
 const xpCount = (g, s = L()) => { const pool = xpPool(g, s), got = s.xpGot || {}; return [pool.filter(id => got[id]).length, pool.length]; };
-const xpStage = (s = L()) => { let st = 0; for (const g of [6, 7, 8]) { const [a, b] = xpCount(g, s); if (b && a >= b) st++; else break; } return st; };
+const xpStage0 = (s = L()) => { let st = 0; for (const g of [6, 7, 8]) { const [a, b] = xpCount(g, s); if (b && a >= b) st++; else break; } return st; };
+// 境界倍率：入門 ×2（基礎數值的圓滿）；小成＝體系仙階下品功法圓滿的 1.5 倍，大成＝中品的 1.5 倍，圓滿＝上品的 1.5 倍
+// （基礎修煉是 3，所以倍率剛好是那個品階體系功法的平均修煉值：平均 × 圓滿 2 × 1.5 ÷ 3）
+let xpMemo = { k: '' };
+function xpInfo(s = L()) {
+  const k = pathKey(s) + '|' + Object.keys(s.xpGot || {}).length;
+  if (xpMemo.k !== k) { const st = xpStage0(s), g = [0, 6, 7, 8][st], pool = g ? xpPool(g, s) : []; xpMemo = { k, st, mul: g ? pool.reduce((a, id) => a + (TECHS[id].rate || 0), 0) / pool.length : 2 }; }
+  return xpMemo;
+}
+const xpStage = (s = L()) => xpInfo(s).st;
 // 學到一部自己體系的仙階功法：化入流派功法（成仙前的主修留著給「前世功法」）
 function xpAbsorb(id, s = L()) {
   const t = TECHS[id]; if (!xpOn(s) || !t || t.grade < 6 || !xpTypes(s).includes(t.type) || t.custom || t.xpath) return false;
@@ -676,7 +685,7 @@ function setDual(id) {
 function techNeed(id, l) { return l * l * 60 * TECHS[id].grade; }
 function techLayer(id, s = L()) { return Math.min(9, Math.floor(Math.sqrt((s.techs[id] || 0) / (60 * TECHS[id].grade)))); }
 function techMul(id, s = L()) { const l = techLayer(id, s); return 1 + .1 * l + (l >= 9 ? .1 : 0); }
-function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return NO_SCALE.includes(key) ? v : TECHS[id].xpath ? v * XP_STAGE_MUL[xpStage(s)] * xpMul(s) : v * techMul(id, s); }   // 仙界流派功法隨大境界變強
+function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return NO_SCALE.includes(key) ? v : TECHS[id].xpath ? v * xpInfo(s).mul * xpMul(s) : v * techMul(id, s); }   // 仙界流派功法隨大境界變強
 // 法寶祭煉倍率
 // 本命法寶隨大境界變強：化神 ×1，之後每個大境界 +25%（渡劫 ×2、人仙 ×2.25、玄仙 ×3）
 const benMul = (s = L()) => 1 + .25 * Math.max(0, stg(s).major - 4);
@@ -2271,7 +2280,7 @@ function renderGong() {
     .sort((a, b) => techSort === 'layer' ? techLayer(b) - techLayer(a) || TECHS[b].grade - TECHS[a].grade : TECHS[b].grade - TECHS[a].grade || techLayer(b) - techLayer(a));
   return `<h3>主修</h3>${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換，轉世後恢復。</p>' : ''}${techCard(s.tech)}
     ${pathSlots(s).map(ty => { const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉、精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度、精進都是五折。</p>`); }).join('')}
-    ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（入門 ×1、小成 ×1.25、大成 ×1.5、圓滿 ×2）；效果也隨大境界變強（目前 ×${xpMul(s).toFixed(2).replace(/\.?0+$/, '')}）。</p>` : ''}
+    ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（小成的效果是體系仙階下品功法圓滿的 1.5 倍，大成是中品的 1.5 倍，圓滿是上品的 1.5 倍）；效果也隨大境界變強（目前 ×${xpMul(s).toFixed(2).replace(/\.?0+$/, '')}）。</p>` : ''}
     ${tl('liangyi') && !xpOn(s) ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
 ` : ''}
