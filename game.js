@@ -618,7 +618,7 @@ function setPathMain(id) {
   s.ptech[ty] = id; s.subs = s.subs.filter(x => x !== id); save(); render();
 }
 // ---------- 自創功法（v2.2.4 起拿掉融合功能；以前融出來的只留到那一世結束，存在 s.custom，讀檔時再登記回 TECHS） ----------
-const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom', 'xpath'];
+const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom', 'xpath', 'fixed'];
 // ---------- 仙界流派功法：成仙時主修依修行路線改成固定名字，繼承原本主修（含兼修主修五折、副主修）的效果，隨大境界變強；仙界主修不能再換 ----------
 const XPATH_TECH = { fa: ['天衍法章', '太衍經'], ti: ['九極鑄身篇', '太初經'], hun: ['太虛守神錄', '太虛經'], 'fa,ti': ['萬法鑄體訣', '混元典'], 'fa,hun': ['陰陽觀想法', '衍天經'], 'hun,ti': ['形神同鑄錄', '神魔經'], 'fa,hun,ti': ['三元歸真錄', '鴻蒙經'] };   // [地仙界, 天仙界進化（之後才用）]
 const XPATH_LABEL = { fa: '法修', ti: '體修', hun: '魂修', 'fa,ti': '法體雙修', 'fa,hun': '法魂雙修', 'hun,ti': '體魂雙修', 'fa,hun,ti': '三修' };
@@ -640,12 +640,22 @@ function xpAbsorb(id, s = L()) {
   log(`《${t.name}》化入了《${TECHS[s.tech].name}》（${GRADES[t.grade]} ${a}/${b}）${st > st0 ? `，《${TECHS[s.tech].name}》修至${XP_STAGE[st]}！` : '。'}`);
   return true;
 }
+// 每種流派一組固定數值（不繼承凡界主修）：修煉都一樣，其他效果雙修加總打七五折、三修打六折；實際效果再 ×收集境界（入門 ×2 起）×大境界
+const XPATH_BASE = { fa: { mp: .5, skillUp: .3, crit: .1 }, ti: { hp: 1, def: .6, normalAtk: .6 }, hun: { shenUp: .6, crit: .15, techXp: .2 } };
+function xpBase(key) {
+  const ps = key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .75 : .6, d = { rate: 3 };
+  for (const p of ps) for (const k in XPATH_BASE[p]) d[k] = +((d[k] || 0) + XPATH_BASE[p][k] * f).toFixed(3);
+  return d;
+}
 function xpathForm(s = L()) {
-  if (!isXian(s) || !TECHS[s.tech] || xpOn(s)) return;
-  const key = pathKey(s), main = TECHS[s.tech], parts = [[s.tech, 1], ...pathMains(s).map(id => [id, .5]), ...(dualOn(s) ? [[s.tech2, dualFactor(s.tech2, s.tech)]] : [])];
-  const d = { name: XPATH_TECH[key][0], grade: 6, type: main.type, elem: main.elem, xpath: key };
-  // 照原本實際生效的量折算：流派功法是圓滿（×2），所以會被放大的效果先除以 2
-  for (const [id, f] of parts) for (const k in TECHS[id]) if (!FUSE_SKIP.includes(k) && typeof TECHS[id][k] === 'number') d[k] = +((d[k] || 0) + TECHS[id][k] * f * (NO_SCALE.includes(k) ? 1 : techMul(id, s) / 2)).toFixed(3);
+  if (!isXian(s) || !TECHS[s.tech]) return;
+  if (xpOn(s)) {   // 舊版是繼承凡界主修的數值：改成固定數值
+    const d = TECHS[s.tech]; if (d.fixed) return;
+    for (const k of Object.keys(d)) if (!FUSE_SKIP.includes(k)) delete d[k];
+    Object.assign(d, xpBase(d.xpath), { fixed: 1 }); s.custom[s.tech] = d; return;
+  }
+  const key = pathKey(s), main = TECHS[s.tech], parts = [[s.tech], ...pathMains(s).map(id => [id]), ...(dualOn(s) ? [[s.tech2]] : [])];
+  const d = { name: XPATH_TECH[key][0], grade: 6, type: main.type, elem: main.elem, xpath: key, fixed: 1, ...xpBase(key) };
   const id = 'xpt' + Date.now().toString(36);
   TECHS[id] = d; (s.custom = s.custom || {})[id] = d; s.techs[id] = techNeed(id, 9);
   s.xpFrom = s.tech; s.tech = id; s.tech2 = null; s.ptech = {};
