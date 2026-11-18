@@ -1348,7 +1348,9 @@ function popEvent(storyOnly) {
   for (const e of STORY) if (e.cond(s)) c.push({ ref: { story: e.id }, w: 8 });
   if (!storyOnly && recruitCands(s).length) c.push({ ref: { recruit: recruitPick(s) }, w: 2 });   // 宗門招收   // 主線，閉關時也會夢到
   if (!c.length) return;
-  s.ev = pickW(c, o => o.w).ref;
+  // 渡劫大圓滿、還沒飛升：有主線（守碑人、碑與名）可走就一定先出主線，免得卡在飛升條件
+  const mains = !xian && s.stage === MORTAL_TOP && s.xiu >= stg(s).need ? c.filter(o => isMainEv(o.ref)) : [];
+  s.ev = pickW(mains.length ? mains : c, o => o.w).ref;
   dirty = true;
 }
 function curEvent() {
