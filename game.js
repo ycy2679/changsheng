@@ -2018,7 +2018,7 @@ function render() {
       <div class="row"><span>修為</span><span id="xtxt"></span></div>
       ${bar('xiu', 0, 'xbar')}
       <div class="vit small"><div><div class="row"><span>氣血</span><span id="hptxt"></span></div>${bar('hp thin', 1, 'hpbar')}</div>
-        <div><div class="row"><span id="mplbl">法力</span><span id="mptxt"></span></div>${bar('mp thin', 1, 'mpbar')}<div id="mp2"></div></div></div>
+        <div><div id="mpone"><div class="row"><span id="mplbl">法力</span><span id="mptxt"></span></div>${bar('mp thin', 1, 'mpbar')}</div><div id="mp2" class="res2"></div></div></div>
       <div class="row small"><span id="res"></span><span id="inj"></span></div>
       <div class="small same" id="buffs"></div>
       <div class="btns">
@@ -2068,9 +2068,9 @@ function updateDyn() {
   { const ps = myPaths(s), fr = k => k === 'fa' ? mp : k === 'hun' ? s.snNow ?? 1 : .2, m0 = ps[0];
     $('mplbl').textContent = cur(RES_NAME[m0]) + (m0 === 'ti' ? '（開戰兩成）' : '');
     $('mptxt').textContent = `${fmt(Math.round(resMax(m0, s, st) * fr(m0)))} / ${fmt(resMax(m0, s, st))}`;
-    // 兼修：其他路線的資源在同一格，各自一行
-    const h2 = ps.slice(1).map(k => `<div class="row"><span>${cur(RES_NAME[k])}${k === 'ti' ? '（開戰兩成）' : ''}</span><span>${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}</span></div>${bar('mp thin', fr(k))}`).join('');
-    const e2 = $('mp2'); if (e2._h !== h2) { e2.innerHTML = h2; e2._h = h2; }
+    // 兼修：同一格對半分，每條路線一半，只顯示百分比
+    const h2 = ps.length > 1 ? ps.map(k => `<div><div class="row"><span>${cur(RES_NAME[k])}</span><span>${Math.round(fr(k) * 100)}%</span></div>${bar('mp thin', fr(k))}</div>`).join('') : '';
+    const e2 = $('mp2'); if (e2._h !== h2) { e2.innerHTML = h2; e2._h = h2; $('mpone').style.display = h2 ? 'none' : ''; }
     $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);

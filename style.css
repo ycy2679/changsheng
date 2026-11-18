@@ -164,3 +164,6 @@ nav button { white-space: nowrap; }
 
 /* 本命法寶：赤紅色，不標品階 */
 .gben { color: var(--ben); font-weight: bold; }
+/* 兼修：資源那格對半分 */
+.res2:not(:empty) { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.res2 .row { flex-wrap: nowrap; gap: 4px; white-space: nowrap; }
