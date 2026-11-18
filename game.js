@@ -105,7 +105,7 @@ function load() {
   if (s.root) pathSkillCheck(s);
   if (s.phys && PHYS_SHEN[s.phys] && !s.flags.physShen) { s.flags.physShen = 1; gainShen(PHYS_SHEN[s.phys], `${PHYSIQUES[s.phys].name}血脈甦醒`, s); }
   if (s.root && s.stage >= 18 && !s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
-  if (!s.dead && !s.mortal && !s.draw) xpathForm(s);   // 已經在仙界的存檔：主修改成流派功法
+  if (!s.dead && !s.mortal && !s.draw) { xpathForm(s); xshenForm(s); }   // 已經在仙界的存檔：主修改成流派功法、神通融成一門
   pathArtCheck(s);
 }
 
@@ -991,7 +991,7 @@ function fight(foe) {
   const RB = { fa: .08, ti: 0, hun: .04 }, mainR = R[myPaths(s)[0]];
   const pool = k => R[skillRes(k, s)], addR = (k, f) => { const x = R[k]; if (x) x.v = Math.min(x.m, x.v + x.m * f); };
   // 神通：領域類整場生效，其他記下來等時機
-  const shens = (s.shenEquip || []).map(id => SHENS[id]), shUsed = [], clones = [];
+  const shens = shenList(s), shUsed = [], clones = [], letUsed = new Map();
   const twice = !!s.flags.xingshen; if (twice) s.flags.xingshen = 0;   // 醒神丹
   let faAtk = 1, faDef = 1, faT = 0, reflAll = 0, mpRegen = eff('mpRegen', s), skillUp = 0, fled = false;
   const sm = 1 + eff('shenUp', s), na = 1 + eff('normalAtk', s);   // 魂修神通、體修普攻
@@ -1023,7 +1023,7 @@ function fight(foe) {
       if (x.stun) skip = Math.max(skip, x.stun);
       if (x.fa) { faAtk = x.fa[0]; faDef = x.fa[1]; faT = x.fa[2]; }
       if (x.shield) shield += p.hp * x.shield * sm;
-      if (x.clone) clones.push({ v: x.clone[0] * sm, t: x.clone[1], n: x.clone[2] });
+      for (const c of x.clones || (x.clone ? [x.clone] : [])) clones.push({ v: c[0] * sm, t: c[1], n: c[2] });
     }
     // 冷卻好的術法；回法要法力不到一半才放，增益還在就不重複放
     const ready = [...ultList(s), ...s.equip].filter(k => !(cd[k] > 0) && !(SKILLS[k].kind === 'mana' && pool(k).v > pool(k).m * .5) && !(SKILLS[k].kind === 'buff' && (buffT > 0 || (SKILLS[k].fa && faT > 0))));
@@ -1067,15 +1067,15 @@ function fight(foe) {
     }
     // 保命神通：受到致命傷時發動（不滅回血、遁法直接走人）
     if (php <= 0) {
-      const x = shens.find(x => x.trig === 'lethal' && shUsed.filter(n => n === x.name).length < (twice ? 2 : 1));
-      if (x) { shUsed.push(x.name); if (x.flee) { fled = true; php = p.hp * .05; break; } php = p.hp * x.revive; }
+      const x = shens.find(x => x.trig === 'lethal' && (letUsed.get(x) || 0) < (twice ? 2 : 1));
+      if (x) { letUsed.set(x, (letUsed.get(x) || 0) + 1); shUsed.push(x.name); if (x.flee) { fled = true; php = p.hp * .05; break; } php = p.hp * x.revive; }
     }
     dodgeT--; reflT--; buffT--; faT--;
     php = Math.min(p.hp, php + p.hp * p.regen);
     if (fq) addR('fa', RB.fa + mpRegen); else for (const k in R) addR(k, RB[k] + mpRegen);
   }
   if (R.hun) s.snNow = R.hun.v / R.hun.m;
-  return { win: ehp <= 0, fled, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), shen: shUsed.join('、'), pill, hp: Math.max(0, php) / p.hp, mp: R.fa ? R.fa.v / R.fa.m : s.mpNow ?? 1 };
+  return { win: ehp <= 0, fled, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), shen: [...new Set(shUsed)].join('、'), pill, hp: Math.max(0, php) / p.hp, mp: R.fa ? R.fa.v / R.fa.m : s.mpNow ?? 1 };
 }
 // ---------- 秘境：每個大境界一座，三層（兩層精英、一層頭目），連戰不回血；有冷卻，戰敗重傷退出 ----------
 const SECRETS = [
@@ -1475,7 +1475,69 @@ const maxShen = () => 3 + tl('shenwei');
 const PHYS_SHEN_IDS = Object.values(PHYS_SHEN);
 const randShen = (s = L()) => { const ids = Object.keys(SHENS).filter(id => !SHENS[id].tech && !PHYS_SHEN_IDS.includes(id) && !hasShen(id, s)); return ids.length ? pick(ids) : null; };
 // 身上神通某個欄位的總和（機緣類：loot、dropUp、winXiu）
-const shenSum = (key, s = L()) => (s.shenEquip || []).reduce((a, id) => a + (SHENS[id][key] || 0), 0);
+const shenSum = (key, s = L()) => shenList(s).reduce((a, x) => a + (x[key] || 0), 0);
+// ---------- 仙界流派神通：成仙時把裝著的神通融成一門，強度隨根本仙法的收集階段成長 ----------
+const XSHEN_NAME = { fa: '玄元御道', ti: '龍象真身', hun: '太虛神遊', 'fa,ti': '道紋仙軀', 'fa,hun': '觀想演天', 'hun,ti': '神軀同鑄', 'fa,hun,ti': '混元一炁' };
+const XSHEN_GROW = [1, 1.2, 1.4, 1.6];   // 入門／小成／大成／圓滿
+function xshenForm(s = L()) {
+  if (!isXian(s) || s.xshen) return;
+  const src = (s.shenEquip && s.shenEquip.length ? s.shenEquip : (s.shen || []).slice(0, maxShen(s))).filter(id => SHENS[id]);
+  s.xshen = { key: pathKey(s), src: src.slice() }; s.shenEquip = [];
+  log(`成仙之後，${src.length ? src.map(id => `「${SHENS[id].name}」`).join('') + '融成了一門' : '神魂凝成了一門'}${XPATH_LABEL[s.xshen.key]}神通「${XSHEN_NAME[s.xshen.key]}」，往後隨根本仙法一同精進。`);
+}
+// 融合後的三段（開場／整場／危急），每次戰鬥現算
+function xshenParts(s = L()) {
+  const X = s.xshen, name = XSHEN_NAME[X.key], ps = X.key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .75 : .6;
+  const g = XSHEN_GROW[xpStage(s)], gp = 1 + (g - 1) / 2, pe = pathElem(s), src = X.src.map(id => SHENS[id]);
+  const o = { name, trig: 'open', nuke: 0, burn: 0, shield: 0, brk: 0, stun: 0, clones: [] }, fd = { name, trig: 'field' }, le = { name, trig: 'lethal' };
+  let fa = null; const add = (k, v) => { fd[k] = (fd[k] || 0) + v; };
+  for (const x of src) {
+    if (x.trig === 'open') {
+      o.nuke += (x.nuke || 0) * (pe && (x.elem === pe || (pe === '無' && x.elem === 'void')) ? 1.5 : 1); if (x.nuke && x.pierce) o.pierce = 1;
+      o.burn += x.burn || 0; o.shield += x.shield || 0; o.brk = Math.max(o.brk, x.brk || 0); o.stun = Math.max(o.stun, x.stun || 0);
+      if (x.fa) fa = fa ? [Math.max(fa[0], x.fa[0]), Math.max(fa[1], x.fa[1]), Math.max(fa[2], x.fa[2])] : x.fa.slice();
+      if (x.clone) o.clones.push(x.clone.slice());
+    } else if (x.trig === 'field') {
+      for (const k of ['regen', 'dodge', 'steal', 'reflect', 'crit', 'mpRegen', 'skillUp', 'loot', 'dropUp', 'winXiu']) if (x[k]) add(k, x[k]);
+      if (x.foeAtk) fd.foeAtk = (fd.foeAtk ?? 1) * x.foeAtk;
+      if (x.foeDef !== undefined) fd.foeDef = (fd.foeDef ?? 1) * x.foeDef;
+      if (x.mpFull) fd.mpFull = 1;
+    } else { if (x.revive) le.revive = (le.revive || 0) + x.revive; if (x.flee) le.flee = 1; }
+  }
+  // 流派固定效果：法修開場回滿法力、術法威力 +20%；體修開場護盾三成氣血；魂修開場神通威力 ×1.3（雙修七五折、三修六折）
+  if (ps.includes('fa')) { fd.mpFull = 1; add('skillUp', .2 * f); }
+  if (ps.includes('ti')) o.shield += .3 * f;
+  const hb = ps.includes('hun') ? 1 + .3 * f : 1;
+  o.nuke *= g * hb; o.burn *= g * hb; o.shield *= g * hb; o.brk = Math.min(.9, o.brk * g);
+  o.clones = o.clones.map(c => [c[0] * g * hb, c[1], c[2]]);
+  if (fa) o.fa = [1 + (fa[0] - 1) * g, 1 + (fa[1] - 1) * g, fa[2]];
+  for (const k of ['regen', 'steal', 'reflect', 'mpRegen', 'skillUp', 'loot', 'dropUp', 'winXiu']) if (fd[k]) fd[k] *= g;
+  if (fd.dodge) fd.dodge = Math.min(.6, fd.dodge * gp);
+  if (fd.crit) fd.crit *= gp;
+  if (fd.steal) fd.steal = Math.min(.5, fd.steal);
+  if (fd.foeAtk !== undefined) fd.foeAtk = Math.max(.3, 1 - (1 - fd.foeAtk) * g);
+  if (fd.foeDef !== undefined) fd.foeDef = Math.max(0, 1 - (1 - fd.foeDef) * g);
+  if (le.revive) { le.revive = Math.min(1, le.revive * g); delete le.flee; }
+  return [o, fd, ...(le.revive || le.flee ? [le] : [])];
+}
+const pctT = v => Math.round(v * 100) + '%', xT = v => '×' + +v.toFixed(2);
+function xshenDesc(s = L()) {
+  const [o, fd, le] = xshenParts(s), a = [], b = [];
+  if (o.nuke) a.push(`一擊 ${xT(o.nuke)}${o.pierce ? '（無視防禦）' : ''}`);
+  if (o.burn) a.push(`灼燒 4 回合（每回合攻擊力 ${xT(o.burn)}）`);
+  if (o.stun) a.push(`敵人停手 ${o.stun} 回合`);
+  if (o.brk) a.push(`破防 ${pctT(o.brk)}`);
+  if (o.fa) a.push(`法相 ${o.fa[2]} 回合（攻擊 ${xT(o.fa[0])}、防禦 ${xT(o.fa[1])}）`);
+  if (o.shield) a.push(`護盾 ${pctT(o.shield)} 氣血`);
+  for (const c of o.clones) a.push(`${c[1]} 回合內每回合追加 ${c[2]} 次攻擊（${pctT(c[0])} 威力）`);
+  if (fd.mpFull) b.push('開場法力回滿');
+  if (fd.foeAtk !== undefined) b.push(`敵人攻擊 ${xT(fd.foeAtk)}`);
+  if (fd.foeDef !== undefined) b.push(`敵人防禦 ${xT(fd.foeDef)}`);
+  const L2 = { regen: '每回合回血', dodge: '閃避', steal: '吸血', reflect: '反彈傷害', crit: '暴擊', mpRegen: '每回合多回法力', skillUp: '術法威力', loot: '打贏後靈石', dropUp: '掉落機率', winXiu: '打贏後修為（當前境界）' };
+  for (const k in L2) if (fd[k]) b.push(`${L2[k]} +${pctT(fd[k])}`);
+  return [a.length ? '開場：' + a.join('、') : '', b.length ? '整場：' + b.join('、') : '', le ? '危急：' + (le.revive ? `受到致命傷時不死，回血 ${pctT(le.revive)}` : '快輸時直接遁走') : ''].filter(Boolean);
+}
+const shenList = (s = L()) => s.xshen ? xshenParts(s) : (s.shenEquip || []).map(id => SHENS[id]);
 const benmingShen = (s = L()) => s.root.type === 'void' ? 'guixu' : Object.keys(SHENS).find(id => SHENS[id].elem === s.root.elems[0]);
 // 指定的那門已經有了，就改給一門隨機的
 function gainShen(id, why, s = L()) {
@@ -1483,9 +1545,9 @@ function gainShen(id, why, s = L()) {
   if (!id) return;
   (s.shen = s.shen || []).push(id); codexAdd('s', id);
   s.shenEquip = s.shenEquip || [];
-  const fit = s.shenEquip.length < maxShen(s);
+  const fit = !s.xshen && s.shenEquip.length < maxShen(s);
   if (fit) s.shenEquip.push(id);
-  log(`${why}，覺醒神通「${SHENS[id].name}」：${SHENS[id].desc}。${fit ? '' : '神通欄位已滿，先收進輪迴錄，之後再裝備。'}`);
+  log(`${why}，覺醒神通「${SHENS[id].name}」：${SHENS[id].desc}。${fit ? '' : '' + (s.xshen ? '仙界神通已融成一門，先收進輪迴錄。' : '神通欄位已滿，先收進輪迴錄，之後再裝備。')}`);
 }
 // 裝備／卸下神通（只有裝備的才會在戰鬥裡生效）
 function toggleShen(id) {
@@ -1796,7 +1858,7 @@ function ascend(s) {
   if (s.ev && !s.ev.who) s.ev = null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
-  s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false); xpathForm(s);
+  s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false); xpathForm(s); xshenForm(s);
   if (!s.flags.xn7) s.ev = { story: 'n7' };   // 一進仙界，主線「仙籍」馬上跳出來
   log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；材料都收在須彌戒裡。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了`)}${yiNum(s)}招${yiNames(s)}。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
@@ -1925,6 +1987,7 @@ function xianEnter(s) {
   xpathForm(s); pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
   if (!s.flags.xn7) s.ev = { story: 'n7' };   // 一進仙界，主線「仙籍」馬上跳出來
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
+  xshenForm(s);
   log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}${yiNum(s)}招${yiNames(s)}${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
 // ---------- 天人五衰：仙人壽元過八成，每過 4% 出現一個徵兆，修煉、氣血、攻擊各 -5% ----------
@@ -2227,6 +2290,7 @@ function renderGen() {
 // 神通：哪些學會了、哪些裝進了神通欄
 function renderShenTab() {
   const s = L(), shen = s.shen || [];
+  if (s.xshen) return `<h3>流派神通</h3><div class="item"><div class="row"><b class="gben">${XSHEN_NAME[s.xshen.key]}</b><span class="small muted">${XPATH_LABEL[s.xshen.key]} · ${XP_STAGE[xpStage(s)]}（${xT(XSHEN_GROW[xpStage(s)])}）</span></div>${xshenDesc(s).map(l => `<div class="small">${l}</div>`).join('')}<div class="small muted">${s.xshen.src.length ? '融合自：' + s.xshen.src.map(id => SHENS[id].name).join('、') + '。' : ''}根本仙法每升一個收集階段，神通也跟著變強（入門 ×1、小成 ×1.2、大成 ×1.4、圓滿 ×1.6；閃避、暴擊只加一半）。</div></div>`;
   return `<h3>神通欄（${(s.shenEquip || []).length}/${maxShen()}）</h3>${shen.length ? shen.map(id => { const x = SHENS[id], on = (s.shenEquip || []).includes(id);
       return `<div class="item"><div class="row"><b class="g4">${x.name}</b><span class="small muted">${x.type} · ${{ open: '開場發動', field: '整場生效', lethal: '危急時發動' }[x.trig]}</span></div>
         <div class="small">${x.desc}</div>
