@@ -2454,7 +2454,12 @@ function randomRecipe(grades) {
   const ids = unknownRecipes().filter(id => !grades || grades.includes(RECIPES[id].g));
   if (!ids.length) return ''; const id = pick(ids); learnRecipe(id); return `「${ITEMS[id].name}」丹方`;
 }
-const alchLv = (s = L()) => ALCH_NEED.filter(n => (s.alch || 0) >= n).length - 1;
+// 凡界最多到宗師（3），成仙後才能升丹王、丹聖、丹仙（器王、器聖、器仙）
+const craftTop = (s = L()) => isXian(s) ? ALCH_NEED.length - 1 : 3;
+const craftLvOf = (xp, s) => Math.min(craftTop(s), ALCH_NEED.filter(n => (xp || 0) >= n).length - 1);
+// 品質加成：宗師以前每級 1，之後每級 0.4（不然丹仙每爐都是極品）
+const craftQ = lv => Math.min(lv, 3) + .4 * Math.max(0, lv - 3);
+const alchLv = (s = L()) => craftLvOf(s.alch, s);
 // 成功率：品階基礎、煉丹術每級 +10%、丹藥效果加成的兩成、丹宗弟子 +5%（每升一階再 +2%）
 function brewChance(id, s = L()) {
   const g = RECIPES[id].g, sect = s.sect && s.sect.id === 'dan' ? .05 + .02 * s.sect.rank : 0;
@@ -2490,7 +2495,7 @@ function brewTick(dt, s = L()) {
 function brewDone(f, s) {
   const g = RECIPES[f.id].g, nm = ITEMS[f.id].name;
   if (pct(brewChance(f.id, s))) {
-    const sc = .5 * alchLv(s) + .5 * eff('pillEff', s) + Math.random() * 2, q = sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0;
+    const sc = .5 * craftQ(alchLv(s)) + .5 * eff('pillEff', s) + Math.random() * 2, q = sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0;
     addItem(f.id, q + 1); s.alch = (s.alch || 0) + BREW_XP[g] * (q === 3 ? 2 : 1);
     log(`丹成！${QUAL_RANK[q]}${nm} ${q + 1} 顆出爐。`, true);
   } else {
@@ -2501,7 +2506,7 @@ function brewDone(f, s) {
   dirty = true;
 }
 // ---------- 百藝・煉器 ----------
-const forgeLv = (s = L()) => ALCH_NEED.filter(n => (s.forge || 0) >= n).length - 1;
+const forgeLv = (s = L()) => craftLvOf(s.forge, s);
 const forgeChance = (g, s = L()) => Math.min(.95, BREW_RATE[g] + .1 * forgeLv(s) + .05 * arrEff('dihuo', s));
 const forgeFee = g => px(Math.round(ART_PRICE[g] * .3));
 // 這個部位、品階還有沒拿過的法寶（頭目專屬、宗門賞賜不算）
@@ -2531,7 +2536,7 @@ function forgeTick(dt, s = L()) {
 function forgeDone(f, s) {
   const pool = forgePool(f.slot, f.g, s);
   if (pool.length && pct(forgeChance(f.g, s))) {
-    const fresh = pool.filter(id => !(id in s.arts)), id = pick(fresh.length ? fresh : pool), q = (sc => sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0)(.5 * forgeLv(s) + Math.random() * 2);
+    const fresh = pool.filter(id => !(id in s.arts)), id = pick(fresh.length ? fresh : pool), q = (sc => sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0)(.5 * craftQ(forgeLv(s)) + Math.random() * 2);
     s.forge = (s.forge || 0) + BREW_XP[f.g] * (q === 3 ? 2 : 1);
     if (id in s.arts) {
       if (q > s.arts[id]) { s.arts[id] = q; log(`器成！又煉出一件「${ARTS[id].name}」，比原本的${QUAL_RANK[q]}，直接升到 ${q} 重祭煉！`, true); }
@@ -2554,7 +2559,7 @@ function renderForge() {
       <div class="btnrow">${ok ? qtyPicker(key, max) : ''}<button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g}, ${q})">開爐${q > 1 ? `×${q}` : ''}</button></div></div>`;
   };
   return `<h3${gx()}>${isXian() ? '靈器術' : '煉器術'}・${FORGE_RANK[lv]}</h3>
-    ${lv < 3 ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : '<p class="small same">已是宗師。</p>'}
+    ${lv < craftTop(s) ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : `<p class="small same">已是${FORGE_RANK[lv]}。${lv === 3 ? '成仙之後還能再往上升。' : ''}</p>`}
     <h3${gx()}>器爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b><span class="g${f.g}">${GRADES[f.g]}</span>${f.slot}</b></span><span>還要 <span id="forT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'forB')}</div>` : '<p class="small muted">爐火已熄。選部位和品階開爐，關掉網頁也會照煉。</p>'}
     <p class="small">礦材：${ores}</p>
     ${gradeNav('qi', gs)}${ART_SLOTS.map(slot => cell(slot, craftG('qi', gs))).join('')}
@@ -2657,7 +2662,7 @@ function renderCraft() {
   if (craftTab === 'zhen') return craftNav() + renderArrays();
   return `${craftNav()}
     <h3${gx()}>${isXian(s) ? '仙丹術' : '煉丹術'}・${ALCH_RANK[lv]}</h3>
-    ${lv < 3 ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${ALCH_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : '<p class="small same">已是宗師。</p>'}
+    ${lv < craftTop(s) ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${ALCH_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : `<p class="small same">已是${ALCH_RANK[lv]}。${lv === 3 ? '成仙之後還能再往上升。' : ''}</p>`}
     <h3${gx()}>丹爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b>${ITEMS[f.id].name}</b></span><span>還要 <span id="furT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'furB')}</div>` : '<p class="small muted">爐火已熄，選一張丹方開爐。關掉網頁也會照煉。</p>'}
     <p class="small">${isXian(s) ? '仙草' : '靈草'}：${herbs}</p>
     <h3${gx()}>丹方（${known.length}/${total}）</h3>

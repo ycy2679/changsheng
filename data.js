@@ -338,11 +338,11 @@ for (let i = 0; i < XIAN_MJ; i++) RECIPES[XIU_PILLS[i]] = { g: majorGrade(i), n:
 for (let i = 0; i < BRK_PILLS.length; i++) RECIPES[BRK_PILLS[i]] = { g: majorGrade(i), n: 6 };
 const BREW_SEC = [0, 10, 20, 40, 60];          // 出爐時間（秒）
 const BREW_RATE = [0, .8, .65, .5, .35];       // 基礎成功率
-const ALCH_RANK = ['學徒', '丹師', '大師', '宗師'], ALCH_NEED = [0, 20, 100, 400];   // 煉丹術等級與經驗門檻
+const ALCH_RANK = ['學徒', '丹師', '大師', '宗師', '丹王', '丹聖', '丹仙'], ALCH_NEED = [0, 20, 100, 400, 2000, 6000, 15000];   // 煉丹術等級與經驗門檻；宗師之後三級只有成仙後升得上去
 const BREW_XP = [0, 1, 3, 8, 20];
 // 煉器：選部位和品階，出爐隨機得到一件還沒有的法寶；品質決定出爐時的祭煉重數
 const FORGE_ORE = [0, 3, 4, 5, 6];             // 要幾份同階礦材
-const FORGE_RANK = ['學徒', '器師', '大師', '宗師'];
+const FORGE_RANK = ['學徒', '器師', '大師', '宗師', '器王', '器聖', '器仙'];
 // 陣法：佈在洞府裡，洞府 0／3／5／8 級各開一座陣位；每座最多 4 級，第 N 級要 N 階材料 5 份（藥園用靈草，其他用礦材）和靈石
 const ARRAYS = {
   juling:   { name: '聚靈陣', desc: l => `修煉速度 +${8 * l}%` },
