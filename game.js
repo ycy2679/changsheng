@@ -2557,7 +2557,7 @@ function forgeDone(f, s) {
     s.forge = (s.forge || 0) + BREW_XP[f.g] * (q === 3 ? 2 : 1);
     if (id in s.arts) {
       if (q > s.arts[id]) { s.arts[id] = q; log(`器成！又煉出一件「${ARTS[id].name}」，比原本的${QUAL_RANK[q]}，直接升到 ${q} 重祭煉！`, true); }
-      else { const p = px(Math.round(ART_PRICE[ARTS[id].grade] * SELL_RATE)); s.stone += p; log(`器成！又煉出一件「${ARTS[id].name}」，品質不比身上那件好，直接賣了，得靈石 ${fmt(p)}。`, true); }   // 重複又沒比較好：照基本賣價換錢（不算祭煉加成，免得煉器變成刷錢）
+      else { const p = Math.round((forgeFee(f.g) + FORGE_ORE[f.g] * itemPrice(MAT_ORE[f.g])) * 2 * (1 + .3 * q)); s.stone += p; log(`器成！又煉出一件「${ARTS[id].name}」，品質不比身上那件好，直接賣了，得靈石 ${fmt(p)}。`, true); }   // 重複又沒比較好：賣價＝一爐成本（爐費＋礦材坊市價）的兩倍，再算祭煉加成（每重 +30%）
     } else { gainArt(id); s.arts[id] = q; log(`器成！${QUAL_RANK[q]}${f.slot}「${ARTS[id].name}」出爐${q ? `，一出爐就有 ${q} 重祭煉` : ''}。`); }
   } else {
     s.forge = (s.forge || 0) + Math.ceil(BREW_XP[f.g] / 2);
