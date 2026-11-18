@@ -27,8 +27,7 @@ function newLife(meta) {
     root: null, phys: null, draw: null, mortal: newMortal(12 - 2 * t('tongyan')), arts: {}, gear: {}, tox: 0, body: 0, shop: null,
     lifeBonus: 0, brkBonus: 0, flags: {}, arcs: {}, encT: 15, evT: 100, ev: null, log: [], wins: 0, peak: 0,
   };
-  // 前世術法：隨機帶一個玄階術法；前世功法：保留上一世的主修（連同進度）
-  if (t('kaiju')) { const id = pick(Object.keys(SKILLS).filter(k => SKILLS[k].grade === 2)); s.skills[id] = 0; s.equip.push(id); }
+  // 前世功法：保留上一世的主修（連同進度）
   if (t('qianshi') && meta.keepTech && meta.keepTech.def) { TECHS[meta.keepTech.id] = meta.keepTech.def; s.custom = { [meta.keepTech.id]: meta.keepTech.def }; }
   if (t('qianshi') && meta.keepTech && TECHS[meta.keepTech.id]) s.techs[meta.keepTech.id] = meta.keepTech.xp;
   // 宿世神通：帶上上一世的一門神通（報通）
@@ -61,6 +60,14 @@ function load() {
     let back = 0; for (let l = 0; l < lv; l++) back += Math.round(base * Math.pow(gr, l));
     m.guo += back; delete m.talents[id]; delete m.talentsEff[id]; m.refunded = (m.refunded || 0) + back;
   }
+  // v2.1.3 悟道樹重排：刪掉仙府家底、器隨身養、戰鬥分支（熟能生巧、法隨念轉、前世術法），天降機緣＋天材地寶合併成新的天降機緣；點過的道果全數退還（只做一次）
+  if (!m.tal213) { m.tal213 = 1;
+    for (const [id, base, gr] of [['xianfu', 6, 2], ['a_refine', 8, 1], ['shulian', 3, 2], ['slot5', 10, 1], ['kaiju', 6, 1], ['qiyu', 4, 2], ['diaoluo', 4, 1.6]]) {
+      const lv = m.talents[id]; delete m.talents[id]; delete m.talentsEff[id]; if (m.auto) delete m.auto[id]; if (!lv) continue;
+      let back = 0; for (let l = 0; l < lv; l++) back += Math.round(base * Math.pow(gr, l));
+      m.guo += back; m.refunded = (m.refunded || 0) + back; m.tal213Back = (m.tal213Back || 0) + back;
+    }
+    if (m.tal213Back && S.life && S.life.log) S.life.log.unshift({ age: Math.floor(S.life.age || 0), text: `悟道樹重排：刪掉或合併的天賦，點過的道果已全數退還（道果 +${m.tal213Back}）。` }); }
   // 天賦延後生效上線前的存檔：已經點的天賦當作本來就生效，不受影響；之後新點的才要等下一世
   if (!m.talentsEff) m.talentsEff = { ...m.talents };
   if (m.best === undefined) m.best = Math.max(s.peak || 0, ...m.history.map(h => STAGES.findIndex(x => x.name === h.stageName)));
@@ -666,15 +673,15 @@ function talentEff(key) {
   switch (key) {
     case 'rate': return .05 * tl('suhui');
     case 'stone': return .1 * tl('caiyun') + fu;
-    case 'drop': return .2 * tl('diaoluo') + fu;
-    case 'evRate': return .25 * tl('qiyu');
+    case 'drop': return .2 * tl('qiyu') + fu;   // 天降機緣（合併了天材地寶）
+    case 'evRate': return .15 * tl('qiyu');
     case 'pillEff': return .1 * tl('yaoli');
     case 'techXp': return .1 * tl('tianren');
     case 'lifePct': return .05 * tl('shouyuan');
   }
   return 0;
 }
-const maxEquip = () => 4 + tl('slot5');
+const maxEquip = () => 4;
 const maxSubs = () => 2 + tl('fuxiu');
 const maxBrkPills = () => 3 + tl('sidan');
 function lifespan(s = L()) { return (MAJORS[stg(s).major].life + eff('life', s) + s.lifeBonus) * (1 + eff('lifePct', s) + (isXian(s) ? (s.phys ? .05 * PHYSIQUES[s.phys].r : 0) + .1 * tl('xshou') : 0)); }   // 仙體越稀有，仙壽越長
@@ -967,7 +974,7 @@ function fight(foe) {
     const id = ready.find(k => skillCost(k) <= pool(k).v);
     if (id) {
       const sk = SKILLS[id], pw = skillPow(id) * (1 + skillUp), cm = ctrlMul(id, s);
-      pool(id).v -= skillCost(id); cd[id] = sk.cd + 1; s.skills[id] += 1 + .5 * tl('shulian'); used[id] = (used[id] || 0) + 1;
+      pool(id).v -= skillCost(id); cd[id] = sk.cd + 1; s.skills[id] += 1; used[id] = (used[id] || 0) + 1;
       if (sk.kind === 'dmg' || sk.kind === 'multi') {
         // 先上破防再打，打完才結算灼燒和控制
         if (sk.brk) { brkT = 3; brkV = Math.max(brkV, sk.brk); }
@@ -1296,7 +1303,6 @@ function autoActs() {
   }
   // 隨緣應變：普通事件 30 秒沒選就自動選（人物劇情、前世羈絆不算）
   if (autoOn('a_event') && s.ev && s.ev.ev && (s.ev.w = (s.ev.w || 0) + 1) >= 30) autoChoose();
-  if (autoOn('a_refine')) for (const id of gearIds()) { if (s.arts[id] < ART_MAX_REFINE && s.stone > refinePrice(id) * 3 && (!refineOre(id) || count(refineOre(id)))) refineArt(id); }
   if (s.xiu >= need && s.stage < STAGES.length - 1 && !jieNext()) {
     if (isMajorNext() ? autoOn('a_major') && realChance() >= S.meta.autoMajor : autoOn('a_minor')) breakthrough();
   }
@@ -1852,7 +1858,7 @@ function xianEnter(s) {
   if (kept) s.tech = keep; else if (tid) { learnTech(tid); s.tech = tid; }
   // 大道至簡：凡界帶來的入門術法化成這條路線的那一招
   s.skills = {}; s.equip = []; yiForm(s, false);
-  s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu') + 100 * tl('kaijushi') * tl('kaijushi');   // 仙府家底、祖蔭
+  s.stone = 300 + 100 * tl('kaijushi') * tl('kaijushi');   // 祖蔭
   const bao = tl('xianbao') ? randomUnowned('art', [6]) : null; if (bao) gainArt(bao);   // 仙家遺寶
   pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
   if (!s.flags.xn7) s.ev = { story: 'n7' };   // 一進仙界，主線「仙籍」馬上跳出來
