@@ -71,6 +71,7 @@ const TALENTS = [
   T('xiandan', '仙緣', '仙丹入骨', 3, 15, 2, ['dujie'], l => `仙界修為丹效果 +${15 * l}%`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
   T('mijing', '仙緣', '秘境熟客', 2, 12, 2.5, ['xianfu'], l => `仙界秘境冷卻 -${25 * l}%`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
   T('xianbao', '仙緣', '仙家遺寶', 1, 40, 1, ['xianfu'], () => '從仙人開始時多帶一件仙階下品靈寶', { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
+  T('a_xj', '仙緣', '仙官代勞', 1, 12, 1, ['jiyi'], () => '仙籍差事冷卻好、沒負傷時，自動接你選的那個差事（只在線上）', { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
   T('xjshop', '仙緣', '仙官看重', 2, 15, 2, ['jiyi'], l => `仙籍兌換多擺 ${l} 部仙法`, { cond: m => m.ascends >= 1, condText: '飛升過一次' }),
 ];
 const TAL = Object.fromEntries(TALENTS.map(t => [t.id, t]));

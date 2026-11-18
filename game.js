@@ -1286,6 +1286,8 @@ function autoActs() {
   if (autoOn('a_heal') && s.injury > 0 && count('heal')) usePill('heal');
   const xp = XIU_PILLS[stg().major];
   if (autoOn('a_xiu') && s.tox < 30 && s.xiu < need && count(xp)) usePill(xp);
+  // 仙官代勞：仙籍差事冷卻好、沒負傷就自動接選好的差事
+  if (autoOn('a_xj') && isXian(s) && s.xj && !(s.injury > 0) && s.xj.task <= s.age) doXjTask(S.meta.xjAuto || 'dang');
   if (autoOn('a_main') && !s.flags.mainManual) {   // 這一世自己換過主修，化身就不再自動換
     // 比潛力（圓滿後的修煉速度，也就是基礎速度），不看目前層數；沒當主修的功法不會長層數，看層數會永遠換不上高階功法
     const pot = id => TECHS[id].rate || 0;
@@ -1828,7 +1830,7 @@ function renderXianji() {
   const names = Object.keys(XIANJI).filter(id => m.arcDone[id] && XIANJI[id][m.arcDone[id]]).map(id => { const [st, txt] = XIANJI[id][m.arcDone[id]]; return `<li><b>${ARCS[id].name}</b> <span class="small ${st > 0 ? 'same' : st < 0 ? 'hurt' : 'muted'}">${st > 0 ? '在碑上' : st < 0 ? '被劃掉' : '不在仙籍'}</span><br><span class="small">${txt}</span></li>`; }).join('');
   return `<section class="panel card"><div class="row"><b>仙籍</b><span><span class="small">仙功 <b class="same">${s.xj.gong}</b></span> <button class="mini" onclick="toggleXj()">收起</button></span></div>
     <p class="small muted">仙籍就是碑的另一面：碑上刻著誰，仙籍上就記著誰。接引仙官會派些差事給你，辦妥了有仙功和仙元石，仙功可以換仙丹和功法。</p>
-    <h3>差事</h3>${s.injury > 0 ? '<p class="small hurt">傷勢未癒，先養傷。</p>' : tw ? `<p class="small muted">剛辦完差事，${tw} 年後可以再接。</p>` : XJ_TASKS.map(k => `<div class="item"><div class="row"><b>${k.name}</b></div><div class="small">${k.desc}</div><div class="btnrow"><button class="mini" onclick="doXjTask('${k.id}')">接下（仙功約 ${Math.round(xjGain(s) * (k.id === 'men' ? 1.5 : k.id === 'dang' ? .7 : 1))}）</button></div></div>`).join('')}
+    <h3>差事</h3>${autoOn('a_xj') ? `<p class="small muted">仙官代勞：冷卻好了會自動接「${XJ_TASKS.find(k => k.id === (S.meta.xjAuto || 'dang')).name}」（悟道樹可以換或關掉）。</p>` : ''}${s.injury > 0 ? '<p class="small hurt">傷勢未癒，先養傷。</p>' : tw ? `<p class="small muted">剛辦完差事，${tw} 年後可以再接。</p>` : XJ_TASKS.map(k => `<div class="item"><div class="row"><b>${k.name}</b></div><div class="small">${k.desc}</div><div class="btnrow"><button class="mini" onclick="doXjTask('${k.id}')">接下（仙功約 ${Math.round(xjGain(s) * (k.id === 'men' ? 1.5 : k.id === 'dang' ? .7 : 1))}）</button></div></div>`).join('')}
     <h3>兌換</h3>${xjList(s).map((o, i) => { const nm = o.k === 'tech' ? `《${TECHS[o.id].name}》` : o.k === 'recipe' ? `丹方・${ITEMS[o.id].name}` : ITEMS[o.id].name, sub = o.k === 'tech' ? gradeTag(TECHS[o.id].grade, `${TECHS[o.id].type} · ${TECHS[o.id].elem}`) : '';
       return `<div class="item"><div class="row"><b>${nm}</b> ${sub}</div><div class="small muted">${o.k === 'tech' ? effText(TECHS[o.id]) : ITEMS[o.id].desc}</div><div class="btnrow"><button class="mini" ${s.xj.gong >= o.cost ? '' : 'disabled'} onclick="xjBuy(${i})">${o.cost} 仙功</button></div></div>`; }).join('')}
     <h3>名冊</h3><ul class="log">${names || '<li class="muted">你在凡間認識的人，仙籍上一個也找不到。</li>'}</ul>
@@ -2827,6 +2829,7 @@ const pendingTalents = () => Object.keys(S.meta.talents).filter(id => TAL[id] &&
 let treeTab = TALENT_BRANCHES[0];   // 悟道樹目前顯示的分類
 function setTreeTab(b) { treeTab = b; render(); }
 function toggleTreeFull() { S.meta.treeHideFull = !S.meta.treeHideFull; save(); render(); }
+function setXjAuto(v) { S.meta.xjAuto = v; save(); render(); }
 function toggleAuto(id) { S.meta.auto[id] = !autoOn(id); save(); render(); }
 function setAutoMajor(v) { S.meta.autoMajor = +v; save(); }
 // 天賦在樹上的深度：沒有前置是 0，否則是前置裡最深的 +1（顯示時由淺到深排）
@@ -2839,8 +2842,8 @@ function renderTree() {
       : !condOk ? `<span class="muted">解鎖條件：${t.condText}</span>`
       : full ? '<span class="same">已點滿</span>'
       : `<button class="mini" ${m.guo >= cost ? '' : 'disabled'} onclick="buyTalent('${t.id}')">${cost} 道果</button>`;
-    const auto = t.branch === '化身' && eff ? `<button class="mini ${autoOn(t.id) ? 'on' : ''}" onclick="toggleAuto('${t.id}')">${autoOn(t.id) ? '開啟中' : '已關閉'}</button>` : '';
-    const thr = t.id === 'a_major' && eff ? `<select onchange="setAutoMajor(this.value)">${[.3, .5, .7, .9].map(v => `<option value="${v}" ${m.autoMajor === v ? 'selected' : ''}>成功率 ≥ ${v * 100}%</option>`).join('')}</select>` : t.id === 'a_event' && eff ? `<select onchange="setEvMode(this.value)">${Object.entries(EV_MODES).map(([k, n]) => `<option value="${k}" ${(m.evMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '';
+    const auto = (t.branch === '化身' || t.id === 'a_xj') && eff ? `<button class="mini ${autoOn(t.id) ? 'on' : ''}" onclick="toggleAuto('${t.id}')">${autoOn(t.id) ? '開啟中' : '已關閉'}</button>` : '';
+    const thr = t.id === 'a_xj' && eff ? `<select onchange="setXjAuto(this.value)">${XJ_TASKS.map(k => `<option value="${k.id}" ${(m.xjAuto || 'dang') === k.id ? 'selected' : ''}>${k.name}</option>`).join('')}</select>` : t.id === 'a_major' && eff ? `<select onchange="setAutoMajor(this.value)">${[.3, .5, .7, .9].map(v => `<option value="${v}" ${m.autoMajor === v ? 'selected' : ''}>成功率 ≥ ${v * 100}%</option>`).join('')}</select>` : t.id === 'a_event' && eff ? `<select onchange="setEvMode(this.value)">${Object.entries(EV_MODES).map(([k, n]) => `<option value="${k}" ${(m.evMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : '';
     return `<div class="node ${lv ? 'got' : ''} ${ok && condOk ? '' : 'locked'}">
       <div class="row"><b>${t.name}</b><span class="small muted">${lv}/${t.max}</span></div>
       <div class="small">${t.d(Math.max(1, lv))}${lv && !full ? `<span class="muted"> → ${t.d(lv + 1)}</span>` : ''}</div>
