@@ -169,3 +169,4 @@ nav button { white-space: nowrap; }
 .res2 .row { flex-wrap: nowrap; gap: 4px; white-space: nowrap; }
 /* 大道至簡：仙術頁的「仙術」標題金色（招式標籤用 .gben 赤紅） */
 .gyi { color: var(--main); }
+button.on > span[class^="g"] { color: inherit; }

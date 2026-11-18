@@ -2364,7 +2364,7 @@ function renderBatch(kind) {
     const sellN = batchEligible(kind, g, false).length, studyN = kind === 'art' ? 0 : batchEligible(kind, g, true).length;
     if (!sellN && !studyN) return '';
     const sKey = `bsell:${kind}:${g}`, tKey = `bstudy:${kind}:${g}`;
-    return `<div class="small">${GRADES[g]}</div><div class="btnrow">${studyN ? `<button class="mini ${armed === tKey ? 'danger' : ''}" onclick="batchStudy('${kind}', ${g})">${armed === tKey ? `確定參悟 ${studyN} 件？` : `批量參悟（${studyN}）`}</button>` : ''}${sellN ? `<button class="mini ${armed === sKey ? 'danger' : ''}" onclick="batchSell('${kind}', ${g})">${armed === sKey ? `確定賣出 ${sellN} 件？` : `批量賣出（${sellN}）`}</button>` : ''}</div>`;
+    return `<div class="small g${g}">${GRADES[g]}</div><div class="btnrow">${studyN ? `<button class="mini ${armed === tKey ? 'danger' : ''}" onclick="batchStudy('${kind}', ${g})">${armed === tKey ? `確定參悟 ${studyN} 件？` : `批量參悟（${studyN}）`}</button>` : ''}${sellN ? `<button class="mini ${armed === sKey ? 'danger' : ''}" onclick="batchSell('${kind}', ${g})">${armed === sKey ? `確定賣出 ${sellN} 件？` : `批量賣出（${sellN}）`}</button>` : ''}</div>`;
   }).join('');
   return rows ? `<div class="item"><div class="row small muted"><span>批量操作</span><span>依品階選未鎖定的${KIND_NAME[kind]}一次處理</span></div>${rows}</div>` : '';
 }
@@ -2549,13 +2549,13 @@ function renderForge() {
   const ores = MAT_ORE.slice(1).filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const cell = (slot, g) => {
     const n = forgePool(slot, g).filter(id => !(id in s.arts)).length, max = forgeMax(slot, g, s), key = 'qi:' + slot + ':' + g, q = getQty(key, Math.max(max, 1)), ok = max >= 1 && forgePool(slot, g).length;
-    return `<div class="item"><div class="row"><b>${GRADES[g]}${slot}</b></div>
+    return `<div class="item"><div class="row"><b><span class="g${g}">${GRADES[g]}</span>${slot}</b></div>
       <div class="small muted">${ITEMS[MAT_ORE[g]].name} ×${FORGE_ORE[g] * q}（有 ${count(MAT_ORE[g])}）＋靈石 ${fmt(forgeFee(g) * q)} · ${Math.round(forgeSec(g))} 秒/爐 · 成功 ${Math.round(forgeChance(g) * 100)}% · ${n ? `可煉 ${n} 種${(nc => nc ? `（未收錄 ${nc}）` : '')(forgePool(slot, g).filter(id => !(((S.meta.codex || {}).a || {})[id])).length)}` : '身上都有了，可以再煉重複的賭品質'}</div>
       <div class="btnrow">${ok ? qtyPicker(key, max) : ''}<button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g}, ${q})">開爐${q > 1 ? `×${q}` : ''}</button></div></div>`;
   };
   return `<h3${gx()}>${isXian() ? '靈器術' : '煉器術'}・${FORGE_RANK[lv]}</h3>
     ${lv < 3 ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : '<p class="small same">已是宗師。</p>'}
-    <h3${gx()}>器爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b>${GRADES[f.g]}${f.slot}</b></span><span>還要 <span id="forT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'forB')}</div>` : '<p class="small muted">爐火已熄。選部位和品階開爐，關掉網頁也會照煉。</p>'}
+    <h3${gx()}>器爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b><span class="g${f.g}">${GRADES[f.g]}</span>${f.slot}</b></span><span>還要 <span id="forT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'forB')}</div>` : '<p class="small muted">爐火已熄。選部位和品階開爐，關掉網頁也會照煉。</p>'}
     <p class="small">礦材：${ores}</p>
     ${gradeNav('qi', gs)}${ART_SLOTS.map(slot => cell(slot, craftG('qi', gs))).join('')}
     <p class="muted small">出爐隨機得到一件這個部位、品階、你這一世身上沒有的法寶；品質決定一出爐就有幾重祭煉：下品 0、中品 1、上品 2、極品 3。${isXian(s) ? '成仙以後只煉得了靈器（仙階），中品要地仙、上品要真仙才煉得出來。失敗礦材會燒掉，還可能受傷。仙礦從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙礦取得。' : '玄階法寶要築基、地階要金丹、天階要元嬰才煉得出來。失敗礦材會燒掉，地階以上還可能受傷。礦材從遊歷打怪、秘境、坊市櫃台取得。'}</p>`;
@@ -2618,7 +2618,7 @@ function renderArrays() {
     const can = c && arrayAfford(c);
     const buildBtn = !c ? '<span class="same">已滿級</span>' : `<button class="mini" ${can ? '' : 'disabled'} onclick="buildArray('${id}')">${l ? '升級' : '佈陣'}：${c.mats.map(([m, n]) => `${ITEMS[m].name} ×${n}`).join('＋')}＋${fmt(c.stone)} 靈石</button>`;
     const onBtn = l ? `<button class="mini ${isOn ? 'on' : ''}" ${!isOn && on >= slots ? 'disabled' : ''} onclick="toggleArrOn('${id}')">${isOn ? '停用' : '啟用'}</button>` : '';
-    return `<div class="item"><div class="row"><b>${arrName(id, s)}</b>${l ? ` <span class="${isXian(s) ? 'gyi' : 'same'}">${GRADES[arrLvGrade(l)]}${isOn ? '' : '・未啟用'}</span>` : ''}</div>
+    return `<div class="item"><div class="row"><b>${arrName(id, s)}</b>${l ? ` <span class="g${arrLvGrade(l)}">${GRADES[arrLvGrade(l)]}${isOn ? '' : '・未啟用'}</span>` : ''}</div>
       <div class="small muted">${!l ? '佈下後：' + a.desc(1) : isOn ? '目前：' + a.desc(l) : '已蓋好，但沒有啟用，沒有效果'}${l && l < arrMax(s) ? `；升到${GRADES[arrLvGrade(l + 1)]}${l === 4 ? `（成為${XIAN_ARR_NAME[id]}）` : ''}：${a.desc(l + 1)}` : ''}</div>
       ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[arrLvGrade(l)]}）</option>${[1, 2, 3, 4, 6, 7, 8].filter(g => g <= arrLvGrade(l)).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}
       <div class="btnrow">${buildBtn}${onBtn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</div></div>`;
@@ -2638,7 +2638,7 @@ const qtyPicker = (key, max) => { const q = getQty(key, max);
 const craftGrade = {};
 function craftG(k, gs) { if (!gs.includes(craftGrade[k])) craftGrade[k] = gs.includes(matGrade()) ? matGrade() : gs[gs.length - 1]; return craftGrade[k]; }
 function setCraftGrade(k, g) { craftGrade[k] = g; render(); }
-const gradeNav = (k, gs) => `<nav>${gs.map(g => `<button class="${craftG(k, gs) === g ? 'on' : ''}" onclick="setCraftGrade('${k}', ${g})">${GRADES[g]}</button>`).join('')}</nav>`;
+const gradeNav = (k, gs) => `<nav>${gs.map(g => `<button class="${craftG(k, gs) === g ? 'on' : ''}" onclick="setCraftGrade('${k}', ${g})"><span class="g${g}">${GRADES[g]}</span></button>`).join('')}</nav>`;
 function setCraftTab(k) { craftTab = k; render(); }
 const craftNav = () => `<nav>${(isXian() ? [['dan', '仙丹'], ['qi', '靈器'], ['zhen', '仙陣']] : [['dan', '煉丹'], ['qi', '煉器'], ['zhen', '陣法']]).map(([k, n]) => `<button class="${craftTab === k ? 'on' : ''}" onclick="setCraftTab('${k}')">${n}</button>`).join('')}</nav>`;
 function renderCraft() {
