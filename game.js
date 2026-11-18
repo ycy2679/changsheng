@@ -2236,7 +2236,7 @@ function renderSkill() {
   const all = Object.keys(s.skills).filter(id => !s.equip.includes(id) && !SKILLS[id].only);
   const ult = ultList(s);
   const ultRow = id => { const k = SKILLS[id], lv = skillLv(id), nx = MASTERY_USES[lv + 1];
-    return `<div class="item"><div class="row"><b>${k.name}</b>${k.yi ? `<span class="small muted">${SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
+    return `<div class="item"><div class="row"><b${k.yi ? ' class="gyi"' : ''}>${k.name}</b>${k.yi ? `<span class="small gben">${SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}</div>
       <div class="small">${MASTERY[lv]}${nx && !k.yi ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
   if (isXian(s)) return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}`).join('；')}。</p>
