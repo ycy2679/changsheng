@@ -2073,7 +2073,7 @@ function render() {
         <select onchange="setPlace(this.value)" ${s.mode === 'travel' ? '' : 'disabled'}>
           ${PLACES.filter(p => s.stage >= p.min && !p.xian === !isXian(s)).map(p => `<option value="${p.id}" ${p.id === s.place ? 'selected' : ''}>${p.name}</option>`).join('')}
         </select>
-        <span style="margin-left:auto;display:flex;gap:8px;align-items:center">${isMajorNext() ? `<select class="mini" onchange="setBrkMode(this.value)" title="大境界突破方式">${[['safe', '穩紮穩打'], ['all', '全力一搏']].map(([k, n]) => `<option value="${k}" ${(s.brkMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}
+        <span style="margin-left:auto;display:flex;gap:8px;align-items:center">${isMajorNext() && !isXian() ? `<select class="mini" onchange="setBrkMode(this.value)" title="大境界突破方式">${[['safe', '穩紮穩打'], ['all', '全力一搏']].map(([k, n]) => `<option value="${k}" ${(s.brkMode || 'safe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}
         <button id="brk" class="primary" onclick="breakthrough()"></button></span>
       </div>
       <ul class="recent" id="recent"></ul>
@@ -2259,7 +2259,7 @@ function renderGong() {
     ${renderBatch('tech')}
     ${all.length ? `<nav class="wrap">${['全部', ...types].map(ty => `<button class="${techTab === ty ? 'on' : ''}" onclick="setTechView('tab', '${ty}')">${ty}</button>`).join('')}</nav>` : ''}
     ${list.map(id => techCard(id, extra(id), techHint(id), true)).join('') || '<p class="muted">沒有符合的功法。坊市、遊歷、奇遇都可能得到。</p>'}
-    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（主修七成、輔修平分三成；主修圓滿就全給輔修），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。鎖定的不會被批量處理。</p>`;
+    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（主修七成，兼修路線的主修、副主修、輔修平分三成；主修圓滿就全給它們），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。鎖定的不會被批量處理。</p>`;
 }
 // ---------- 術法分頁：屬性分頁、攻防輔篩選、排序 ----------
 let skillTab = '全部', skillKind = '全部', skillSort = 'grade';
@@ -2307,7 +2307,7 @@ function renderSkill() {
 // ---------- 參悟、賣出用不到的功法和術法 ----------
 const techSellPrice = id => px(Math.round(TECH_PRICE[TECHS[id].grade] * SELL_RATE * (1 + .2 * techLayer(id))));   // 每一層 +20%
 const skillSellPrice = (id, s = L()) => px(Math.round(SKILL_PRICE[SKILLS[id].grade] * SELL_RATE * (1 + .5 * skillLv(id, s))));   // 小成、大成、圓滿各 +50%
-// 參悟功法：化為精進（約 5 分鐘 × 品階平方，加上它原本一半的進度）；主修七成、其他輔修平分三成，圓滿的不分
+// 參悟功法：化為精進（約 5 分鐘 × 品階平方，加上它原本一半的進度）；主修七成、其他（兼修路線主修、副主修、輔修）平分三成，圓滿的不分
 const techStudyGain = id => Math.round(300 * TECHS[id].grade ** 2 + (L().techs[id] || 0) * .5);
 // 參悟術法：出招中的每個術法熟練度 +5 × 品階平方
 const skillStudyGain = id => 5 * SKILLS[id].grade ** 2;
@@ -2337,7 +2337,8 @@ function canDrop(kind, id) {
   return id in s.arts && !isOn(id) && !ARTS[id].path;   // 本命法寶不能賣
 }
 function studySplit(id, s = L()) {
-  const g = techStudyGain(id), subs = s.subs.filter(x => x !== id && techLayer(x, s) < 9), main = techLayer(s.tech, s) < 9;
+  // 分給主修以外的：兼修路線的主修、副主修、輔修（還沒圓滿的）
+  const g = techStudyGain(id), subs = [...new Set([...pathMains(s), dualOn(s), ...s.subs])].filter(x => x && x !== id && x !== s.tech && techLayer(x, s) < 9), main = techLayer(s.tech, s) < 9;
   if (!main && !subs.length) return null;
   const toMain = !main ? 0 : subs.length ? g * .7 : g;
   return { main: Math.round(toMain), subs, each: subs.length ? Math.round((g - toMain) / subs.length) : 0 };
@@ -2362,7 +2363,7 @@ function studyIt(kind, id) {
   if (armed !== `study:${kind}:${id}`) { armed = `study:${kind}:${id}`; render(); return; }
   armed = '';
   const s = L(), sp = applyStudy(kind, id, s); if (!sp) return;
-  if (kind === 'tech') log(`參悟《${TECHS[id].name}》：${[sp.main ? `主修《${TECHS[s.tech].name}》+${fmt(sp.main)}` : '', sp.subs.length ? `輔修${sp.subs.map(x => `《${TECHS[x].name}》`).join('')}各 +${fmt(sp.each)}` : ''].filter(Boolean).join('，')}。`);
+  if (kind === 'tech') log(`參悟《${TECHS[id].name}》：${[sp.main ? `主修《${TECHS[s.tech].name}》+${fmt(sp.main)}` : '', sp.subs.length ? `${sp.subs.map(x => `《${TECHS[x].name}》`).join('')}各 +${fmt(sp.each)}` : ''].filter(Boolean).join('，')}。`);
   else log(`參悟《${SKILLS[id].name}》，出招中的術法熟練度各 +${sp.gain}。`);
   save(); render();
 }
@@ -2434,7 +2435,8 @@ function setBagTab(k) { bagTab = k; render(); }
 const BAG_TABS = [['dan', '丹藥', k => !['tc', 'root', 'mat'].includes(k)], ['bao', '寶物', k => k === 'tc' || k === 'root'], ['mat', '材料', k => k === 'mat']];
 function renderBag() {
   const s = L(), all = Object.keys(ITEMS).filter(id => count(id) > 0);
-  const tb = BAG_TABS.find(x => x[0] === bagTab) || BAG_TABS[0], ids = all.filter(id => tb[2](ITEMS[id].kind));
+  const tabs = isXian(s) ? BAG_TABS.filter(x => x[0] !== 'bao') : BAG_TABS;   // 仙界沒有天材地寶、五行之精，不放寶物分頁
+  const tb = tabs.find(x => x[0] === bagTab) || tabs[0], ids = all.filter(id => tb[2](ITEMS[id].kind));
   const btn = id => {
     const k = ITEMS[id].kind;
     if (k === 'brk') return `<span class="muted small">${ITEMS[id].major === stg().major && isMajorNext() ? '突破時自動服用' : '突破對應大境界時自動服用'}</span>`;
@@ -2452,7 +2454,7 @@ function renderBag() {
   };
   const sell = id => { const max = count(id), q = getQty('sell:' + id, max);
     return (max > 1 ? qtyPicker('sell:' + id, max) : '') + `<button class="mini" onclick="sellItem('${id}', ${q})">賣${q > 1 ? ` ×${q}` : ''} ${fmt(sellItemPrice(id) * q)}</button>`; };
-  const nav = `<nav>${BAG_TABS.map(([k, n, f]) => `<button class="${tb[0] === k ? 'on' : ''}" onclick="setBagTab('${k}')">${n}（${all.filter(id => f(ITEMS[id].kind)).length}）</button>`).join('')}</nav>`;
+  const nav = `<nav>${tabs.map(([k, n, f]) => `<button class="${tb[0] === k ? 'on' : ''}" onclick="setBagTab('${k}')">${n}（${all.filter(id => f(ITEMS[id].kind)).length}）</button>`).join('')}</nav>`;
   const head = tb[0] === 'dan' ? `<h3>丹毒 ${Math.ceil(s.tox)}%</h3>${bar('tox', s.tox / 100)}
     <p class="muted small">修為丹、延壽丹、洗髓丹吃了會積累丹毒，丹毒越高藥效越差，每分鐘消退 10%。修為丹要配合境界：吃低階的效果甚微，吃高階的會經脈受損。用不到的丹藥可以按原價七成賣給坊市。</p>` : '';
   const empty = { dan: '沒有丹藥。', bao: '沒有天材地寶或五行之精。秘境、遊歷和奇遇有機會得到。', mat: '沒有材料。遊歷打怪、宗門採藥、秘境、坊市櫃台和藥園礦脈都能得到。' }[tb[0]];
