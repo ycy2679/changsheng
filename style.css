@@ -171,3 +171,4 @@ nav button { white-space: nowrap; }
 .gyi { color: var(--main); }
 button.on > span[class^="g"] { color: inherit; }
 .restock { font-size: 1rem; margin: 4px 0 8px; } .restock #shopT { font-weight: bold; color: var(--main); }
+.restock button.mini { font-size: 1rem; padding: 4px 12px; }
