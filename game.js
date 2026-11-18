@@ -773,9 +773,12 @@ const isSupport = id => !['dmg', 'multi'].includes(SKILLS[id].kind);
 const skillCost = (id, s = L()) => SKILLS[id].kind === 'mana' ? 0 : Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade] * (!ownSch(id, s) ? (isSupport(id) ? 1 : 1.5) : schOf(id) === 'hun' ? .5 : 1));
 // 這招從哪條資源條扣
 const skillRes = (id, s = L()) => ownSch(id, s) ? schOf(id) : myPaths(s)[0];
+// 元炁：仙界三修把仙元、血氣、神識融成一條（上限三條加總、開戰全滿、每回合回 8%）
+const fusedQi = (s = L()) => isXian(s) && myPaths(s).length >= 3;
+const qiMax = (s = L(), st) => myPaths(s).reduce((a, k) => a + resMax(k, s, st), 0);
 // 兼修合招：每條路的資源各扣一份（總耗費平分，神識那份照神魂術減半）；一般招式回傳 null
-const yiParts = (id, s = L()) => SKILLS[id].only !== 'combo' ? null : myPaths(s).map(p => [p, Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade] / myPaths(s).length * (p === 'hun' ? .5 : 1))]);
-const costText = (id, s = L()) => (yiParts(id, s) || [[skillRes(id, s), skillCost(id, s)]]).map(([p, a]) => `${RES_NAME[p]} ${a}`).join('、');
+const yiParts = (id, s = L()) => SKILLS[id].only !== 'combo' ? null : fusedQi(s) ? [['fa', Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade])]] : myPaths(s).map(p => [p, Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade] / myPaths(s).length * (p === 'hun' ? .5 : 1))]);
+const costText = (id, s = L()) => (yiParts(id, s) || [[skillRes(id, s), skillCost(id, s)]]).map(([p, a]) => `${fusedQi(s) ? '元炁' : RES_NAME[p]} ${a}`).join('、');
 // 神魂術的控制機率：魂修 ×1.5（兼修 ×1.25），沒走魂修 ×0.6
 function ctrlMul(id, s = L()) {
   if (schOf(id) !== 'hun') return 1;
@@ -938,7 +941,8 @@ function fight(foe) {
   let burn = 0, burnT = 0, brkT = 0, brkV = 0, skip = 0, reflT = 0, reflV = 0, buffT = 0, buffV = 0, pill = false;
   const cd = {}, used = {};
   // 三種資源：法力帶上一場剩的、血氣每場從兩成開始越打越多、神識帶上一場剩的且幾乎不回
-  const R = {}; for (const k of myPaths(s)) { const m = resMax(k, s, p); R[k] = { m, v: m * (k === 'fa' ? s.mpNow ?? 1 : k === 'hun' ? s.snNow ?? 1 : .2) }; }
+  const R = {}, fq = fusedQi(s); for (const k of myPaths(s)) { const m = resMax(k, s, p); R[k] = { m, v: m * (k === 'fa' ? s.mpNow ?? 1 : k === 'hun' ? s.snNow ?? 1 : .2) }; }
+  if (fq) { const Y = { m: qiMax(s, p) }; Y.v = Y.m; for (const k of myPaths(s)) R[k] = Y; }   // 元炁：三條共用一池，開戰全滿
   const RB = { fa: .08, ti: 0, hun: .04 }, mainR = R[myPaths(s)[0]];
   const pool = k => R[skillRes(k, s)], addR = (k, f) => { const x = R[k]; if (x) x.v = Math.min(x.m, x.v + x.m * f); };
   // 神通：領域類整場生效，其他記下來等時機
@@ -990,7 +994,7 @@ function fight(foe) {
         // 先上破防再打，打完才結算灼燒和控制
         if (sk.brk) { brkT = 3; brkV = Math.max(brkV, sk.brk); }
         for (let h = 0; h < (sk.hits || 1); h++) strike(p.atk * pw * charge, sk.elem, sk.drain || 0, sk.pierce ? 0 : 1, sk.crit || 0);
-        charge = 1; addR('ti', .1);
+        charge = 1; if (!fq) addR('ti', .1);
         if (sk.burn) { burn = p.atk * sk.burn * (pw / sk.pow); burnT = 3; }
         if ((sk.freeze && pct(sk.freeze * cm)) || (sk.stun && pct(sk.stun * cm))) skip = Math.max(skip, sk.stunT || 1);
       }
@@ -1023,7 +1027,7 @@ function fight(foe) {
     }
     dodgeT--; reflT--; buffT--; faT--;
     php = Math.min(p.hp, php + p.hp * p.regen);
-    for (const k in R) addR(k, RB[k] + mpRegen);
+    if (fq) addR('fa', RB.fa + mpRegen); else for (const k in R) addR(k, RB[k] + mpRegen);
   }
   if (R.hun) s.snNow = R.hun.v / R.hun.m;
   return { win: ehp <= 0, fled, rounds: r, used: Object.keys(used).map(k => SKILLS[k].name).join('、'), shen: shUsed.join('、'), pill, hp: Math.max(0, php) / p.hp, mp: R.fa ? R.fa.v / R.fa.m : s.mpNow ?? 1 };
@@ -2089,12 +2093,13 @@ function updateDyn() {
   const st = stats(), hp = s.hpNow ?? 1, mp = s.mpNow ?? 1;
   $('hptxt').textContent = `${fmt(Math.round(st.hp * hp))} / ${fmt(st.hp)}`; $('hpbar').firstChild.style.width = hp * 100 + '%';
   { const ps = myPaths(s), fr = k => k === 'fa' ? mp : k === 'hun' ? s.snNow ?? 1 : .2, m0 = ps[0];
-    $('mplbl').textContent = cur(RES_NAME[m0]) + (m0 === 'ti' ? '（開戰兩成）' : '');
-    $('mptxt').textContent = `${fmt(Math.round(resMax(m0, s, st) * fr(m0)))} / ${fmt(resMax(m0, s, st))}`;
+    const fq = fusedQi(s), mx = fq ? qiMax(s, st) : resMax(m0, s, st), f0 = fq ? 1 : fr(m0);   // 元炁開戰全滿
+    $('mplbl').textContent = fq ? '元炁' : cur(RES_NAME[m0]) + (m0 === 'ti' ? '（開戰兩成）' : '');
+    $('mptxt').textContent = `${fmt(Math.round(mx * f0))} / ${fmt(mx)}`;
     // 兼修：資源移到氣血下一行，幾條路就平分幾格，只顯示百分比
-    const h2 = ps.length > 1 ? ps.map(k => `<div><div class="row"><span>${cur(RES_NAME[k])}</span><span>${Math.round(fr(k) * 100)}%</span></div>${bar('mp thin', fr(k))}</div>`).join('') : '';
+    const h2 = ps.length > 1 && !fq ? ps.map(k => `<div><div class="row"><span>${cur(RES_NAME[k])}</span><span>${Math.round(fr(k) * 100)}%</span></div>${bar('mp thin', fr(k))}</div>`).join('') : '';
     const e2 = $('mp2'); if (e2._h !== h2) { e2.innerHTML = h2; e2._h = h2; $('mpone').style.display = h2 ? 'none' : ''; e2.style.gridTemplateColumns = h2 ? `repeat(${ps.length}, 1fr)` : '';  }   // 兼修：資源放到氣血下一行，幾條路就平分幾格
-    $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
+    $('mpbar').firstChild.style.width = f0 * 100 + '%'; }
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
     const tip = atTop ? (w.length ? '飛升還差：' + w.join('、') + (noDao ? '（道心在坐化或兵解時才會增加，這一世多半飛升不了）' : '') : '九道天雷之後就能飛升，但失敗就會身死。') : noDao ? `道心 ${S.meta.dao}/${ASCEND_DAO}，這一世多半飛升不了`
