@@ -167,5 +167,5 @@ nav button { white-space: nowrap; }
 /* 兼修：資源那格對半分 */
 .res2:not(:empty) { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .res2 .row { flex-wrap: nowrap; gap: 4px; white-space: nowrap; }
-/* 大道至簡的仙術：招式名金色，標籤赤紅 */
+/* 大道至簡：仙術頁的「仙術」標題金色（招式標籤用 .gben 赤紅） */
 .gyi { color: var(--main); }

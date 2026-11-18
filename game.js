@@ -2236,11 +2236,11 @@ function renderSkill() {
   const all = Object.keys(s.skills).filter(id => !s.equip.includes(id) && !SKILLS[id].only);
   const ult = ultList(s);
   const ultRow = id => { const k = SKILLS[id], lv = skillLv(id), nx = MASTERY_USES[lv + 1];
-    return `<div class="item"><div class="row"><b${k.yi ? ' class="gyi"' : ''}>${k.name}</b>${k.yi ? `<span class="small gben">${SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
+    return `<div class="item"><div class="row"><b>${k.name}</b>${k.yi ? `<span class="small gben">${SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}</div>
       <div class="small">${MASTERY[lv]}${nx && !k.yi ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
   if (isXian(s)) return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}`).join('；')}。</p>
-    <h3>仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這${yiNum(s)}招：自動施展，跟著境界精進：人仙入門、地仙小成、真仙大成、玄仙圓滿。</p>
+    <h3 class="gyi">仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這${yiNum(s)}招：自動施展，跟著境界精進：人仙入門、地仙小成、真仙大成、玄仙圓滿。</p>
     ${ult.map(ultRow).join('')}`;
   const elems = SKILL_ELEMS.filter(e => all.some(id => SKILLS[id].elem === e));
   if (skillTab !== '全部' && !elems.includes(skillTab)) skillTab = '全部';
