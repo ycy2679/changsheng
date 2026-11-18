@@ -2120,7 +2120,7 @@ function renderOffline() {
     <div class="choices"><button onclick="closeOffline()">知道了</button></div></section>`;
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
-const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem !== '無' && rootFits(t.elem)) ? ` · <span class="same">靈根親和${isMainType(t.type) ? '（主修時修煉 +15%）' : ''}</span>` : '';
+const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem !== '無' && rootFits(t.elem)) ? ` · <span class="aff">靈根親和${isMainType(t.type) ? '（主修時修煉 +15%）' : ''}</span>` : '';
 function techCard(id, btns = '', hint = '', lock = false) {
   const s = L(), t = TECHS[id], l = techLayer(id);
   return `<div class="item"><div class="row"><span>${lock ? lockBtn('tech', id) : ''}<b>《${t.name}》</b></span>${gradeTag(t.grade, `${t.custom ? '自創 · ' : ''}${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
@@ -2423,7 +2423,7 @@ function renderShop() {
   const slot = (o, i) => {
     if (o.sold) return `<div class="item row muted"><span>（已售出）</span></div>`;
     const deal = o.deal ? ' <span class="deal">奇貨</span>' : '';
-    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><span><b>《${t.name}》</b>${deal}</span> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}${techAff(t)}${isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? ' · <span class="muted">你只能輔修</span>' : ` · <span class="hurt">${mainBlock(o.id)}</span>`) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
+    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><span><b>《${t.name}》</b>${deal}</span> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}</div>${(n => n ? `<div class="small">${n}</div>` : '')([techAff(t).replace(/^ · /, ''), isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? '<span class="muted">你只能輔修</span>' : `<span class="hurt">${mainBlock(o.id)}</span>`) : ''].filter(Boolean).join(' · '))}<div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row"><span><b>${k.name}</b>${deal}</span> ${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     if (o.k === 'art') { const a = ARTS[o.id]; return `<div class="item"><div class="row"><span><b>${a.name}</b>${deal}</span> ${gradeTag(a.grade, `法寶 · ${a.slot}`)}</div><div class="small">${effText(a)}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     const it = ITEMS[o.id];
