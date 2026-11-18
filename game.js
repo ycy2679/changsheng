@@ -1286,7 +1286,7 @@ function autoActs() {
   if (autoOn('a_heal') && s.injury > 0 && count('heal')) usePill('heal');
   const xp = XIU_PILLS[stg().major];
   if (autoOn('a_xiu') && s.tox < 30 && s.xiu < need && count(xp)) usePill(xp);
-  if (autoOn('a_main')) {
+  if (autoOn('a_main') && !s.flags.mainManual) {   // 這一世自己換過主修，化身就不再自動換
     // 比潛力（圓滿後的修煉速度，也就是基礎速度），不看目前層數；沒當主修的功法不會長層數，看層數會永遠換不上高階功法
     const pot = id => TECHS[id].rate || 0;
     const best = Object.keys(s.techs).filter(id => canMain(id) && id !== s.tech2).sort((a, b) => pot(b) - pot(a))[0];   // 副主修交給玩家自己安排
@@ -1485,6 +1485,7 @@ function switchTech(id, force) {
   const s = L(); if (!canMain(id) || id === s.tech) return;
   if (!force && armed !== 'tech:' + id) { armed = 'tech:' + id; render(); return; }
   armed = ''; s.xiu /= 2; s.tech = id; s.subs = s.subs.filter(x => x !== id);
+  if (!force) s.flags.mainManual = 1;   // 手動換過：這一世「擇法而修」不再自動換主修
   log(`散功重修，改以《${TECHS[id].name}》為主修，修為折半。`);
   // 副主修變成主修，或跟新主修相剋，就只能放下
   if (s.tech2 && (s.tech2 === id || !dualFactor(s.tech2))) { if (s.tech2 !== id) log(`《${TECHS[s.tech2].name}》與新主修相剋，只能放下。`); s.tech2 = null; }
@@ -2200,7 +2201,7 @@ function renderGong() {
   if (techTab !== '全部' && !types.includes(techTab)) techTab = '全部';
   const list = all.filter(id => (techTab === '全部' || TECHS[id].type === techTab) && (!techUsable || subOk(TECHS[id]) || canMain(id)))
     .sort((a, b) => techSort === 'layer' ? techLayer(b) - techLayer(a) || TECHS[b].grade - TECHS[a].grade : TECHS[b].grade - TECHS[a].grade || techLayer(b) - techLayer(a));
-  return `<h3>主修</h3>${techCard(s.tech)}
+  return `<h3>主修</h3>${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換，轉世後恢復。</p>' : ''}${techCard(s.tech)}
     ${tl('liangyi') ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
       ${s.tech2 ? (canFuse() ? `<div class="btns"><button class="mini ${armed === 'fuse' ? 'danger' : 'primary'}" onclick="fuseTech()">${armed === 'fuse' ? '確定融合？兩部功法會合為一部' : '融合自創功法'}</button></div>`
