@@ -2440,7 +2440,7 @@ function renderShop() {
     <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
 ` : `
-    <div class="row"><span></span><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
+    <div class="row restock"><span></span><span>下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
     <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的${isXian() ? '功法' : '功法、術法'}比較常上架。</p>`);
 }
