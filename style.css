@@ -160,3 +160,4 @@ nav button { white-space: nowrap; }
 .card.main-ev { border: 2px solid var(--main); box-shadow: 0 0 0 3px color-mix(in srgb, var(--main) 25%, transparent); }
 .tag-main { display: inline-block; font-size: .75rem; font-weight: bold; padding: 0 6px; margin-right: 6px; border-radius: 4px; background: var(--main); color: var(--bg); vertical-align: middle; }
 .log li.main, .recent li.main { color: var(--main); font-weight: bold; }
+.choices button.main-choice { border: 2px solid var(--main); color: var(--main); font-weight: bold; }

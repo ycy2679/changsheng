@@ -1379,7 +1379,7 @@ function choose(i) {
   if (ref.story) { storyMark(ref.story); if (ref.story === 'n1') s.flags.n1 = 1; }
   const res = ref.ev ? withStoneMul(TRAVEL_STONE, () => ch.run(s)) : ch.run(s);   // 一般奇遇只在遊歷時出現
   if (ref.arc && !arc(ref.arc).ended) arc(ref.arc).step++;
-  log(`【${e.title}】${res}`); if (isMainEv(ref)) s.log[0].m = 1;
+  log(`【${e.title}】${res}`); if (isMainEv(ref) || ref.arc) s.log[0].m = 1;   // 主線和重要人物劇情：紀事標金色
   save(); render();
 }
 
@@ -1723,6 +1723,7 @@ function ascend(s) {
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   if (place(s).min > s.stage || topPlace(s).lv > place(s).lv) s.place = topPlace(s).id;
   s.ascView = 1; xjOpen(s); giftXiuPills(s); yiForm(s, false);
+  if (!s.flags.xn7) s.ev = { story: 'n7' };   // 一進仙界，主線「仙籍」馬上跳出來
   log(`你踏進了仙界，成了${stg(s).name}的仙人。${s.phys ? `穿過天門的那一刻，${PHYSIQUES[s.phys].name}脫胎換骨，完成了仙蛻（體質的好處 ×1.5）。` : ''}${keepWords(`一身法力化為仙元。凡間帶來的靈石、丹藥和雜物，折成了仙元石 ${s.stone} 枚；材料都收在須彌戒裡。${sect ? sect + '留在了凡界；' : ''}洞府和陣法隨你一起穿過了天門。凡間學的那些術法，到了這裡一招一式都顯得多餘——大道至簡，一身術法反璞歸真，化成了`)}${yiNum(s)}招${yiNames(s)}。仙人壽元 ${Math.floor(lifespan(s))} 年，但仙界的歲月流得快。`);
 }
 function closeAscend() { L().ascView = 0; render(); }
@@ -1848,6 +1849,7 @@ function xianEnter(s) {
   s.stone = 300 + 1000 * tl('xianfu') * tl('xianfu') + 100 * tl('kaijushi') * tl('kaijushi');   // 仙府家底、祖蔭
   const bao = tl('xianbao') ? randomUnowned('art', [6]) : null; if (bao) gainArt(bao);   // 仙家遺寶
   pathSkillCheck(s); pathArtCheck(s); xjOpen(s); giftXiuPills(s);
+  if (!s.flags.xn7) s.ev = { story: 'n7' };   // 一進仙界，主線「仙籍」馬上跳出來
   if (!s.flags.benming) { s.flags.benming = 1; gainShen(benmingShen(s), '元神與天地相合', s); }
   log(`第 ${S.meta.lives} 世。你在一座雲霧繚繞的仙山上睜開眼，身上穿著仙袍，仙籍上已經有你的名字——${stg(s).name}。你身負${rootName()}、${physName(s)}。${kept ? `前世的《${TECHS[keep].name}》還刻在心裡，你直接接著修。接引仙官留給你` : tid ? `接引仙官留給你一部《${TECHS[tid].name}》、` : '接引仙官留給你'}${yiNum(s)}招${yiNames(s)}${bao ? `、一件「${ARTS[bao].name}」` : ''}，還有仙元石 ${s.stone} 枚。前世的事，只剩一點模糊的影子。`);
 }
@@ -2086,12 +2088,18 @@ const dur2 = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padS
 
 // 主線劇情：碑與名的節點、守碑人（飛升條件）；隨緣應變本來就不會替這些做選擇
 const isMainEv = r => !!r && (!!r.story || r.arc === 'bei');
+// 重要人物劇情的「正確選擇」：好感加最多的那個選項（看選項裡 aff += / -= 的數字）
+function bestArcChoice(ch) {
+  const flagged = ch.findIndex(c => c.best); if (flagged >= 0) return flagged;   // 不靠好感決定結局的（謝無咎），在資料裡標 best
+  const d = ch.map(c => { const src = c.run.toString(); let n = 0; for (const m of src.matchAll(/aff\s*([+-])=\s*(\d+)/g)) n += (m[1] === '+' ? 1 : -1) * +m[2]; return n; });
+  const top = Math.max(...d); return top > 0 && d.filter(x => x === top).length === 1 ? d.indexOf(top) : -1;
+}
 function renderEvent() {
-  const e = curEvent(), s = L(), main = isMainEv(s.ev);
-  return `<section class="panel card${main ? ' main-ev' : ''}">
+  const e = curEvent(), s = L(), main = isMainEv(s.ev), story = main || !!s.ev.arc, best = s.ev.arc ? bestArcChoice(visible(e)) : -1;
+  return `<section class="panel card${story ? ' main-ev' : ''}">
     <div class="row"><b>${main ? '<span class="tag-main">主線</span>' : ''}${e.title}</b>${e.who ? `<span class="who">${e.who}</span>` : ''}</div>
     <p>${val(e.text, s)}</p>
-    <div class="choices">${visible(e).map((c, i) => `<button onclick="choose(${i})">${val(c.t, s)}</button>`).join('')}</div>
+    <div class="choices">${visible(e).map((c, i) => `<button ${i === best ? 'class="main-choice" ' : ''}onclick="choose(${i})">${val(c.t, s)}</button>`).join('')}</div>
     ${autoOn('a_event') && s.ev.ev ? `<p class="muted small">隨緣應變：30 秒內沒選，會照「${EV_MODES[S.meta.evMode || 'safe']}」自動選。</p>` : ''}
   </section>`;
 }

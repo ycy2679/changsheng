@@ -176,13 +176,13 @@ Object.assign(ARCS, {
       { t: '收下丹藥', run() { arc('xie').deal = 1; return `紙鶴化成三顆${addPill(3)}。你心裡有點不舒服。`; } },
       { t: '燒了紙鶴', run() { arc('xie').resolve = 1; return '紙鶴燒成灰之前，你好像聽見他在笑。'; } }] },
     { min: 21, title: '舊案', text: '你查到一樁三百年前的舊案：一個書香世家被正道以「通魔」之名滅門，只逃出一個孩子，姓謝。', choices: [
-      { t: '去找他談談', run() { arc('xie').talk = 1; return '你們在一座破廟喝了一夜的酒。天亮時，他說：「你是第一個問我為什麼的人。」'; } },
+      { best: 1, t: '去找他談談', run() { arc('xie').talk = 1; return '你們在一座破廟喝了一夜的酒。天亮時，他說：「你是第一個問我為什麼的人。」'; } },
       { t: '過去的事不重要', run() { arc('xie').resolve = 1; return '你把卷宗燒了。'; } }] },
     { min: 24, title: '血祭一城', text: '謝無咎要血祭一整座城來衝擊更高的境界，城裡住著十萬凡人。', choices: [
-      { t: '阻止他', run(s) { const a = arc('xie'); if (battle('入魔的謝無咎', s.stage + 3, 1.3)) { a.beat = 1; return '你打碎了他的血祭大陣。他跪在城門口，半身都是血。'; } injure(300); return '你沒能阻止。那一夜，城裡的燈一盞一盞滅了。'; } },
+      { best: 1, t: '阻止他', run(s) { const a = arc('xie'); if (battle('入魔的謝無咎', s.stage + 3, 1.3)) { a.beat = 1; return '你打碎了他的血祭大陣。他跪在城門口，半身都是血。'; } injure(300); return '你沒能阻止。那一夜，城裡的燈一盞一盞滅了。'; } },
       { t: '那不是你的事', run() { return '那一夜，城裡的燈一盞一盞滅了。'; } }] },
     { min: 26, title: '謝無咎的結局', text() { const a = arc('xie'); return !a.beat ? '謝無咎的魔功大成了。他最後一次出現在你面前，衣袍白得發亮。' : a.talk ? '謝無咎靠在城牆上，抬頭看你：「殺了我吧。還是說，你要給我一條路走？」' : '謝無咎倒在城門口，已經站不起來了。'; }, choices: [
-      { t: '給他一條路', cond: () => arc('xie').beat && arc('xie').talk, run() { arcEnd('xie', 'redeemed'); return '你轉身離開。很久以後，你聽說有個白衣僧人在各地修橋鋪路。'; } },
+      { best: 1, t: '給他一條路', cond: () => arc('xie').beat && arc('xie').talk, run() { arcEnd('xie', 'redeemed'); return '你轉身離開。很久以後，你聽說有個白衣僧人在各地修橋鋪路。'; } },
       { t: '斬了他', cond: () => arc('xie').beat, run() { arcEnd('xie', 'slain'); return `他沒有躲。他死後，身上掉出${giftTech([4])}。`; } },
       { t: '目送他離開', cond: () => !arc('xie').beat, run() { arcEnd('xie', 'demon'); return '他朝天上指了指：「我先上去了，在上面等你。」然後消失在雲裡。'; } }] },
   ] },

@@ -204,11 +204,11 @@ const xs_ = () => S.meta.story || {};
 const xsMark = id => { (S.meta.story = S.meta.story || {})[id] = 1; };   // 節點裡的小段落：只記進度，不進輪迴錄
 const defy = () => { S.meta.defy = (S.meta.defy || 0) + 1; };   // 對抗的選擇，留給第二批「破天」結局
 const XIAN_STORY = [
-  { id: 'n7', title: '仙籍', cond: s => isXian(s) && !xs_().n7,
+  { id: 'n7', title: '仙籍', cond: s => isXian(s) && !s.flags.xn7,   // 每一世進仙界都會先遇到
     text: '一個穿灰袍的仙官在天門後等你，手裡捧著一本厚得驚人的冊子。「新來的？名字。」他翻開冊子——你的名字已經在上面了，墨跡還沒乾。你伸手去翻背面，背面密密麻麻全是劃痕，一道疊著一道。仙官「啪」地合上冊子：「仙籍跟碑是同一塊東西。正面記活著的，背面記劃掉的。別亂翻。」',
     choices: [
-      { t: '問他背面是什麼', run(s) { storyMark('n7'); xjOpen(s); return '「背面是回收的帳。」他說完才發覺說溜了嘴，揮揮手要你走。從那天起，仙籍上的差事都歸他派給你（上方「仙籍」）。'; } },
-      { t: '默默記下', run(s) { storyMark('n7'); xjOpen(s); addItem('dujiedan'); return '你沒有多問。仙官看了你一眼，好像有點意外，塞給你一顆渡劫仙丹：「第一次渡仙劫的時候吃。」從那天起，仙籍上的差事都歸他派給你（上方「仙籍」）。'; } }] },
+      { t: '問他背面是什麼', run(s) { storyMark('n7'); s.flags.xn7 = 1; xjOpen(s); return '「背面是回收的帳。」他說完才發覺說溜了嘴，揮揮手要你走。從那天起，仙籍上的差事都歸他派給你（上方「仙籍」）。'; } },
+      { t: '默默記下', run(s) { storyMark('n7'); s.flags.xn7 = 1; xjOpen(s); addItem('dujiedan'); return '你沒有多問。仙官看了你一眼，好像有點意外，塞給你一顆渡劫仙丹：「第一次渡仙劫的時候吃。」從那天起，仙籍上的差事都歸他派給你（上方「仙籍」）。'; } }] },
   { id: 'n8a', title: '釣雲的人', cond: s => isXian(s) && s.stage >= 37 && xs_().n7 && !xs_().n8a,
     text: '浮雲殘島的懸崖邊，一個女仙拿著竿子在釣雲。「雲裡有魚，你信不信？」她叫晏青蘿，比你早三百年飛升，說起話來卻像個沒長大的孩子。',
     choices: [
