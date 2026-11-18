@@ -603,6 +603,20 @@ function dualFactor(id, main = L().tech) {
   return SHENG[a] === b || SHENG[b] === a ? .5 : .3;
 }
 const dualOn = (s = L()) => s.tech2 && tl('liangyi') ? s.tech2 : null;
+// 兼修：主路以外，每條路再一個主修欄（法修吐納、體修鍛體、魂修觀想），效果、修煉、精進都五折
+const pathSlots = (s = L()) => [...new Set(myPaths(s).map(p => PATH_MAIN[p]))].filter(ty => !TECHS[s.tech] || ty !== TECHS[s.tech].type);
+const pathMains = (s = L()) => pathSlots(s).map(ty => (s.ptech || {})[ty]).filter(id => id && TECHS[id] && id in s.techs && id !== s.tech && id !== s.tech2 && canMain(id, s));
+function setPathMain(id) {
+  const s = L(), ty = TECHS[id].type, nm = PATHS[MAIN_PATH[ty]].name; s.ptech = s.ptech || {};
+  if (s.ptech[ty] === id && pathMains(s).includes(id)) { delete s.ptech[ty]; log(`放下${nm}主修《${TECHS[id].name}》。`); save(); render(); return; }
+  if (!pathSlots(s).includes(ty) || !canMain(id, s) || id === s.tech || id === s.tech2) return;
+  const old = pathMains(s).includes(s.ptech[ty]);
+  if (old && armed !== 'pm:' + id) { armed = 'pm:' + id; render(); return; }
+  armed = '';
+  if (old) { s.xiu /= 2; log(`散功改修，${nm}主修換成《${TECHS[id].name}》，修為折半。`); }
+  else log(`以《${TECHS[id].name}》為${nm}主修（效果五折）。`);
+  s.ptech[ty] = id; s.subs = s.subs.filter(x => x !== id); save(); render();
+}
 // ---------- 自創功法：化神後主修、副主修都圓滿，融合成一部 ----------
 // 效果是兩部相加打八折，直接從第 9 層開始；自創的功法存在 s.custom，讀檔時再登記回 TECHS
 const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom'];
@@ -630,7 +644,7 @@ function fuseTech() {
 function setDual(id) {
   const s = L();
   if (s.tech2 === id) { s.tech2 = null; log(`放下副主修《${TECHS[id].name}》。`); save(); render(); return; }
-  if (!tl('liangyi') || !canMain(id) || id === s.tech || !dualFactor(id)) return;
+  if (!tl('liangyi') || !canMain(id) || id === s.tech || !dualFactor(id) || pathMains(s).includes(id)) return;
   if (s.tech2 && armed !== 'dual:' + id) { armed = 'dual:' + id; render(); return; }
   armed = '';
   if (s.tech2) { s.xiu /= 2; log(`散功改修，副主修換成《${TECHS[id].name}》，修為折半。`); }
@@ -652,6 +666,7 @@ const physName = (s = L()) => (isXian(s) ? '仙蛻・' : '') + PHYSIQUES[s.phys]
 function eff(key, s = L()) {
   let v = equipped(s).reduce((a, id, i) => a + (i && key === 'rate' ? 0 : effOf(id, key, s) * (i ? subBoost(id, s) : 1)), 0) + pathEff(key, s);   // 輔修不算修煉速度
   const t2 = dualOn(s); if (t2) v += effOf(t2, key, s) * dualFactor(t2, s.tech);   // 副主修打折
+  for (const id of pathMains(s)) v += effOf(id, key, s) * .5;   // 兼修路線的主修五折
   for (const id of gearIds(s)) v += (ARTS[id][key] || 0) * (NO_SCALE.includes(key) ? 1 : artMul(id, s));
   if (s.phys) v += physVal(key, s) * physMul(s);
   return v + talentEff(key) + buffEff(key, s) + sectEff(key, s);
@@ -1240,6 +1255,7 @@ function growTechs(sec) {
   // 副主修精進速度跟輔修一樣是一半
   const t2 = dualOn(s);
   if (t2) { const before = techLayer(t2); s.techs[t2] += sec * mul * .5; const l = techLayer(t2); if (l > before) log(`副主修《${TECHS[t2].name}》修至第 ${l} 層${l >= 9 ? '，功法圓滿' : ''}。`); techShenCheck(t2, l); }
+  for (const id of pathMains(s)) { const before = techLayer(id); s.techs[id] += sec * mul * .5; const l = techLayer(id); if (l > before) log(`《${TECHS[id].name}》修至第 ${l} 層${l >= 9 ? '，功法圓滿' : ''}。`); techShenCheck(id, l); }   // 兼修路線的主修精進五折
 }
 // 功法專屬神通：天階功法圓滿時覺醒它自己的那門（已經有了就不重複給）
 function techShenCheck(id, l) {
@@ -1313,7 +1329,7 @@ function autoActs() {
   if (autoOn('a_main') && !s.flags.mainManual) {   // 這一世自己換過主修，化身就不再自動換
     // 比潛力（圓滿後的修煉速度，也就是基礎速度），不看目前層數；沒當主修的功法不會長層數，看層數會永遠換不上高階功法
     const pot = id => TECHS[id].rate || 0;
-    const best = Object.keys(s.techs).filter(id => canMain(id) && id !== s.tech2).sort((a, b) => pot(b) - pot(a))[0];   // 副主修交給玩家自己安排
+    const best = Object.keys(s.techs).filter(id => canMain(id) && id !== s.tech2 && !pathMains(s).includes(id)).sort((a, b) => pot(b) - pot(a))[0];   // 副主修交給玩家自己安排
     if (best && pot(best) > pot(s.tech)) switchTech(best, true);
   }
   // 隨緣應變：普通事件 30 秒沒選就自動選（人物劇情、前世羈絆不算）
@@ -1508,6 +1524,7 @@ function switchTech(id, force) {
   const s = L(); if (!canMain(id) || id === s.tech) return;
   if (!force && armed !== 'tech:' + id) { armed = 'tech:' + id; render(); return; }
   armed = ''; s.xiu /= 2; s.tech = id; s.subs = s.subs.filter(x => x !== id);
+  if (s.ptech) for (const k in s.ptech) if (s.ptech[k] === id) delete s.ptech[k];   // 原本是兼修路線的主修，改當主修
   if (!force) s.flags.mainManual = 1;   // 手動換過：這一世「擇法而修」不再自動換主修
   log(`散功重修，改以《${TECHS[id].name}》為主修，修為折半。`);
   // 副主修變成主修，或跟新主修相剋，就只能放下
@@ -1516,7 +1533,7 @@ function switchTech(id, force) {
 }
 function toggleSub(id) {
   const s = L(), i = s.subs.indexOf(id);
-  if (i >= 0) s.subs.splice(i, 1); else if (s.subs.length < maxSubs() && subOk(TECHS[id]) && id !== s.tech && id !== s.tech2) s.subs.push(id);
+  if (i >= 0) s.subs.splice(i, 1); else if (s.subs.length < maxSubs() && subOk(TECHS[id]) && id !== s.tech && id !== s.tech2 && !pathMains().includes(id)) s.subs.push(id);
   save(); render();
 }
 function toggleEquip(id) {
@@ -2215,7 +2232,8 @@ function renderGong() {
     const sub = !subOk(t) ? '' : s.subs.length < maxSubs() ? `<button class="mini" onclick="toggleSub('${id}')">輔修</button>` : '<span class="muted">輔修已滿</span>';
     if (isMainType(t.type)) {
       if (!canMain(id)) return sub || `<span class="muted">${mainBlock(id)}</span>`;
-      const main = `<button class="mini ${armed === 'tech:' + id ? 'danger' : ''}" onclick="switchTech('${id}')">${armed === 'tech:' + id ? '確定散功？修為減半' : '改為主修'}</button>`;
+      const pm = pathSlots(s).includes(t.type) ? `<button class="mini ${armed === 'pm:' + id ? 'danger' : ''}" onclick="setPathMain('${id}')">${armed === 'pm:' + id ? '確定散功？修為減半' : `${PATHS[MAIN_PATH[t.type]].name}主修 50%`}</button>` : '';
+      const main = `<button class="mini ${armed === 'tech:' + id ? 'danger' : ''}" onclick="switchTech('${id}')">${armed === 'tech:' + id ? '確定散功？修為減半' : '改為主修'}</button>` + pm;
       if (!tl('liangyi')) return main + sub;
       const f = dualFactor(id);
       return main + sub + (!f ? '<span class="muted small">與主修相剋</span>' : `<button class="mini ${armed === 'dual:' + id ? 'danger' : ''}" onclick="setDual('${id}')">${armed === 'dual:' + id ? '確定散功？修為減半' : `副主修 ${f * 100}%`}</button>`);
@@ -2223,12 +2241,13 @@ function renderGong() {
     return s.subs.length < maxSubs() ? `<button class="mini" onclick="toggleSub('${id}')">輔修</button>` : '<span class="muted">輔修已滿</span>';
   };
   const extra = id => `${btnFor(id)}${dropBtns('tech', id)}`;
-  const all = Object.keys(s.techs).filter(id => !equipped().includes(id) && id !== s.tech2);
+  const all = Object.keys(s.techs).filter(id => !equipped().includes(id) && id !== s.tech2 && !pathMains(s).includes(id));
   const types = TECH_TYPES.filter(ty => all.some(id => TECHS[id].type === ty));
   if (techTab !== '全部' && !types.includes(techTab)) techTab = '全部';
   const list = all.filter(id => (techTab === '全部' || TECHS[id].type === techTab) && (!techUsable || subOk(TECHS[id]) || canMain(id)))
     .sort((a, b) => techSort === 'layer' ? techLayer(b) - techLayer(a) || TECHS[b].grade - TECHS[a].grade : TECHS[b].grade - TECHS[a].grade || techLayer(b) - techLayer(a));
   return `<h3>主修</h3>${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換，轉世後恢復。</p>' : ''}${techCard(s.tech)}
+    ${pathSlots(s).map(ty => { const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉、精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度、精進都是五折。</p>`); }).join('')}
     ${tl('liangyi') ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
       ${s.tech2 ? (canFuse() ? `<div class="btns"><button class="mini ${armed === 'fuse' ? 'danger' : 'primary'}" onclick="fuseTech()">${armed === 'fuse' ? '確定融合？兩部功法會合為一部' : '融合自創功法'}</button></div>`
@@ -2313,7 +2332,7 @@ function dropBtns(kind, id) {
 function canDrop(kind, id) {
   const s = L();
   if (isLocked(kind, id)) return false;
-  if (kind === 'tech') return id in s.techs && !equipped().includes(id) && id !== s.tech2;
+  if (kind === 'tech') return id in s.techs && !equipped().includes(id) && id !== s.tech2 && !pathMains(s).includes(id);
   if (kind === 'skill') return id in s.skills && !s.equip.includes(id) && !SKILLS[id].only;
   return id in s.arts && !isOn(id) && !ARTS[id].path;   // 本命法寶不能賣
 }
@@ -2357,7 +2376,7 @@ function sellIt(kind, id) {
 // 批量：依品階選出這一頁裡所有未鎖定、能賣／能參悟的，一次處理
 function poolIds(kind) {
   const s = L();
-  if (kind === 'tech') return Object.keys(s.techs).filter(id => !equipped().includes(id) && id !== s.tech2);
+  if (kind === 'tech') return Object.keys(s.techs).filter(id => !equipped().includes(id) && id !== s.tech2 && !pathMains(s).includes(id));
   if (kind === 'skill') return Object.keys(s.skills).filter(id => !s.equip.includes(id) && !SKILLS[id].only);
   return Object.keys(s.arts).filter(id => !isOn(id));
 }
