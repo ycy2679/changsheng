@@ -773,6 +773,9 @@ const isSupport = id => !['dmg', 'multi'].includes(SKILLS[id].kind);
 const skillCost = (id, s = L()) => SKILLS[id].kind === 'mana' ? 0 : Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade] * (!ownSch(id, s) ? (isSupport(id) ? 1 : 1.5) : schOf(id) === 'hun' ? .5 : 1));
 // 這招從哪條資源條扣
 const skillRes = (id, s = L()) => ownSch(id, s) ? schOf(id) : myPaths(s)[0];
+// 兼修合招：每條路的資源各扣一份（總耗費平分，神識那份照神魂術減半）；一般招式回傳 null
+const yiParts = (id, s = L()) => SKILLS[id].only !== 'combo' ? null : myPaths(s).map(p => [p, Math.round(10 * (1 + .5 * s.stage) * SKILL_COST[SKILLS[id].grade] / myPaths(s).length * (p === 'hun' ? .5 : 1))]);
+const costText = (id, s = L()) => (yiParts(id, s) || [[skillRes(id, s), skillCost(id, s)]]).map(([p, a]) => `${RES_NAME[p]} ${a}`).join('、');
 // 神魂術的控制機率：魂修 ×1.5（兼修 ×1.25），沒走魂修 ×0.6
 function ctrlMul(id, s = L()) {
   if (schOf(id) !== 'hun') return 1;
@@ -950,10 +953,12 @@ function fight(foe) {
     p.regen += x.regen || 0; p.dodge += x.dodge || 0; p.lifesteal += x.steal || 0; p.crit += x.crit || 0;
     reflAll += x.reflect || 0; mpRegen += x.mpRegen || 0; skillUp += x.skillUp || 0; if (x.mpFull) for (const k in R) R[k].v = R[k].m;
   }
-  const strike = (atk, elem, drain = 0, defMul = 1) => {
+  const canPay = k => { const pp = yiParts(k, s); return pp ? pp.every(([q, a]) => R[q] && R[q].v >= a) : skillCost(k) <= pool(k).v; };
+  const pay = k => { const pp = yiParts(k, s); if (pp) for (const [q, a] of pp) R[q].v -= a; else pool(k).v -= skillCost(k); };
+  const strike = (atk, elem, drain = 0, defMul = 1, critAdd = 0) => {
     let m = elemMul(elem, foe.elem); if (isVoid) m = Math.max(1, m);
     let d = hit(atk * m * (buffT > 0 ? 1 + buffV : 1) * (faT > 0 ? faAtk : 1), foe.def * defMul * (brkT > 0 ? 1 - brkV : 1));
-    if (pct(p.crit)) d *= p.critDmg;
+    if (pct(p.crit + critAdd)) d *= p.critDmg;
     ehp -= d; php = Math.min(p.hp, php + d * (p.lifesteal + drain));
   };
   while (php > 0 && ehp > 0 && r < 30) {
@@ -974,17 +979,17 @@ function fight(foe) {
     // 冷卻好的術法；回法要法力不到一半才放，增益還在就不重複放
     const ready = [...ultList(s), ...s.equip].filter(k => !(cd[k] > 0) && !(SKILLS[k].kind === 'mana' && pool(k).v > pool(k).m * .5) && !(SKILLS[k].kind === 'buff' && (buffT > 0 || (SKILLS[k].fa && faT > 0))));
     // 資源不夠放招、又傷到一半：自動服回氣丹（每場一顆，回主路線的資源）
-    if (!pill && ready.length && ready.every(k => skillCost(k) > pool(k).v) && php < p.hp * .5 && count('huiqi')) {
+    if (!pill && ready.length && ready.every(k => !canPay(k)) && php < p.hp * .5 && count('huiqi')) {
       s.items.huiqi--; S.meta.pills++; pill = true; mainR.v = Math.min(mainR.m, mainR.v + mainR.m * .6);
     }
-    const id = ready.find(k => skillCost(k) <= pool(k).v);
+    const id = ready.find(canPay);
     if (id) {
       const sk = SKILLS[id], pw = skillPow(id) * (1 + skillUp), cm = ctrlMul(id, s);
-      pool(id).v -= skillCost(id); cd[id] = sk.cd + 1; s.skills[id] += 1; used[id] = (used[id] || 0) + 1;
+      pay(id); cd[id] = sk.cd + 1; s.skills[id] += 1; used[id] = (used[id] || 0) + 1;
       if (sk.kind === 'dmg' || sk.kind === 'multi') {
         // 先上破防再打，打完才結算灼燒和控制
         if (sk.brk) { brkT = 3; brkV = Math.max(brkV, sk.brk); }
-        for (let h = 0; h < (sk.hits || 1); h++) strike(p.atk * pw * charge, sk.elem, sk.drain || 0, sk.pierce ? 0 : 1);
+        for (let h = 0; h < (sk.hits || 1); h++) strike(p.atk * pw * charge, sk.elem, sk.drain || 0, sk.pierce ? 0 : 1, sk.crit || 0);
         charge = 1; addR('ti', .1);
         if (sk.burn) { burn = p.atk * sk.burn * (pw / sk.pow); burnT = 3; }
         if ((sk.freeze && pct(sk.freeze * cm)) || (sk.stun && pct(sk.stun * cm))) skip = Math.max(skip, sk.stunT || 1);
@@ -2256,7 +2261,7 @@ function renderSkill() {
   const ultRow = id => { const k = SKILLS[id], lv = skillLv(id), nx = MASTERY_USES[lv + 1];
     return `<div class="item"><div class="row"><b>${k.name}</b>${k.yi ? `<span class="small gben">${k.only === 'combo' ? { yi_fati: '法體雙修', yi_fahun: '法魂雙修', yi_tihun: '體魂雙修', yi_san: '三修' }[id] : SCHOOL_NAME[skillSchool(k)]} · 大道至簡</span>` : gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div>
       <div class="small">${skillDesc(k)}</div>
-      <div class="small">${MASTERY[lv]}${nx && !k.yi ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${RES_NAME[skillRes(id)]} ${skillCost(id)}</div></div>`; };
+      <div class="small">${MASTERY[lv]}${nx && !k.yi ? `（${s.skills[id]}/${nx}）` : ''}${k.kind === 'charge' ? '' : ` · 威力 ${skillPow(id).toFixed(1)}`} · 冷卻 ${k.cd} · 耗${costText(id)}</div></div>`; };
   if (isXian(s)) return `<p class="small">${myPaths().map(k => `${RES_NAME[k]} ${fmt(resMax(k))}`).join('；')}。</p>
     <h3 class="gyi">仙術</h3><p class="muted small">大道至簡。成仙之後，${keepWords('一身術法')}反璞歸真，化成了這${yiNum(s)}招：自動施展，跟著境界精進：人仙入門、地仙小成、真仙大成、玄仙圓滿。</p>
     ${ult.map(ultRow).join('')}`;

@@ -273,6 +273,7 @@ function skillDesc(k) {
   if (k.freeze) p.push(`冰凍 ${Math.round(k.freeze * 100)}%`);
   if (k.stun) p.push(`麻痺 ${Math.round(k.stun * 100)}%${k.stunT ? `（${k.stunT} 回合）` : ''}`);
   if (k.brk) p.push(`破防 ${Math.round(k.brk * 100)}%`);
+  if (k.crit) p.push(`暴擊率 +${Math.round(k.crit * 100)}%`);
   if (k.drain) p.push(`吸血 ${Math.round(k.drain * 100)}%`);
   if (k.reflect) p.push(`反震 ${Math.round(k.reflect * 100)}%`);
   return p.join(' · ');

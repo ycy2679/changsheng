@@ -314,14 +314,14 @@ SKILLS.xs_fa = K('接引仙光', 6, '無', 'dmg', 6, 4, { sch: 'fa', brk: .2, xs
 SKILLS.xs_ti = K('仙軀擎嶽', 6, '無', 'multi', 1.15, 5, { hits: 4, sch: 'ti', xs: 1 });
 SKILLS.xs_hun = K('照神仙念', 6, '無', 'dmg', 5.2, 5, { stun: .35, sch: 'hun', xs: 1 });
 // ---------- 大道至簡：成仙後一身術法反璞歸真，按修行路線化成一招（仙界唯一的仙術，自動施展，熟練度跟著境界） ----------
-SKILLS.yi_fa = K('一法通玄', 6, '無', 'dmg', 8, 2, { brk: .3, sch: 'fa', only: 'fa', yi: 1 });
+SKILLS.yi_fa = K('一法通玄', 6, '無', 'dmg', 8, 2, { crit: .3, sch: 'fa', only: 'fa', yi: 1 });
 SKILLS.yi_ti = K('一力破萬法', 6, '無', 'dmg', 8, 2, { pierce: 1, sch: 'ti', only: 'ti', yi: 1 });
 SKILLS.yi_hun = K('一念鎮仙', 6, '無', 'dmg', 7, 3, { pierce: 1, stun: 1, sch: 'hun', only: 'hun', yi: 1 });
-// 兼修合成一招：兼具各路的特點（法修破防、體修穿透、魂修暈眩），耗主路的資源
-SKILLS.yi_fati = K('拳出法隨', 6, '無', 'dmg', 9, 2, { brk: .3, pierce: 1, only: 'combo', yi: 1 });
-SKILLS.yi_fahun = K('念起法生', 6, '無', 'dmg', 8.5, 3, { brk: .3, pierce: 1, stun: 1, only: 'combo', yi: 1 });
+// 兼修合成一招：兼具各路的特點（法修暴擊、體修穿透、魂修暈眩），各路的資源都扣一份
+SKILLS.yi_fati = K('拳出法隨', 6, '無', 'dmg', 9, 2, { crit: .3, pierce: 1, only: 'combo', yi: 1 });
+SKILLS.yi_fahun = K('念起法生', 6, '無', 'dmg', 8.5, 3, { crit: .3, pierce: 1, stun: 1, only: 'combo', yi: 1 });
 SKILLS.yi_tihun = K('神軀同鑄', 6, '無', 'dmg', 8.5, 3, { pierce: 1, stun: 1, only: 'combo', yi: 1 });
-SKILLS.yi_san = K('三元歸一', 6, '無', 'dmg', 10, 3, { brk: .3, pierce: 1, stun: 1, only: 'combo', yi: 1 });
+SKILLS.yi_san = K('三元歸一', 6, '無', 'dmg', 10, 3, { crit: .3, pierce: 1, stun: 1, only: 'combo', yi: 1 });
 for (const id of ['yi_fati', 'yi_fahun', 'yi_tihun', 'yi_san']) Object.defineProperty(SKILLS[id], 'sch', { get: () => { try { return myPaths(L())[0] || 'fa'; } catch (e) { return 'fa'; } }, enumerable: true });
 
 // ---------- 仙界坊市只賣仙階：多補一批靈寶、仙術，免得人仙時貨架很快就空 ----------
