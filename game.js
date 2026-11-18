@@ -377,9 +377,11 @@ const speedCtl = () => tl('guangyin') ? `<select class="mini" onchange="setSpeed
 const L = () => S.life;
 const stg = (s = L()) => STAGES[s.stage];
 const isXian = (s = L()) => s.stage > MORTAL_TOP;                       // 已經成仙（地仙界）
-let XIAN_RATE = 20, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008 };
+let XIAN_RATE = 170, XIAN_GROW = 1.17, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008 };
 // 照修為百分比給的東西（頓悟、擊殺得修為、奇遇給的修為）在仙界跟仙丹一樣打折，不然九重一下就衝完
-const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   // 仙丹每顆補幾成修為：越往上越補不動   // 仙界吐納的是仙靈之氣：修煉速度 ×20（洞府、陣法帶上來以後從 ×30 調低；仙界的修為需求也大得多）
+// 仙界閉關：倍率跟著重數長（需求每重 ×1.2），只靠閉關每重的時間大致一樣，閉關約占修為一半，另一半靠丹藥、頓悟
+const xianRateMul = (s = L()) => isXian(s) ? XIAN_RATE * Math.pow(XIAN_GROW, s.stage - MORTAL_TOP - 1) : 1;
+const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   // 仙丹每顆補幾成修為：越往上越補不動
 const yearSec = (s = L()) => isXian(s) ? 6 : YEAR_SEC;                   // 仙界歲月流得快：線上 6 秒一年
 // 下一步要渡劫：渡劫後期 → 九道天雷；仙界每個大境界 → 仙劫。自動突破、離線都不會碰
 const jieNext = (s = L()) => s.stage === MORTAL_TOP || (isXian(s) && s.stage < STAGES.length - 1 && STAGES[s.stage + 1].major !== stg(s).major);
@@ -406,7 +408,7 @@ const topPlace = (s = L()) => PLACES.filter(p => s.stage >= p.min).pop();   // �
 const placeLv = () => place().lv;
 const stoneUnit = (lv = placeLv()) => Math.round(4 * Math.pow(lv, 1.4));
 // 仙元石：仙界一律用仙元石。價格照凡界公式算（境界改用等效境界），再除以 XY_RATE；收入也一樣除
-const XY_RATE = 100;
+const XY_RATE = 100, XY_INCOME = 50;   // 收入除以 50（價格除以 100）：仙界收入是照價格換算的兩倍
 const est = (s = L()) => s.stage <= MORTAL_TOP ? s.stage : MORTAL_TOP + (s.stage - MORTAL_TOP) / 3;
 const px = (n, s = L()) => isXian(s) ? Math.max(1, Math.round(n / XY_RATE)) : n;
 const xs = () => L().stage - MORTAL_TOP - 1;   // 仙界第幾重（人仙一重 = 0）
@@ -418,7 +420,9 @@ const mpPillPrice = () => px(Math.round(15 * (1 + est()) * pillDisc()));
 const cavePrice = () => isXian() ? Math.round(40 * Math.pow(2, Math.min(8, L().cave)) * Math.pow(1.5, Math.max(0, L().cave - 8))) : 80 * Math.pow(2, L().cave);   // 仙界重新開闢洞府（洞天），收仙元石
 const caveMax = () => isXian() ? 16 : 8;
 const caveMats = (s = L()) => isXian(s) && s.cave === 8 ? [[MAT_HERB[6], 10], [MAT_ORE[6], 10]] : [];   // 洞府升洞天那一級要仙材
-const xiuPillPrice = () => Math.round((isXian() ? 200 * Math.pow(1.15, xs()) : 25 * Math.pow(1.5, L().stage)) * pillDisc());
+// 仙界修為丹：照「補滿一重要花多少」定價（每重 ×1.08，跟收入差不多一起長），人仙不會太便宜、真仙不會買不起
+const XIAN_PER_CHONG = 81000, xianXiuPrice = (major, i) => XIAN_PER_CHONG * Math.pow(1.08, i) * XIAN_PILL[major];
+const xiuPillPrice = () => Math.round((isXian() ? xianXiuPrice(stg().major, xs()) : 25 * Math.pow(1.5, L().stage)) * pillDisc());
 const itemPrice = id => ['heal', 'mp', 'xiu'].includes(ITEMS[id].kind) ? itemPrice0(id) : px(itemPrice0(id));   // 這三種的價格函式已經換算過仙元石，不能再除一次
 const itemPrice0 = id => {
   const st = est(), k = ITEMS[id].kind, f = ITEMS[id].xian ? 1 : Math.pow(1 + st, 1.5);   // 仙界專屬的丹藥不跟著境界漲
@@ -437,7 +441,7 @@ function addTc() { const id = tcNext(); if (!id) return ''; addItem(id); return 
 const sellItemPrice = id => px(sellItemPrice0(id));
 const sellItemPrice0 = id => {
   const it = ITEMS[id], k = it.kind;
-  const base = k === 'tc' ? tcPrice(id) : k === 'root' ? ESSENCE_PRICE : k === 'mat' ? MAT_PRICE[it.grade] : k === 'dan' ? it.base : k === 'brk' ? BRK_PILL_PRICE[it.major] : k === 'xiu' ? (it.major >= XIAN_MJ ? 200 * XY_RATE * Math.pow(1.15, STAGES.findIndex(x => x.major === it.major) - MORTAL_TOP - 1) : 25 * Math.pow(1.5, STAGES.findIndex(x => x.major === it.major)))
+  const base = k === 'tc' ? tcPrice(id) : k === 'root' ? ESSENCE_PRICE : k === 'mat' ? MAT_PRICE[it.grade] : k === 'dan' ? it.base : k === 'brk' ? BRK_PILL_PRICE[it.major] : k === 'xiu' ? (it.major >= XIAN_MJ ? XY_RATE * xianXiuPrice(it.major, STAGES.findIndex(x => x.major === it.major) - MORTAL_TOP - 1) : 25 * Math.pow(1.5, STAGES.findIndex(x => x.major === it.major)))
     : k === 'heal' ? 20 : k === 'mp' ? 15 : it.xian && it.base || { life: 200, body: 500, tech: 150 }[k];
   return Math.max(1, Math.round(base * SELL_RATE));
 };
@@ -683,7 +687,7 @@ function rate(s = L(), mode = s.mode) {
   return (1 + .2 * s.stage) * rootRate(s) * (mainAff(s) ? 1.15 : 1)
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
-    * (isXian(s) ? XIAN_RATE : 1) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
+    * xianRateMul(s) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
 }
 // 靈根後期路線的修煉倍率
 function pathRate(s = L()) {
@@ -768,7 +772,7 @@ function elemMul(a, d, mine = true) {
 }
 
 // ---------- 給事件用的獎懲 ----------
-function addStone(n) { const s = L(); n = Math.max(0, n); if (isXian(s)) { s.xyFrac = (s.xyFrac || 0) + n / XY_RATE; n = Math.floor(s.xyFrac); s.xyFrac -= n; } else n = Math.round(n); s.stone += n; return n; }
+function addStone(n) { const s = L(); n = Math.max(0, n); if (isXian(s)) { s.xyFrac = (s.xyFrac || 0) + n / XY_INCOME; n = Math.floor(s.xyFrac); s.xyFrac -= n; } else n = Math.round(n); s.stone += n; return n; }
 // 厚積薄發：修為滿了還在閉關，多出來的修為化為根基；多修出一整個境界的量就攢滿 +30% 突破率
 function addFound(amount) { const s = L(); s.found = Math.min(.3, (s.found || 0) + amount / stg().need * .3); }
 function addXiu(frac) { const s = L(), need = stg().need, g = Math.min(need - s.xiu, Math.round(need * frac * .35 * xianDamp(s))); s.xiu += Math.max(0, g); return Math.max(0, g); }
@@ -1333,7 +1337,7 @@ function popEvent(storyOnly) {
   // 一般事件一世只發生一次；標了 repeat 的可以重複，但一世最多 4 次，而且要隔 40 年
   if (!storyOnly) for (const e of EVENTS) {
     const seen = s.flags['ev_' + e.id], times = s.flags['evn_' + e.id] || 0;
-    if (!e.xian !== !xian || s.stage < (e.min || 0) || (e.cond && !e.cond(s)) || (seen !== undefined && !e.free && (!e.repeat || times >= 4 || s.age - seen < (e.xian ? 400 : 40)))) continue;
+    if (!e.xian !== !xian || s.stage < (e.min || 0) || (e.cond && !e.cond(s)) || (seen !== undefined && !e.free && (!e.repeat || times >= (e.xian ? 2 : 4) || s.age - seen < (e.xian ? 2000 : 40)))) continue;
     c.push({ ref: { ev: e.id }, w: 1 });
   }
   for (const e of STORY) if (e.cond(s)) c.push({ ref: { story: e.id }, w: 8 });
