@@ -42,6 +42,27 @@ const XIAN_TECH = [
   ['tiandaolu', '玄機通明經', '大道悟真錄', '天心照見經'],
   ['jubao', '仙府藏珍錄', '聚星寶鑑', '萬寶天書'],
 ];
+// 補鍛體、觀想（讓三種主修類各有 9 部，流派功法收集量一致）：[id, 天階範本（id 或數值）, 下品名, 中品名, 上品名]
+const XIAN_TECH_EXTRA = [
+  ['wanjie', 'wanjie', '萬劫仙軀訣', '歷劫不壞錄', '萬劫長存身'],
+  ['xingdou', 'xingdou', '星斗煉仙體', '周天星骨錄', '北斗鎮身經'],
+  ['taichu', 'taichu', '太初仙軀訣', '混元聖骨錄', '先天道骨經'],
+  ['dx_jin', { type: '鍛體', elem: '金', rate: 2.8, def: .7, normalAtk: .5 }, '庚金仙骨訣', '金剛仙身錄', '太白不朽身'],
+  ['dx_tu', { type: '鍛體', elem: '土', rate: 2.7, hp: 1, def: .6 }, '后土鎮身訣', '磐岳仙骨錄', '厚土承天體'],
+  ['dx_lei', { type: '鍛體', elem: '雷', rate: 2.8, atk: .4, crit: .12, normalAtk: .4 }, '雷霆煉骨訣', '九霄雷身錄', '紫極雷體經'],
+  ['dx_bing', { type: '鍛體', elem: '冰', rate: 2.7, hp: .8, def: .5, regen: .02 }, '玄冰仙骨訣', '寒魄凝身錄', '北冥冰魄體'],
+  ['gx_shui', { type: '觀想', elem: '水', rate: 2.7, techXp: .3, shenUp: .3 }, '觀海仙念經', '滄溟照神錄', '若水觀天經'],
+  ['gx_bing', { type: '觀想', elem: '冰', rate: 2.7, shenUp: .5, crit: .1 }, '寒潭映心經', '冰心明鏡錄', '太陰觀神經'],
+  ['gx_lei', { type: '觀想', elem: '雷', rate: 2.8, crit: .15, shenUp: .3 }, '雷音照心經', '震霄神念錄', '天雷觀想經'],
+  ['gx_mu', { type: '觀想', elem: '木', rate: 2.6, evRate: .3, shenUp: .3 }, '青蓮觀心經', '菩提照神錄', '建木通神經'],
+  ['gx_huo', { type: '觀想', elem: '火', rate: 2.8, shenUp: .4, crit: .12 }, '心火照神經', '赤霄觀想錄', '朱明觀天經'],
+  ['gx_jin', { type: '觀想', elem: '金', rate: 2.7, crit: .18, shenUp: .3 }, '金燈照影經', '鏡心觀神錄', '太白觀星經'],
+  ['gx_tu', { type: '觀想', elem: '土', rate: 2.6, shenUp: .4, techXp: .2 }, '坐忘守一經', '觀山定神錄', '鎮嶽觀神經'],
+];
+for (const [tid, tpl, ...names] of XIAN_TECH_EXTRA) {
+  const t = typeof tpl === 'string' ? TECHS[tpl] : tpl;
+  XG.forEach((g, i) => { TECHS[`x${g}_${tid}`] = { name: names[i], grade: g, type: t.type, elem: t.elem, ...xianScale(t, XF[g]) }; });
+}
 for (const [tid, ...names] of XIAN_TECH) {
   const t = TECHS[tid];
   XG.forEach((g, i) => { TECHS[`x${g}_${tid}`] = { name: names[i], grade: g, type: t.type, elem: t.elem, ...xianScale(t, XF[g]) }; });
