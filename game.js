@@ -1632,7 +1632,8 @@ function shelfRank(o) {
   return ({ tech: TECHS, skill: SKILLS, art: ARTS })[o.k][o.id].grade;
 }
 // 貨架分頁，跟悟道樹一樣切換
-let shopTab = 'tech';
+let shopTab = 'tech', shopPage = 'counter';   // 坊市：櫃台／貨架小分頁；貨架裡再分功法、術法⋯⋯
+function setShopPage(k) { shopPage = k; render(); }
 function setShopTab(k) { shopTab = k; render(); }
 function shelf(slots, render1) {
   if (isXian(L()) && shopTab === 'skill') shopTab = 'tech';
@@ -2428,7 +2429,8 @@ function renderShop() {
     const it = ITEMS[o.id];
     return `<div class="item"><div class="row"><span><b>${it.name}</b>${deal}</span></div><div class="small">${it.desc}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`;
   };
-  return `<h3>櫃台</h3>
+  const page = `<nav>${[['counter', '櫃台'], ['shelf', '貨架']].map(([k, n]) => `<button class="${shopPage === k ? 'on' : ''}" onclick="setShopPage('${k}')">${n}</button>`).join('')}</nav>`;
+  return page + (shopPage === 'counter' ? `
     <div class="item"><div class="row"><b>療傷丹</b></div><div class="small">立刻治好傷勢</div><div class="btnrow">${btn(healPrice(), "buy('heal')")}</div></div>
     <div class="item"><div class="row"><b>回氣丹</b></div><div class="small">戰鬥中法力不夠又受傷時自動服用</div><div class="btnrow">${btn(mpPillPrice(), "buy('mp')")}</div></div>
     ${[['herb', '靈草', '煉丹用的靈草。', MAT_HERB], ['ore', '礦材', '煉器、祭煉法寶用的礦材。', MAT_ORE]].map(([k, name, desc, M]) => {
@@ -2437,9 +2439,10 @@ function renderShop() {
       return `<div class="item"><div class="row"><b>${name}</b></div><div class="small">${desc}選擇：${sel}</div><div class="btnrow">${max > 1 ? qtyPicker('mat:' + k, max) : ''}${btn(p * q, `buy('${k}', ${g}, ${q})`).replace('</button>', `${q > 1 ? ` ×${q}` : ''} 買</button>`)}</div></div>`; }).join('')}
     <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
-    <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
+` : `
+    <div class="row"><span></span><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
-    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的${isXian() ? '功法' : '功法、術法'}比較常上架。</p>`;
+    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的${isXian() ? '功法' : '功法、術法'}比較常上架。</p>`);
 }
 // ---------- 百藝・煉丹：丹方（跨世保留）、開爐、出爐 ----------
 const matGrade = (s = L()) => majorGrade(stg(s).major);
