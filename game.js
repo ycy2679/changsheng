@@ -687,7 +687,7 @@ function rate(s = L(), mode = s.mode) {
   return (1 + .2 * s.stage) * rootRate(s) * (mainAff(s) ? 1.15 : 1)
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
-    * xianRateMul(s) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? .5 : 1) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
+    * xianRateMul(s) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? .5 : CLOSED_XIU) * (1 + qualBonus(s)) * pathRate(s) * (1 + .08 * arrEff('juling', s));
 }
 // 靈根後期路線的修煉倍率
 function pathRate(s = L()) {
@@ -772,7 +772,11 @@ function elemMul(a, d, mine = true) {
 }
 
 // ---------- 給事件用的獎懲 ----------
-function addStone(n) { const s = L(); n = Math.max(0, n); if (isXian(s)) { s.xyFrac = (s.xyFrac || 0) + n / XY_INCOME; n = Math.floor(s.xyFrac); s.xyFrac -= n; } else n = Math.round(n); s.stone += n; return n; }
+// 遊歷收益：遊歷遇怪、遊歷奇遇給的靈石／仙元石 ×3（秘境、差事、宗門不算）；閉關修煉 ×2
+const TRAVEL_STONE = 3, CLOSED_XIU = 2;
+let stoneMul = 1;
+function withStoneMul(m, fn) { const o = stoneMul; stoneMul = m; try { return fn(); } finally { stoneMul = o; } }
+function addStone(n) { const s = L(); n = Math.max(0, n) * stoneMul; if (isXian(s)) { s.xyFrac = (s.xyFrac || 0) + n / XY_INCOME; n = Math.floor(s.xyFrac); s.xyFrac -= n; } else n = Math.round(n); s.stone += n; return n; }
 // 厚積薄發：修為滿了還在閉關，多出來的修為化為根基；多修出一整個境界的量就攢滿 +30% 突破率
 function addFound(amount) { const s = L(); s.found = Math.min(.3, (s.found || 0) + amount / stg().need * .3); }
 function addXiu(frac) { const s = L(), need = stg().need, g = Math.min(need - s.xiu, Math.round(need * frac * .35 * xianDamp(s))); s.xiu += Math.max(0, g); return Math.max(0, g); }
@@ -1238,7 +1242,7 @@ function tick(dt) {
   const evGap = () => (90 + Math.random() * 90) / (1 + eff('evRate'));
   if (s.mode === 'travel') {
     s.encT -= dt;
-    if (s.encT <= 0) { s.encT = 12 + Math.random() * 8; encounter(); }
+    if (s.encT <= 0) { s.encT = 12 + Math.random() * 8; withStoneMul(TRAVEL_STONE, encounter); }
     if (!s.ev) { s.evT -= dt; if (s.evT <= 0) { s.evT = evGap(); popEvent(false); } }
   } else {
     if (!s.ev) { s.evT -= dt * .5; if (s.evT <= 0) { s.evT = evGap(); popEvent(true); } }
@@ -1370,7 +1374,7 @@ function choose(i) {
   if (ref.mem) S.meta.memSeen[ref.mem] = 1;
   if (ref.recruit) s.flags['rc_' + stg().major] = (s.flags['rc_' + stg().major] || 0) + 1;
   if (ref.story) { storyMark(ref.story); if (ref.story === 'n1') s.flags.n1 = 1; }
-  const res = ch.run(s);
+  const res = ref.ev ? withStoneMul(TRAVEL_STONE, () => ch.run(s)) : ch.run(s);   // 一般奇遇只在遊歷時出現
   if (ref.arc && !arc(ref.arc).ended) arc(ref.arc).step++;
   log(`【${e.title}】${res}`);
   save(); render();
@@ -1915,7 +1919,7 @@ function applyOffline(sec) {
   s.age = Math.min(age1, ageCap);
   if (age1 > ageCap) log(`壽元將盡，${how}中你強撐著一口氣，沒有再老下去。`);
   s.tox = Math.max(0, s.tox - off / 6 * (1 + .5 * tl('jiedu')));
-  const stones = s.mode === 'travel' ? addStone(off / 16 * .6 * stoneUnit() * .5 * (1 + eff('stone'))) : 0;
+  const stones = s.mode === 'travel' ? withStoneMul(TRAVEL_STONE, () => addStone(off / 16 * .6 * stoneUnit() * .5 * (1 + eff('stone')))) : 0;
   if (s.mode === 'travel') { const n = Math.floor(off / 16 * .6 * .25); if (n) addMat(matGrade(), Math.random() < .5 ? 'herb' : 'ore', n); }
   const o = s.offline;   // 還沒按「知道了」的上一段離線報告：累加起來，不要只顯示最後一分鐘
   s.offline = { sec: Math.round(sec) + (o ? o.sec : 0), off: Math.round(off) + (o ? o.off : 0), xiu: Math.round(gained) + (o ? o.xiu : 0), stones: stones + (o ? o.stones : 0), up: s.stage > stage0 ? stg().name : o ? o.up : '', travel: s.mode === 'travel' };
@@ -2090,7 +2094,7 @@ function renderOffline() {
   const o = L().offline;
   return `<section class="panel card"><b>閉關歸來</b>
     <p>你離開了 ${dur(o.sec)}${o.off < o.sec ? `（洞府只撐得住 ${dur(o.off)}）` : ''}。這段時間修為 +${fmt(o.xiu)}${o.up ? `，突破到了${o.up}` : ''}${o.stones ? `，遊歷所得靈石 ${fmt(o.stones)}` : ''}。</p>
-    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${o.travel ? '（你離開時在遊歷，修為再減半、不吃洞府加成，但有靈石和材料）' : ''}${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園、礦脈也照常運轉。</p>
+    <p class="small muted">離線時照 ${Math.round(offRate() * 100)}% 的效率修煉${o.travel ? '（你離開時在遊歷，修為只有閉關的四分之一、不吃洞府加成，但有靈石和材料）' : ''}${tl('a_minor') ? '' : '；點了悟道樹「水到渠成」才會自動突破小境界，不然修為滿了就停著化為根基'}。丹爐、器爐和藥園、礦脈也照常運轉。</p>
     <div class="choices"><button onclick="closeOffline()">知道了</button></div></section>`;
 }
 // 功法屬性和靈根相符：標示「靈根親和」（主修吐納功法修煉再快 15%）
@@ -2640,7 +2644,7 @@ function renderCraft() {
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
-  { id: 'rudao', title: '踏上仙途', when: s => true, text: '上面的修為條滿了就能突破。「閉關」修煉最快；「遊歷」修煉減半，但會遇到妖獸、撿到靈石和寶物，也比較常碰到奇遇。' },
+  { id: 'rudao', title: '踏上仙途', when: s => true, text: '上面的修為條滿了就能突破。「閉關」修煉最快；「遊歷」修煉只有閉關的四分之一，但會遇到妖獸、撿到靈石和寶物，也比較常碰到奇遇。' },
   { id: 'tupo', title: '突破', when: s => s.xiu >= stg(s).need && !isMajorNext(s), text: '修為滿了，按右邊的「突破」。小境界幾乎都會成功；每過一個大境界（築基、金丹⋯⋯）壽元會大幅增加。' },
   { id: 'fight', title: '戰鬥', when: s => !!s.flags.fought, text: '戰鬥是自動打的：會照「術法」分頁的出招順序放招，資源不夠就普通攻擊。氣血、法力打完不會馬上回滿，連戰會越打越虛。' },
   { id: 'injury', title: '負傷', when: s => s.injury > 0, text: '負傷時修煉減半，遊歷時也會避開妖獸。可以服療傷丹，或乾脆閉關，閉關養傷快一倍。' },
