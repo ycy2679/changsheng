@@ -654,15 +654,6 @@ function xpathForm(s = L()) {
   for (const x of Object.keys(s.techs)) xpAbsorb(x, s);   // 已經學過的體系仙階功法一起化入
   log(`成仙之後，${parts.map(([x]) => `《${TECHS[x].name}》`).join('')}化入了${XPATH_LABEL[key]}的根本功法《${d.name}》，往後隨境界一同精進。`);
 }
-// 輔修圓滿了，可以像自創功法一樣融進流派功法（效果八成）
-function fuseIntoPath(id) {
-  const s = L(), d = TECHS[s.tech]; if (!xpOn(s) || !s.subs.includes(id) || techLayer(id, s) < 9) return;
-  if (armed !== 'xf:' + id) { armed = 'xf:' + id; render(); return; }
-  armed = ''; const t = TECHS[id];
-  for (const k in t) if (!FUSE_SKIP.includes(k) && typeof t[k] === 'number') d[k] = +((d[k] || 0) + t[k] * .8).toFixed(3);
-  s.custom[s.tech] = d; s.subs = s.subs.filter(x => x !== id); delete s.techs[id];
-  log(`《${t.name}》融進了《${d.name}》。`); save(); render();
-}
 const FUSE_TAIL = /[訣經錄法功典篇圖心術譜]+$/;
 const canFuse = (s = L()) => !!dualOn(s) && s.stage >= PATH_STAGE && techLayer(s.tech, s) >= 9 && techLayer(s.tech2, s) >= 9;
 function fuseName(a, b) {
@@ -2292,12 +2283,12 @@ function renderGong() {
     .sort((a, b) => techSort === 'layer' ? techLayer(b) - techLayer(a) || TECHS[b].grade - TECHS[a].grade : TECHS[b].grade - TECHS[a].grade || techLayer(b) - techLayer(a));
   return `<h3>主修</h3>${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換，轉世後恢復。</p>' : ''}${techCard(s.tech)}
     ${pathSlots(s).map(ty => { const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉、精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度、精進都是五折。</p>`); }).join('')}
-    ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（入門 ×1、小成 ×1.25、大成 ×1.5、圓滿 ×2）；效果也隨大境界變強（目前 ×${xpMul(s).toFixed(2).replace(/\.?0+$/, '')}）。圓滿的輔修可以融進來（效果八成）。</p>` : ''}
+    ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（入門 ×1、小成 ×1.25、大成 ×1.5、圓滿 ×2）；效果也隨大境界變強（目前 ×${xpMul(s).toFixed(2).replace(/\.?0+$/, '')}）。</p>` : ''}
     ${tl('liangyi') && !xpOn(s) ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
       ${s.tech2 ? (canFuse() ? `<div class="btns"><button class="mini ${armed === 'fuse' ? 'danger' : 'primary'}" onclick="fuseTech()">${armed === 'fuse' ? '確定融合？兩部功法會合為一部' : '融合自創功法'}</button></div>`
         : '<p class="muted small">踏入化神、主修和副主修都練到圓滿，就能把兩部融合成自創功法：效果兩部相加打八折，直接圓滿，副主修欄也會空出來。</p>') : ''}` : ''}
-    <h3>輔修（${s.subs.length}/${maxSubs()}）</h3>${s.subs.map(id => techCard(id, `<button class="mini on" onclick="toggleSub('${id}')">卸下</button>${xpOn(s) && techLayer(id) >= 9 ? `<button class="mini ${armed === 'xf:' + id ? 'danger' : ''}" onclick="fuseIntoPath('${id}')">${armed === 'xf:' + id ? '確定融入？這部會消失' : `融入《${TECHS[s.tech].name}》`}</button>` : ''}`, TECHS[id].rate ? '<span class="muted">輔修時不算修煉速度</span>' : '')).join('') || '<p class="muted small">空著。鍛體、身法、劍修、長生、丹道、殺伐、悟性、尋寶類功法都能輔修，精進速度是主修的一半。</p>'}
+    <h3>輔修（${s.subs.length}/${maxSubs()}）</h3>${s.subs.map(id => techCard(id, `<button class="mini on" onclick="toggleSub('${id}')">卸下</button>`, TECHS[id].rate ? '<span class="muted">輔修時不算修煉速度</span>' : '')).join('') || '<p class="muted small">空著。鍛體、身法、劍修、長生、丹道、殺伐、悟性、尋寶類功法都能輔修，精進速度是主修的一半。</p>'}
     <div class="row"><h3>已學功法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setTechView('sort', this.value)">${[['grade', '品階高的在前'], ['layer', '層數高的在前']].map(([k, n]) => `<option value="${k}" ${techSort === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <button class="mini ${techUsable ? 'on' : ''}" onclick="setTechView('usable')">只看修得了的</button></span></div>
