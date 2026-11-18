@@ -468,7 +468,7 @@ Object.assign(SHENS, {
   jixinghm: SH('吉星護命', '機緣', '無', 'field', '整場閃避 +15%，打贏後靈石 +50%', { dodge: .15, loot: .5, tech: 'jixing' }),
 });
 Object.assign(SHENS, {
-  buzhantq: SH('不滅戰體', '反彈', '無', 'field', '肉身如混沌不壞：整場敵人攻擊 -25%，反彈 25% 傷害', { foeAtk: .75, reflect: .25, tech: 'd_wu4' }),
+  buzhantq: SH('混沌不壞身', '反彈', '無', 'field', '肉身如混沌不壞：整場敵人攻擊 -25%，反彈 25% 傷害', { foeAtk: .75, reflect: .25, tech: 'd_wu4' }),
   shenmofx: SH('神魔法相', '法相', '無', 'open', '顯化太古神魔：8 回合攻擊 ×1.8、防禦 ×1.3', { fa: [1.8, 1.3, 8], tech: 'd_huo4' }),
   wannianyg: SH('萬念歸一', '禁錮', '無', 'open', '萬念合一刺出：攻擊力 ×6 無視防禦，敵人失神 2 回合', { nuke: 6, pierce: 1, stun: 2, tech: 'g_wu4' }),
   shenyoutx: SH('神遊太虛', '洞察', '無', 'field', '元神神遊太虛：整場閃避 +25%、暴擊 +15%', { dodge: .25, crit: .15, tech: 'g_feng4' }),

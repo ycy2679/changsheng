@@ -81,10 +81,10 @@ for (const [aid, ...names] of XIAN_ART) {
   XG.forEach((g, i) => { ARTS[`x${g}_${aid}`] = { name: names[i], slot: a.slot, grade: g, ...xianScale(a, XF[g]) }; });
 }
 // 仙界秘境頭目專屬
-ARTS.yunhai = { name: '雲海鎮魂鈴', slot: '飾品', grade: 8, hp: .6, def: .4, rate: .6, shenUp: .5 };
+ARTS.yunhai = { name: '雲海鎮魂鈴', slot: '飾品', grade: 8, hp: .6, def: .4, rate: .6, shenUp: .5, boss: 1 };   // 雲海仙宮頭目專屬
 ARTS.wanyaohu = { name: '萬藥葫', slot: '飾品', grade: 8, hp: .8, def: .4, rate: .5, boss: 1 };   // 藥王洞天頭目專屬（原本給仙術，仙界改成只有一招）
 ARTS.baiduji = { name: '擺渡古槳', slot: '武器', grade: 8, atk: .8, crit: .15, rate: .5, boss: 1 };   // 星河斷渡頭目專屬
-ARTS.guixudeng = { name: '歸墟引魂燈', slot: '飾品', grade: 8, atk: .6, crit: .2, lifesteal: .08, rate: .5 };
+ARTS.guixudeng = { name: '歸墟引魂燈', slot: '飾品', grade: 8, atk: .6, crit: .2, lifesteal: .08, rate: .5, boss: 1 };   // 歸墟頭目專屬
 SKILLS.yaowang = K('萬藥回春', 8, '木', 'heal', 6, 5, { boss: 1 });
 SKILLS.tianheduan = K('一劍斷天河', 8, '水', 'dmg', 9, 6, { pierce: 1, boss: 1 });
 
@@ -161,7 +161,7 @@ EVENTS.push(
     { t: '赴宴', run(s) { const n = addStone(stoneUnit(topPlace().lv) * 8); s.tox = Math.min(100, s.tox + 20); return `席上的仙釀太烈，你喝得頭昏腦脹，丹毒 +20。散席時主人塞給每個人一個紅包，你得到仙元石 ${n}。`; } },
     { t: '婉拒', run() { return '你回了一封客氣的信。青鳥看起來有點失望。'; } }] },
   { id: 'xj_fallen', xian: 1, title: '沒有仙籍的人', text: '坊市角落蹲著一個衣衫破舊的仙人。他說他的名字被劃掉了，卻不知為何沒有墜回凡界，只能在仙界躲躲藏藏。', choices: [
-    { t: '給他一些仙元石', run(s) { const n = Math.min(s.stone, 50); s.stone -= n; return pct(.5) ? `他收下仙元石 ${n}，教了你一門他從前的本事：${giftSkill(xgr())}。` : `他收下仙元石 ${n}，什麼也沒說就消失在人群裡。`; } },
+    { t: '給他一些仙元石', run(s) { const n = Math.min(s.stone, 50); s.stone -= n; return pct(.5) ? `他收下仙元石 ${n}，指點了你幾處修行上的關竅，那是他從前的本事。修為 +${fmt(addXiu(.3))}。` : `他收下仙元石 ${n}，什麼也沒說就消失在人群裡。`; } },
     { t: '報給仙官', run() { return `仙官派人把他帶走了，記了你仙功 ${addGong(15)}。你回頭看了一眼，他也正看著你。`; } }] },
   { id: 'xj_peach', xian: 1, title: '蟠桃落果', text: '一顆熟透的仙桃從雲上掉下來，正好滾到你腳邊，香得整條路都是甜味。', choices: [
     { t: '吃掉它', run() { addLife(150); return '一口下去，滿嘴生津，身上的倦意一掃而空。壽元 +150 年。'; } },
@@ -217,7 +217,7 @@ const XIAN_STORY = [
   { id: 'n8b', title: '第一衰', cond: s => isXian(s) && s.stage >= 41 && xs_().n8a && !xs_().n8b,
     text: '再見到晏青蘿，她的衣角沾著一點灰，怎麼拂也拂不掉。她自己先笑了：「天人五衰，第一衰。」她算過，自己還剩不到一百年。',
     choices: [
-      { t: '替她找延壽的法子', run() { xsMark('n8b'); return '你跑遍了萬藥仙谷，找來的延壽仙丹她一顆也沒吃：「仙丹是給還有路走的人吃的。我的路，到這裡就好。」'; } },
+      { t: '替她找延壽的法子', run() { xsMark('n8b'); return '你跑遍了仙界的坊市和藥園，找來的延壽仙丹她一顆也沒吃：「仙丹是給還有路走的人吃的。我的路，到這裡就好。」'; } },
       { t: '陪她把剩下的日子過完', run() { xsMark('n8b'); addLife(50); return '你們把仙界能去的地方都走了一遍。她說這樣就夠了。你也覺得，這些年過得比哪一世都慢。壽元 +50 年。'; } }] },
   { id: 'n8c', title: '隕落', cond: s => isXian(s) && s.stage >= 43 && xs_().n8b && !xs_().n8,
     text: '那天天門外起了風。晏青蘿的名字，在仙籍上被一筆劃掉。她站過的地方空了，四周的仙靈之氣卻忽然濃了一截，濃到你的修為都跟著漲。仙官站在你身後，聲音很輕：「這就是回收。仙界的靈氣，就是這麼來的。」',

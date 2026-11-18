@@ -335,7 +335,7 @@ function renderMortal() {
     <p>${S.meta.lives === 1 ? '你降生在山腳下的一個小鎮。聽說山裡住著會飛的仙人，但沒有人真的見過。' : '你又一次生在凡人家裡，前世的事像一場記不清的夢。'}這一世，你生在什麼樣的人家？</p>
     <div class="namerow small">名字：<input class="nameinput" maxlength="8" value="${s.name || ''}" onchange="setName(this.value)"><button class="mini" onclick="rerollName()">換一個</button></div>
     <div class="opts">${m.origins.map(id => { const o = ORIGINS[id]; return `<button class="opt" onclick="chooseOrigin('${id}')"><b class="g${o.r}">${o.name}</b><span class="small">${o.desc}</span></button>`; }).join('')}</div>
-    ${S.meta.ascends > 0 ? `<p class="small muted">你飛升過。碑上的那一縷真靈還記得仙界的路，這一世也可以不當凡人：</p><div class="opts"><button class="opt" onclick="chooseXianStart()"><b class="g8">從仙人開始</b><span class="small">跳過凡人篇和整個凡界，測完根骨、選好路線，直接是人仙一重（帶一部仙階下品功法、一門術法、一點仙元石）。這一世的道心道果只算仙界的部分。</span></button></div>` : ''}</section>`;
+    ${S.meta.ascends > 0 ? `<p class="small muted">你飛升過。碑上的那一縷真靈還記得仙界的路，這一世也可以不當凡人：</p><div class="opts"><button class="opt" onclick="chooseXianStart()"><b class="g8">從仙人開始</b><span class="small">跳過凡人篇和整個凡界，測完根骨、選好路線，直接是人仙一重（帶一部仙階下品功法、一點仙元石，術法化成修行路線的那一招）。這一世的道心道果只算仙界的部分。</span></button></div>` : ''}</section>`;
   if (m.phase === 'fate') return `${head}<section class="panel card"><b>仙緣</b>
     <p>${Math.floor(s.age)} 歲這年，平靜的日子起了波瀾。你只能抓住其中一個機會。</p>
     <div class="opts">${m.fates.map(id => `<button class="opt" onclick="chooseFate('${id}')"><b>${FATES[id].name}</b><span class="small">${FATES[id].desc}</span></button>`).join('')}</div></section>`;
@@ -829,15 +829,15 @@ function renderCodex() {
   const section = (title, cls, k, ids, nameOf) => ids.length ? `<div class="row small" style="margin-top:8px"><b class="${cls}">${title}</b><span class="muted">${ids.filter(id => has(k, id)).length}/${ids.length}</span></div>
     <div class="codex">${ids.map(id => cell(k, id, nameOf(id), cls)).join('')}</div>` : '';
   // 有品階的：依第二排分組，再照天地玄黃分段
-  const graded = (P, key, keys) => {
+  const graded = (P, key, keys, ok = () => true) => {
     if (!keys.includes(codexSub)) codexSub = keys[0];
-    const ids = Object.keys(P).filter(id => P[id][key] === codexSub && !P[id].custom);
-    return nav(keys.map(g => { const l = Object.keys(P).filter(id => P[id][key] === g && !P[id].custom); return [g, `${g} ${l.filter(id => has(codexTab, id)).length}/${l.length}`]; }), codexSub, 'sub')
+    const ids = Object.keys(P).filter(id => P[id][key] === codexSub && !P[id].custom && ok(id));
+    return nav(keys.map(g => { const l = Object.keys(P).filter(id => P[id][key] === g && !P[id].custom && ok(id)); return [g, `${g} ${l.filter(id => has(codexTab, id)).length}/${l.length}`]; }), codexSub, 'sub')
       + [8, 7, 6, 4, 3, 2, 1].map(g => section(GRADE_NAMES[g], 'g' + g, codexTab, ids.filter(id => P[id].grade === g), id => P[id].name)).join('');
   };
   let body = '';
   if (codexTab === 't') body = graded(TECHS, 'type', TECH_TYPES);
-  else if (codexTab === 'k') body = graded(SKILLS, 'elem', SKILL_ELEMS);
+  else if (codexTab === 'k') body = graded(SKILLS, 'elem', SKILL_ELEMS, id => SKILLS[id].grade < 6 || SKILLS[id].yi);   // 仙界只剩大道至簡那三招，其他仙術拿不到就不列
   else if (codexTab === 'a') body = graded(ARTS, 'slot', ART_SLOTS);
   else if (codexTab === 's') body = [...new Set(Object.values(SHENS).map(x => x.type))].map(ty => section(ty, 'g4', 's', Object.keys(SHENS).filter(id => SHENS[id].type === ty), id => SHENS[id].name)).join('');
   else if (codexTab === 'p') body = [5, 4, 3, 2, 1].map(r => section(PHYS_RANK[r], 'g' + r, 'p', Object.keys(PHYSIQUES).filter(id => PHYSIQUES[id].r === r), id => PHYSIQUES[id].name)).join('');
@@ -1557,7 +1557,7 @@ function useDan(id, it, addTox) {
     case 'pozhang': if (s.flags.pozhang) return ''; s.flags.pozhang = 1; return `服下${it.name}，下一次小境界突破必定成功。`;
     case 'jiedan': if (danBlock(id, s)) return ''; s.flags.jiedan = (s.flags.jiedan || 0) + 1; return `服下渡劫仙丹，藥力沉在丹田，等著劫雷落下${s.flags.jiedan > 1 ? `（共 ${s.flags.jiedan} 顆）` : ''}。`;
     case 'humai': if (s.flags.humai) return ''; s.flags.humai = 1; return `服下${it.name}，經脈被一層藥力護住。`;
-    case 'zhuyan': if (s.age < 26) return ''; s.age -= it.amt || 10; addTox(it.tox); return `服下${it.name}，鬢角的白髮轉黑，年齡 -${it.amt || 10} 歲。`;
+    case 'zhuyan': if (s.age < 26) return ''; s.age -= it.amt || 10; ageShift(s, -(it.amt || 10)); addTox(it.tox); return `服下${it.name}，鬢角的白髮轉黑，年齡 -${it.amt || 10} 歲。`;
     case 'xingshen': if (s.flags.xingshen) return ''; s.flags.xingshen = 1; return `服下${it.name}，神魂清明，下一場戰鬥神通可以再發動一次。`;
     case 'tianji': if (s.flags.tianji || danBlock(id, s)) return ''; s.flags.tianji = 1; return `服下${it.name}，隱約算到坊市下一批貨裡有好東西。`;
   }
@@ -1849,6 +1849,12 @@ function wuShuaiCheck(s) {
   if (n <= was) return;
   s.wsLog = n; log(`天人五衰之${'一二三四五'[n - 1]}：${WU_SHUAI[n - 1]}。${n === 1 ? '仙人的壽元也有盡頭。衝下一個大境界，或吃延壽仙丹，能把它推遠一點。' : n === 5 ? '五衰俱現，你的名字快要從碑上被劃掉了。' : ''}`);
 }
+// 年齡變年輕時，用年齡記的冷卻（秘境、奇遇、宗門、仙籍差事）跟著往前移，不然會越等越久
+function ageShift(s, d) {
+  for (const k in s.flags) if (/^(sj|ev)_/.test(k) && typeof s.flags[k] === 'number') s.flags[k] += d;
+  if (s.sect) for (const k of ['pay', 'duty', 'bigbi', 'task']) if (typeof s.sect[k] === 'number') s.sect[k] += d;
+  if (s.xj && typeof s.xj.task === 'number') s.xj.task += d;
+}
 function die() {
   const s = L(); s.dead = true;
   S.meta.history.push({ life: S.meta.lives, name: s.name || '', stageName: STAGES[s.peak].name + (s.peak > MORTAL_TOP ? '' : s.ascended ? '・飛升' : s.tribFail ? '・渡劫失敗' : ''), fall: s.peak > MORTAL_TOP ? 1 : 0, age: Math.floor(s.age), root: s.root ? rootName(s) + (s.phys ? '、' + PHYSIQUES[s.phys].name : '') : '' });
@@ -1869,7 +1875,7 @@ function setDeathView(v) { deathView = v; render(); scrollTo(0, 0); }
 function arm(what) {
   if (armed !== what) { armed = what; render(); return; }
   armed = '';
-  if (what === 'rebirth') { log('你散去一身修為，兵解轉世。'); die(); render(); }
+  if (what === 'rebirth') { log('你散去一身修為，兵解轉世。'); L().bingjie = 1; die(); render(); }
   if (what === 'reset') { localStorage.removeItem(SAVE_KEY); S = null; load(); title = true; render(); }
 }
 
@@ -1935,13 +1941,13 @@ function rootDesc(root) {
 }
 function renderDraw() {
   const s = L(), d = s.draw, fake = r => rootName({ root: r });
-  const intro = s.mortal ? FATES[s.mortal.fate].test : S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。';
+  const intro = s.mortal && s.mortal.fate ? FATES[s.mortal.fate].test : s.xianStart ? '碑上那一縷真靈還認得仙界的路。成仙之前，先看看這一世的根骨。' : S.meta.lives === 1 ? '踏上仙途之前，先看看自己生來帶著什麼。' : '新的一世，根骨也重新來過。';
   const opt = (kind, i, on, title, cls, desc) => `<button class="opt ${on ? 'on' : ''}" onclick="pickDraw('${kind}',${i})"><b class="${cls}">${title}</b><span class="small">${desc}</span></button>`;
   // 前世功法（悟道樹）帶來的主修如果挑靈根，提醒要哪個屬性
   const kid = S.meta.keepTech && S.meta.keepTech.id, kt = kid && kid !== 'yinqi' && kid in s.techs ? TECHS[kid] : null;
   const needEl = kt && kt.grade >= 3 && kt.elem !== '無' && kt.type !== '鍛體' ? kt.elem : null;
   const rootCls = r => ({ heaven: 'g4', mutant: 'g4', void: 'g4', dual: 'g3', triple: 'g2', quad: 'g1', five: 'g1' })[r.type];
-  return `<header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
+  return `<header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心&nbsp;${S.meta.dao}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel card"><b>${s.mortal ? '測靈根' : '測根骨'}</b>
       <p>${intro}</p>
       ${needEl ? `<p class="small">前世功法《${kt.name}》要${needEl}屬性靈根才能當主修，合得上的靈根標了「合前世功法」。</p>` : ''}
@@ -1990,7 +1996,7 @@ function render() {
   if (s.mortal) { app.innerHTML = renderMortal(); updateMortal(); return; }
   if (tab === 'shop') ensureShop();
   app.innerHTML = cur(`
-    <header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心 ${S.meta.dao}${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
+    <header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag()} · 道心&nbsp;${S.meta.dao}${speedCtl()}<button class="mini" onclick="goTitle()">首頁</button></span></header>
     <section class="panel">
       <div class="row"><span><b class="realm" id="realm">${realmName()}</b> <span class="root">${rootName()}</span></span><span class="muted" id="age"></span></div>
       ${bar('life', 0, 'lifebar')}
@@ -2046,7 +2052,7 @@ function updateDyn() {
   $('hptxt').textContent = `${fmt(Math.round(st.hp * hp))} / ${fmt(st.hp)}`; $('hpbar').firstChild.style.width = hp * 100 + '%';
   { const ps = myPaths(s), fr = k => k === 'fa' ? mp : k === 'hun' ? s.snNow ?? 1 : .2, m0 = ps[0];
     $('mplbl').textContent = cur(RES_NAME[m0]) + (m0 === 'ti' ? '（開戰兩成）' : '');
-    $('mptxt').textContent = ps.map((k, i) => `${i ? cur(RES_NAME[k]) + ' ' : ''}${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}`).join(' · ');
+    $('mptxt').textContent = ps.map((k, i) => `${i ? cur(RES_NAME[k]) + ' ' : ''}${fmt(Math.round(resMax(k, s, st) * fr(k)))} / ${fmt(resMax(k, s, st))}`).join(' · ');   // 不可拆空格：窄螢幕只在「·」換行
     $('mpbar').firstChild.style.width = fr(m0) * 100 + '%'; }
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
@@ -2146,7 +2152,7 @@ function techHint(id) {
 function pathSection(s = L()) {
   if (s.flags.pathFree) return `<p class="small">這一世還沒定下修行的路（目前照法修算），可以選一次，選了就不能改：</p><div class="btns">${Object.entries(PATHS).map(([id, x]) => `<button onclick="choosePathLate('${id}')">${x.name}</button>`).join('')}</div>`;
   return pathList(s).map(([id, w]) => `<div class="item"><div class="row"><b>${PATHS[id].name}</b><span class="small muted">${w < 1 ? '兼修（效果五折）' : '主修路線'} · 目前加成 ×${(pathGrow(s) * w).toFixed(2)}</span></div><div class="small">${PATHS[id].desc}</div></div>`).join('')
-    + '<p class="muted small">路線的加成隨大境界成長（練氣 ×0.6，到渡劫 ×1.6）；代價不隨境界變。</p>';
+    + '<p class="muted small">路線的加成隨大境界成長（練氣 ×0.6，到渡劫 ×1.6，成仙後繼續長到玄仙 ×2.1）；代價不隨境界變。</p>';
 }
 function renderGong() {
   const s = L();
@@ -2403,7 +2409,7 @@ function renderShop() {
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
     <div class="row"><h3>貨架</h3><span class="small muted">下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
-    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的功法、術法比較常上架。</p>`;
+    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的${isXian() ? '功法' : '功法、術法'}比較常上架。</p>`;
 }
 // ---------- 百藝・煉丹：丹方（跨世保留）、開爐、出爐 ----------
 const matGrade = (s = L()) => majorGrade(stg(s).major);
@@ -2607,8 +2613,9 @@ function setCraftTab(k) { craftTab = k; render(); }
 const craftNav = () => `<nav>${(isXian() ? [['dan', '仙丹'], ['qi', '靈器'], ['zhen', '仙陣']] : [['dan', '煉丹'], ['qi', '煉器'], ['zhen', '陣法']]).map(([k, n]) => `<button class="${craftTab === k ? 'on' : ''}" onclick="setCraftTab('${k}')">${n}</button>`).join('')}</nav>`;
 function renderCraft() {
   const s = L(), lv = alchLv(), xp = s.alch || 0, f = s.furnace;
-  const known = Object.keys(RECIPES).filter(knowRecipe), total = Object.keys(RECIPES).length;
-  const herbs = MAT_HERB.slice(1).filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
+  const here = Object.keys(RECIPES).filter(id => (RECIPES[id].g >= 6) === isXian(s));   // 凡界、仙界的丹方分開算
+  const known = here.filter(knowRecipe), total = here.length;
+  const herbs = (isXian(s) ? MAT_HERB.slice(6) : MAT_HERB.slice(1, 5)).filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
     const r = RECIPES[id], nd = brewNeed(id), max = brewMax(id, s), key = 'dan:' + id, q = getQty(key, Math.max(max, 1)), ok = max >= 1;
     return `<div class="item"><div class="row"><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}</div>
@@ -2622,10 +2629,10 @@ function renderCraft() {
     <h3>煉丹術・${ALCH_RANK[lv]}</h3>
     ${lv < 3 ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${ALCH_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : '<p class="small same">已是宗師。</p>'}
     <h3>丹爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b>${ITEMS[f.id].name}</b></span><span>還要 <span id="furT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'furB')}</div>` : '<p class="small muted">爐火已熄，選一張丹方開爐。關掉網頁也會照煉。</p>'}
-    <p class="small">靈草：${herbs}</p>
+    <p class="small">${isXian(s) ? '仙草' : '靈草'}：${herbs}</p>
     <h3>丹方（${known.length}/${total}）</h3>
     ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))((isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => known.some(id => RECIPES[id].g === g)))}
-    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的靈石當爐費；修為丹、突破丹只能煉目前大境界用的那一種。失敗靈草會燒掉，地階以上的丹還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
+    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹、突破丹只能煉目前大境界用的那一種。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
@@ -2694,19 +2701,19 @@ function renderDao() {
 function renderDeath() {
   const s = L(), h = S.meta.history[S.meta.history.length - 1];
   const fall = isXian(s), old = s.ascended && !fall;   // old：v1.6 以前飛升就結束的存檔
-  const head = `<header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag(s)} · ${fall ? '隕落' : old ? '飛升' : '坐化'}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  const head = `<header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag(s)} · ${s.bingjie ? '兵解' : fall ? '隕落' : old ? '飛升' : '坐化'}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
   if (deathView === 'tree') return `${head}<section class="panel card">
     <div class="row"><b>悟道</b><span>可用道果 <b class="same">${S.meta.guo}</b></span></div>
     <p class="small muted">天賦永久保留，下一世開始就生效。點好了就轉世，重新抽根骨。</p>
     <div class="choices"><button onclick="setDeathView('sum')">回顧這一世</button><button class="primary" onclick="rebirth()">轉世</button></div></section>
     <section class="panel">${renderTree()}</section>`;
   return `${head}<section class="panel card">
-    ${fall ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.jieFail ? '渡仙劫隕落' : '壽盡隕落'}</b>
-    <p>${s.jieFail ? '劫雷散去的時候，你已經不在了。' : '五衰走到了盡頭。'}無字碑上，你的名字${s.name ? `「${s.name}」` : ''}被一筆劃掉。</p>
+    ${fall ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.jieFail ? '渡仙劫隕落' : s.bingjie ? '兵解' : '壽盡隕落'}</b>
+    <p>${s.jieFail ? '劫雷散去的時候，你已經不在了。' : s.bingjie ? '你散去一身仙元，仙軀化成一道清光。' : '五衰走到了盡頭。'}無字碑上，你的名字${s.name ? `「${s.name}」` : ''}被一筆劃掉。</p>
     <p>你感覺自己往下墜，穿過雲層、穿過天門，一路墜回凡界。前世的記憶一點一點被抹去——只剩一縷，怎麼也抹不掉。</p>` : old ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · 飛升</b>
     <p>你的名字${s.name ? `「${s.name}」` : ''}刻上了無字碑。碑上很前面的位置，有一個被劃掉的名字，是你自己的筆跡。</p>
-    <p class="same">仙界篇（地仙界）已經開放：轉世時可以選擇直接從仙人開始。</p>` : `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.tribFail ? '渡劫失敗' : '坐化'}</b>`}
-    <p>${fall ? `你在 ${h.age} 歲隕落。` : old ? `你在 ${h.age} 歲飛升。` : `你在 ${h.age} 歲走到了盡頭。`}這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
+    <p class="same">仙界篇（地仙界）已經開放：轉世時可以選擇直接從仙人開始。</p>` : `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.tribFail ? '渡劫失敗' : s.bingjie ? '兵解' : '坐化'}</b>`}
+    <p>${s.bingjie ? `你在 ${h.age} 歲兵解。` : fall ? `你在 ${h.age} 歲隕落。` : old ? `你在 ${h.age} 歲飛升。` : `你在 ${h.age} 歲走到了盡頭。`}這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
     <p>這一世的感悟化為道心 +${s.daoGot}、道果 +${s.daoGot}。現在共有道果 <b class="same">${S.meta.guo}</b>，可以到悟道樹點天賦。</p>
     <div class="choices"><button class="primary" onclick="setDeathView('tree')">入悟道</button></div></section>
     <section class="panel"><h3>這一世的紀事</h3>${renderLog(true)}</section>`;
@@ -2716,19 +2723,21 @@ function renderDeath() {
 const HELP = [
   ['放置修煉', '開著網頁，修為就會自己增長。線上 60 秒是遊戲裡的 1 年。關掉網頁後修為照樣累積（效率較低），也會變老，但只有線上的三分之一。點了「水到渠成」，離線時也會自動突破小境界；沒點的話修為滿了就停下，多的化為根基。'],
   ['閉關與遊歷', '閉關修為較穩，多出來的修為會變成根基，提高突破成功率，偶爾還會頓悟。遊歷會遇到事件、戰鬥和寶物，但可能受傷。'],
-  ['凡人篇', '每一世都從凡人開始：先抽出身，做些凡人的事累積底子，等仙緣上門後選一條路，測出靈根、感氣入體，才算踏入練氣。'],
+  ['凡人篇', '每一世都從凡人開始（飛升過以後，也可以選擇從仙人開始）：先抽出身，做些凡人的事累積底子，等仙緣上門後選一條路，測出靈根、感氣入體，才算踏入練氣。'],
   ['突破', '修為滿了就能突破。小境界容易，失敗只會散去一些修為。大境界有機率失敗，失敗會經脈受創、折損壽元，還可能跌回上一個小境界，境界越高越兇險。服用對應境界的突破丹可以提高成功率。大境界成功時會決定品質（下品到極品，例如無瑕道基、九竅金丹），這一世永久提升修煉和戰力；選「全力一搏」成功率較低，但更容易出好品質。想要極品，還得有對應境界的天材地寶（例如突破築基要玄黃地乳），可以從稀有事件、戰鬥掉落、坊市、拍賣得到。'],
   ['神通', '比術法強得多的本事，每門一場戰鬥發動一次。踏入化神會依靈根覺醒本命神通；突破出極品、稀有體質、天階功法圓滿（覺醒該功法專屬的神通）、天階法寶祭煉圓滿也會覺醒。神通跟著這一世，轉世後重來。'],
   ['功法、術法、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。術法在戰鬥中自動施放，要耗法力，用得越多越熟練。法力不夠時會自動服回氣丹。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
   ['雙主修', '悟道樹「兩儀同修」（曾經修到化神才能點）可以多修一部吐納功法當副主修。跟主修五行相生（金生水、水生木、木生火、火生土、土生金）的效果五成，相剋的不能同修，其他三成。'],
   ['自創功法', '踏入化神後，主修和副主修都練到第 9 層，可以把兩部融合成自創功法：效果兩部相加打八折、直接圓滿，副主修欄空出來可以再修別的。'],
   ['靈根後期路線', '踏入化神後，靈根會走上自己的路：五行齊全的是「五行圓滿」，修煉和突破大增；天靈根、變異靈根是「靈根化道」，專精自己的屬性；空靈根是「萬法歸空」，專精無屬性。雙、三、四靈根沒有路線，但可以煉化五行之精補齊五行。'],
-  ['坐化與輪迴', '壽元用盡就會坐化。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
+  ['坐化與輪迴', '壽元用盡就會坐化，也可以自己兵解轉世。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
+  ['飛升', `渡劫後期修為滿了，要挨九道天雷，撐過就飛升仙界。飛升還要道心 ${ASCEND_DAO}，並且走完守碑人的故事；道心不夠的話，這一世多半飛升不了，可以考慮兵解。`],
+  ['仙界', '成仙後一身術法反璞歸真，按修行路線化成一招（大道至簡），熟練度跟著境界走，仙界也不再賣術法。仙界每個大境界都要渡仙劫，渡不過就隕落；壽元剩兩成時會出現天人五衰。仙界隕落也會轉世，飛升過一次以後，轉世可以選擇跳過凡界，直接從人仙一重開始。'],
   ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括化身（自動處理雜事）、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
 ];
 function renderTitle() {
   const s = L(), m = S.meta;
-  const where = s.dead ? `第 ${m.lives} 世已坐化，等待轉世` : s.draw ? `第 ${m.lives} 世，正在測靈根` : s.mortal ? `第 ${m.lives} 世 · 凡人 · ${Math.floor(s.age)} 歲` : `第 ${m.lives} 世 · ${stg().name} · ${Math.floor(s.age)} 歲`;
+  const where = s.dead ? `第 ${m.lives} 世已${s.bingjie ? '兵解' : s.peak > MORTAL_TOP ? '隕落' : '坐化'}，等待轉世` : s.draw ? `第 ${m.lives} 世，正在測靈根` : s.mortal ? `第 ${m.lives} 世 · 凡人 · ${Math.floor(s.age)} 歲` : `第 ${m.lives} 世 · ${stg().name} · ${Math.floor(s.age)} 歲`;
   return `<section class="title">
     <div class="brand"><h1>長生閒記</h1>${themeBtn()}</div>
     <p class="lead">凡人百年，修士千載，仙人不記歲月。<br>你只是一縷不肯散去的念頭，一世又一世地回到人間。<br>這一世，能走多遠？</p>
