@@ -28,8 +28,7 @@ function newLife(meta) {
     lifeBonus: 0, brkBonus: 0, flags: {}, arcs: {}, encT: 15, evT: 100, ev: null, log: [], wins: 0, peak: 0,
   };
   // 前世功法：保留上一世的主修（連同進度）
-  if (t('qianshi') && meta.keepTech && meta.keepTech.def) { TECHS[meta.keepTech.id] = meta.keepTech.def; s.custom = { [meta.keepTech.id]: meta.keepTech.def }; }
-  if (t('qianshi') && meta.keepTech && TECHS[meta.keepTech.id]) s.techs[meta.keepTech.id] = meta.keepTech.xp;
+  if (t('qianshi') && meta.keepTech && TECHS[meta.keepTech.id] && !TECHS[meta.keepTech.id].custom && !TECHS[meta.keepTech.id].xpath) s.techs[meta.keepTech.id] = meta.keepTech.xp;   // 自創功法系統拿掉了，以前的自創功法不帶
   // 宿世神通：帶上上一世的一門神通（報通）
   s.shen = t('baotong') && meta.lastShen && meta.lastShen.length ? [pick(meta.lastShen)] : [];
   s.shenEquip = s.shen.slice();
@@ -618,8 +617,7 @@ function setPathMain(id) {
   else log(`以《${TECHS[id].name}》為${nm}主修（效果五折）。`);
   s.ptech[ty] = id; s.subs = s.subs.filter(x => x !== id); save(); render();
 }
-// ---------- 自創功法：化神後主修、副主修都圓滿，融合成一部 ----------
-// 效果是兩部相加打八折，直接從第 9 層開始；自創的功法存在 s.custom，讀檔時再登記回 TECHS
+// ---------- 自創功法（v2.2.4 起拿掉融合功能；以前融出來的只留到那一世結束，存在 s.custom，讀檔時再登記回 TECHS） ----------
 const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom', 'xpath'];
 // ---------- 仙界流派功法：成仙時主修依修行路線改成固定名字，繼承原本主修（含兼修主修五折、副主修）的效果，隨大境界變強；仙界主修不能再換 ----------
 const XPATH_TECH = { fa: ['天衍法章', '太衍經'], ti: ['九極鑄身篇', '太初經'], hun: ['太虛守神錄', '太虛經'], 'fa,ti': ['萬法鑄體訣', '混元典'], 'fa,hun': ['陰陽觀想法', '衍天經'], 'hun,ti': ['形神同鑄錄', '神魔經'], 'fa,hun,ti': ['三元歸真錄', '鴻蒙經'] };   // [地仙界, 天仙界進化（之後才用）]
@@ -653,26 +651,6 @@ function xpathForm(s = L()) {
   s.xpFrom = s.tech; s.tech = id; s.tech2 = null; s.ptech = {};
   for (const x of Object.keys(s.techs)) xpAbsorb(x, s);   // 已經學過的體系仙階功法一起化入
   log(`成仙之後，${parts.map(([x]) => `《${TECHS[x].name}》`).join('')}化入了${XPATH_LABEL[key]}的根本功法《${d.name}》，往後隨境界一同精進。`);
-}
-const FUSE_TAIL = /[訣經錄法功典篇圖心術譜]+$/;
-const canFuse = (s = L()) => !!dualOn(s) && s.stage >= PATH_STAGE && techLayer(s.tech, s) >= 9 && techLayer(s.tech2, s) >= 9;
-function fuseName(a, b) {
-  const ca = [...a.replace(FUSE_TAIL, '')], cb = [...b.replace(FUSE_TAIL, '')], names = new Set(Object.values(TECHS).map(t => t.name));
-  for (let i = 0; i < 30; i++) { const n = pick(ca) + pick(cb) + pick(['訣', '經', '錄', '真解']); if (!names.has(n) && n[0] !== n[1]) return n; }
-  return ca[0] + cb[0] + '合道經';
-}
-function fuseTech() {
-  const s = L(); if (!canFuse(s)) return;
-  if (armed !== 'fuse') { armed = 'fuse'; render(); return; }
-  armed = '';
-  const a = TECHS[s.tech], b = TECHS[s.tech2];
-  const d = { name: fuseName(a.name, b.name), grade: Math.max(a.grade, b.grade), type: a.type, elem: a.elem !== '無' ? a.elem : b.elem, custom: 1 };
-  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) if (!FUSE_SKIP.includes(k)) d[k] = +(((a[k] || 0) + (b[k] || 0)) * .8).toFixed(3);
-  const id = 'zc' + Date.now().toString(36);
-  TECHS[id] = d; (s.custom = s.custom || {})[id] = d;
-  s.techs[id] = techNeed(id, 9); s.tech = id; s.tech2 = null;
-  log(`融會《${a.name}》與《${b.name}》，自創《${d.name}》，一出手便是圓滿之境！`);
-  save(); render();
 }
 // 設副主修：換掉原本的副主修要散功（兩次確認）；再點一次同一部就卸下
 function setDual(id) {
@@ -1949,7 +1927,7 @@ function ageShift(s, d) {
 function die() {
   const s = L(); s.dead = true;
   S.meta.history.push({ life: S.meta.lives, name: s.name || '', stageName: STAGES[s.peak].name + (s.peak > MORTAL_TOP ? '' : s.ascended ? '・飛升' : s.tribFail ? '・渡劫失敗' : ''), fall: s.peak > MORTAL_TOP ? 1 : 0, age: Math.floor(s.age), root: s.root ? rootName(s) + (s.phys ? '、' + PHYSIQUES[s.phys].name : '') : '' });
-  { const kid = xpOn(s) && s.xpFrom && TECHS[s.xpFrom] ? s.xpFrom : s.tech; S.meta.keepTech = { id: kid, xp: s.techs[kid], def: TECHS[kid].custom ? TECHS[kid] : null }; }   // 流派功法帶不走，帶成仙前的主修   // 給「前世功法」天賦用（自創的連定義一起帶）
+  { const kid = xpOn(s) && s.xpFrom && TECHS[s.xpFrom] ? s.xpFrom : s.tech; S.meta.keepTech = TECHS[kid].custom ? null : { id: kid, xp: s.techs[kid], def: null }; }   // 自創功法不再帶到下一世   // 流派功法帶不走，帶成仙前的主修   // 給「前世功法」天賦用（自創的連定義一起帶）
   S.meta.lastShen = (s.shen || []).slice();                // 給「宿世神通」天賦用
   // 坐化當下就拿到道心和道果，轉世前可以先在悟道樹上花掉
   s.daoGot = daoGain(); S.meta.dao += s.daoGot; S.meta.guo += s.daoGot;
@@ -2286,8 +2264,7 @@ function renderGong() {
     ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（入門 ×1、小成 ×1.25、大成 ×1.5、圓滿 ×2）；效果也隨大境界變強（目前 ×${xpMul(s).toFixed(2).replace(/\.?0+$/, '')}）。</p>` : ''}
     ${tl('liangyi') && !xpOn(s) ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
-      ${s.tech2 ? (canFuse() ? `<div class="btns"><button class="mini ${armed === 'fuse' ? 'danger' : 'primary'}" onclick="fuseTech()">${armed === 'fuse' ? '確定融合？兩部功法會合為一部' : '融合自創功法'}</button></div>`
-        : '<p class="muted small">踏入化神、主修和副主修都練到圓滿，就能把兩部融合成自創功法：效果兩部相加打八折，直接圓滿，副主修欄也會空出來。</p>') : ''}` : ''}
+` : ''}
     <h3>輔修（${s.subs.length}/${maxSubs()}）</h3>${s.subs.map(id => techCard(id, `<button class="mini on" onclick="toggleSub('${id}')">卸下</button>`, TECHS[id].rate ? '<span class="muted">輔修時不算修煉速度</span>' : '')).join('') || '<p class="muted small">空著。鍛體、身法、劍修、長生、丹道、殺伐、悟性、尋寶類功法都能輔修，精進速度是主修的一半。</p>'}
     <div class="row"><h3>已學功法（${all.length}）</h3><span class="small">
       <select class="mini" onchange="setTechView('sort', this.value)">${[['grade', '品階高的在前'], ['layer', '層數高的在前']].map(([k, n]) => `<option value="${k}" ${techSort === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
@@ -2847,7 +2824,6 @@ const HELP = [
   ['神通', '比術法強得多的本事，每門一場戰鬥發動一次。踏入化神會依靈根覺醒本命神通；突破出極品、稀有體質、天階功法圓滿（覺醒該功法專屬的神通）、天階法寶祭煉圓滿也會覺醒。神通跟著這一世，轉世後重來。'],
   ['功法、術法、法寶', '主修功法決定修煉速度，輔修功法提供各種加成。術法在戰鬥中自動施放，要耗法力，用得越多越熟練。法力不夠時會自動服回氣丹。法寶可以祭煉變強。這些都能在事件或坊市取得。'],
   ['雙主修', '悟道樹「兩儀同修」（曾經修到化神才能點）可以多修一部吐納功法當副主修。跟主修五行相生（金生水、水生木、木生火、火生土、土生金）的效果五成，相剋的不能同修，其他三成。'],
-  ['自創功法', '踏入化神後，主修和副主修都練到第 9 層，可以把兩部融合成自創功法：效果兩部相加打八折、直接圓滿，副主修欄空出來可以再修別的。'],
   ['靈根後期路線', '踏入化神後，靈根會走上自己的路：五行齊全的是「五行圓滿」，修煉和突破大增；天靈根、變異靈根是「靈根化道」，專精自己的屬性；空靈根是「萬法歸空」，專精無屬性。雙、三、四靈根沒有路線，但可以煉化五行之精補齊五行。'],
   ['坐化與輪迴', '壽元用盡就會坐化，也可以自己兵解轉世。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
   ['飛升', `渡劫後期修為滿了，要挨九道天雷，撐過就飛升仙界。飛升還要道心 ${ASCEND_DAO}，並且走完守碑人的故事；道心不夠的話，這一世多半飛升不了，可以考慮兵解。`],
