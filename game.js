@@ -60,7 +60,7 @@ function load() {
     let back = 0; for (let l = 0; l < lv; l++) back += Math.round(base * Math.pow(gr, l));
     m.guo += back; delete m.talents[id]; delete m.talentsEff[id]; m.refunded = (m.refunded || 0) + back;
   }
-  // v2.1.3 悟道樹重排：刪掉仙府家底、器隨身養、戰鬥分支（熟能生巧、法隨念轉、前世術法），天降機緣＋天材地寶合併成新的天降機緣；點過的道果全數退還（只做一次）
+  // v2.1.3 悟道樹重排：刪掉仙府家底、器隨身養、戰鬥分支（熟能生巧、法隨念轉、前世術法），天降機緣＋天材地寶合併成新的天降機緣，丹心通明併進藥力精純；點過的道果全數退還（只做一次）
   if (!m.tal213) { m.tal213 = 1;
     for (const [id, base, gr] of [['xianfu', 6, 2], ['a_refine', 8, 1], ['shulian', 3, 2], ['slot5', 10, 1], ['kaiju', 6, 1], ['qiyu', 4, 2], ['diaoluo', 4, 1.6]]) {
       const lv = m.talents[id]; delete m.talents[id]; delete m.talentsEff[id]; if (m.auto) delete m.auto[id]; if (!lv) continue;
@@ -68,6 +68,9 @@ function load() {
       m.guo += back; m.refunded = (m.refunded || 0) + back; m.tal213Back = (m.tal213Back || 0) + back;
     }
     if (m.tal213Back && S.life && S.life.log) S.life.log.unshift({ age: Math.floor(S.life.age || 0), text: `悟道樹重排：刪掉或合併的天賦，點過的道果已全數退還（道果 +${m.tal213Back}）。` }); }
+  // 丹心通明併進藥力精純（跟上面分開記，已經跑過上面那段的存檔也會退）
+  if (!m.tal213b) { m.tal213b = 1; const lv = m.talents.danxin; delete m.talents.danxin; delete m.talentsEff.danxin;
+    if (lv) { m.guo += 15; m.refunded = (m.refunded || 0) + 15; if (S.life && S.life.log) S.life.log.unshift({ age: Math.floor(S.life.age || 0), text: '丹心通明併進了藥力精純，點過的道果已退還（道果 +15）。' }); } }
   // 天賦延後生效上線前的存檔：已經點的天賦當作本來就生效，不受影響；之後新點的才要等下一世
   if (!m.talentsEff) m.talentsEff = { ...m.talents };
   if (m.best === undefined) m.best = Math.max(s.peak || 0, ...m.history.map(h => STAGES.findIndex(x => x.name === h.stageName)));
@@ -1539,7 +1542,7 @@ function usePill(id) {
     const diff = stg().major - it.major;
     const low = Math.pow(.25, diff);
     const xp = it.major >= XIAN_MJ;   // 仙丹：每顆只補一成，丹毒也重
-    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) : .25) * (1 + .2 * tl('danxin')) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨、丹心通明   // 仙丹入骨
+    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) : .25) * (1 + .04 * tl('yaoli')) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨；藥力精純（合併了丹心通明）
     if (diff < 0) { amt = .5 * tf; injure(150); }
     const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 17.5 : 10);   // 修為丹丹毒（原本 35／20，減半讓遊歷賺的錢能換成修為）
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
