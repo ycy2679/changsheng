@@ -1676,7 +1676,7 @@ STORY.push(...XIAN_STORY);
 function beiNameExtra() { if (S.meta.lives < 3) return ''; storyMark('n4a'); return '其中一個被劃掉的名字，筆跡跟你自己寫字一模一樣。'; }
 
 // ---------- 飛升：渡劫後期修為滿、道心夠、走完守碑人的劇情 → 九道天雷 ----------
-const ASCEND_DAO = 80;
+const ASCEND_DAO = 60;
 const TRIB_ELEMS = ['金', '木', '水', '火', '土', '雷', '冰', '風', '無'];
 const NUM9 = '一二三四五六七八九';
 function ascendWhy(s = L()) {
