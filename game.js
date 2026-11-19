@@ -660,15 +660,17 @@ function xpBase(key) {
   for (const p of ps) for (const k in XPATH_BASE[p]) d[k] = +((d[k] || 0) + XPATH_BASE[p][k] * f).toFixed(3);
   return d;
 }
+// 根本仙法的屬性看靈根：靈根化道用靈根本身的屬性，其他（含萬法歸空）都是無屬性
+const xpElem = (s = L()) => rootPathOf(s) === 'pure' ? s.root.elems[0] : '無';
 function xpathForm(s = L()) {
   if (!isXian(s) || !TECHS[s.tech]) return;
   if (xpOn(s)) {   // 每次讀檔都照目前的流派數值重設（舊版繼承凡界主修、或數值調整過）
     const d = TECHS[s.tech];
     for (const k of Object.keys(d)) if (!FUSE_SKIP.includes(k)) delete d[k];
-    Object.assign(d, xpBase(d.xpath), { fixed: 1 }); s.custom[s.tech] = d; return;
+    Object.assign(d, xpBase(d.xpath), { fixed: 1, elem: xpElem(s) }); s.custom[s.tech] = d; return;
   }
   const key = pathKey(s), main = TECHS[s.tech], parts = [[s.tech], ...pathMains(s).map(id => [id]), ...(dualOn(s) ? [[s.tech2]] : [])];
-  const d = { name: XPATH_TECH[key][0], grade: 6, type: main.type, elem: main.elem, xpath: key, fixed: 1, ...xpBase(key) };
+  const d = { name: XPATH_TECH[key][0], grade: 6, type: main.type, elem: xpElem(s), xpath: key, fixed: 1, ...xpBase(key) };
   const id = 'xpt' + Date.now().toString(36);
   TECHS[id] = d; (s.custom = s.custom || {})[id] = d; s.techs[id] = techNeed(id, 9);
   s.xpFrom = s.tech; s.tech = id; s.tech2 = null; s.ptech = {};
