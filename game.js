@@ -393,10 +393,11 @@ const speedCtl = () => tl('guangyin') ? `<select class="mini" onchange="setSpeed
 const L = () => S.life;
 const stg = (s = L()) => STAGES[s.stage];
 const isXian = (s = L()) => s.stage > MORTAL_TOP;                       // 已經成仙（地仙界）
-let XIAN_RATE = 170, XIAN_GROW = 1.17, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008 };
+const isTian = (s = L()) => !!s && stg(s).major >= TIAN_MJ;                 // 登天了（天仙界）
+let XIAN_RATE = 170, XIAN_GROW = 1.17, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008, 13: .006, 14: .005, 15: .004, 16: .003, 17: .003 };
 // 照修為百分比給的東西（頓悟、擊殺得修為、奇遇給的修為）在仙界跟仙丹一樣打折，不然九重一下就衝完
 // 仙界閉關：倍率跟著重數長（需求每重 ×1.2），只靠閉關每重的時間大致一樣，閉關約占修為一半，另一半靠丹藥、頓悟
-const xianRateMul = (s = L()) => isXian(s) ? XIAN_RATE * Math.pow(XIAN_GROW, s.stage - MORTAL_TOP - 1) : 1;
+const xianRateMul = (s = L()) => isXian(s) ? XIAN_RATE * Math.pow(XIAN_GROW, s.stage - MORTAL_TOP - 1) * (s.xianStart && S.meta.dengtian && !isTian(s) ? 3 : 1) : 1;   // 登天過一次以後，從仙人開始的世地仙界修煉 ×3
 const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   // 仙丹每顆補幾成修為：越往上越補不動
 const yearSec = (s = L()) => isXian(s) ? 6 : YEAR_SEC;                   // 仙界歲月流得快：線上 6 秒一年
 // 下一步要渡劫：渡劫後期 → 九道天雷；仙界每個大境界 → 仙劫。自動突破、離線都不會碰
@@ -490,7 +491,7 @@ const PATH_FLAVOR = {
   hun: ['', '識海初開，神識能看清十丈內的一草一木', '神念可以離體，悄無聲息地探查四方', '元神凝實，肉身受創也不致身死', '陰神能夜遊出竅，看得見常人看不見的東西', '陽神能在白日顯形，一念之間化出身影', '同時轉動千般念頭，分心萬用', '神魂與天地相通，冥冥中能感知禍福', '神魂不朽，縱然肉身成灰，真靈也不散'],
 };
 const pathList = (s = L()) => (s.paths || []).map((id, i) => [id, i ? .5 : 1]);
-const pathGrow = (s = L()) => .6 + .125 * Math.min(12, stg(s).major);
+const pathGrow = (s = L()) => .6 + .125 * Math.min(16, stg(s).major);   // 長到大羅金仙 ×2.6
 // 路線對某個效果的總和：gain 乘權重和境界成長，cost 只乘權重
 function pathEff(key, s = L()) {
   if (!s.paths) return 0;
@@ -628,7 +629,7 @@ function setPathMain(id) {
 // ---------- 自創功法（v2.2.4 起拿掉融合功能；以前融出來的只留到那一世結束，存在 s.custom，讀檔時再登記回 TECHS） ----------
 const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom', 'xpath', 'fixed'];
 // ---------- 仙界流派功法：成仙時主修依修行路線改成固定名字，繼承原本主修（含兼修主修五折、副主修）的效果，隨大境界變強；仙界主修不能再換 ----------
-const XPATH_TECH = { fa: ['天衍法章', '太衍經'], ti: ['九極鑄身篇', '太初經'], hun: ['太虛守神錄', '太虛經'], 'fa,ti': ['萬法鑄體訣', '混元典'], 'fa,hun': ['陰陽觀想法', '衍天經'], 'hun,ti': ['形神同鑄錄', '神魔經'], 'fa,hun,ti': ['三元歸真錄', '鴻蒙經'] };   // [地仙界, 天仙界進化（之後才用）]
+const XPATH_TECH = { fa: ['天衍法章', '太衍經'], ti: ['九極鑄身篇', '太初經'], hun: ['太虛守神錄', '太虛經'], 'fa,ti': ['萬法鑄體訣', '混元典'], 'fa,hun': ['陰陽觀想法', '衍天經'], 'hun,ti': ['形神同鑄錄', '神魔經'], 'fa,hun,ti': ['三元歸真錄', '鴻蒙經'] };   // [地仙界, 天仙界進化]
 const XPATH_LABEL = { fa: '法修', ti: '體修', hun: '魂修', 'fa,ti': '法體雙修', 'fa,hun': '法魂雙修', 'hun,ti': '體魂雙修', 'fa,hun,ti': '三修' };
 const pathKey = (s = L()) => [...myPaths(s)].sort().join(',');
 const xpOn = (s = L()) => !!(TECHS[s.tech] && TECHS[s.tech].xpath);
@@ -675,7 +676,7 @@ function xpathForm(s = L()) {
   if (xpOn(s)) {   // 每次讀檔都照目前的流派數值重設（舊版繼承凡界主修、或數值調整過）
     const d = TECHS[s.tech];
     for (const k of Object.keys(d)) if (!FUSE_SKIP.includes(k)) delete d[k];
-    Object.assign(d, xpBase(d.xpath), { fixed: 1, elem: xpElem(s) }); (s.custom = s.custom || {})[s.tech] = d; return;
+    Object.assign(d, xpBase(d.xpath), { fixed: 1, elem: xpElem(s), name: XPATH_TECH[d.xpath][isTian(s) ? 1 : 0] }); (s.custom = s.custom || {})[s.tech] = d; return;   // 登天以後換成進化的名字
   }
   const key = pathKey(s), main = TECHS[s.tech], parts = [[s.tech], ...pathMains(s).map(id => [id]), ...(dualOn(s) ? [[s.tech2]] : [])];
   const d = { name: XPATH_TECH[key][0], grade: 6, type: main.type, elem: xpElem(s), xpath: key, fixed: 1, ...xpBase(key) };
@@ -1317,6 +1318,7 @@ function tick(dt) {
   s.age += dt / yearSec(s);
   const heal = s.mode === 'closed' ? 2 : 1;   // 閉關時養傷、排毒加倍
   if (s.injury > 0) s.injury = Math.max(0, s.injury - dt * heal);
+  if (s.broken > 0) { s.broken = Math.max(0, s.broken - dt); s.injury = Math.max(s.injury, s.broken); s.mode = 'closed'; if (!s.broken) log('根基的裂痕癒合了，可以出關了。'); }   // 根基破裂：強制閉關到結束
   sectTick(s);
   tickBuffs(dt, s);
   brewTick(dt, s); forgeTick(dt, s); arrayTick(dt, s);
@@ -1338,7 +1340,7 @@ function tick(dt) {
       const g = Math.min(stg().need - s.xiu, Math.round(stg().need * Math.min(1, xianDamp(s) * 4)));   // 仙界頓悟只補一部分
       if (g > 0) { s.xiu += g; log(`閉關中豁然開朗，頓悟了，修為 +${fmt(g)}${s.xiu >= stg().need ? `，${stg().name}圓滿` : ''}。`); }
       else if (isXian(s) && jieNext(s)) { addPress(1200); log(`閉關中頓悟，修為已滿，化為劫前淬鍊（+${Math.round((s.press || 0) * 100)}%）。`); }
-      else if (s.stage >= STAGES.length - 1) log('閉關中頓悟，可往上已經沒有路了。登天的門，還沒有為你打開。', true);
+      else if (s.stage >= STAGES.length - 1) log('閉關中頓悟，可道已至極，再沒有往上的路了。', true);
       else { addFound(stg().need * .3); log('閉關中頓悟，修為已滿，化為根基。'); }
     }
   }
@@ -1479,7 +1481,7 @@ function choose(i) {
 }
 
 // ---------- 玩家操作 ----------
-function setMode(m) { L().mode = m; L().encT = 8; dirty = true; render(); }
+function setMode(m) { if (m === 'travel' && L().broken > 0) return; L().mode = m; L().encT = 8; dirty = true; render(); }
 function setPlace(id) { L().place = id; dirty = true; render(); }
 function breakthrough() {
   const s = L(); if (s.stage === MORTAL_TOP) { tribulation(); return; } if (s.xiu < stg().need || s.stage >= STAGES.length - 1) return;
@@ -1502,16 +1504,18 @@ const randShen = (s = L()) => { const ids = Object.keys(SHENS).filter(id => !SHE
 const shenSum = (key, s = L()) => shenList(s).reduce((a, x) => a + (x[key] || 0), 0);
 // ---------- 仙界流派神通：成仙時把裝著的神通融成一門，強度隨根本仙法的收集階段成長 ----------
 const XSHEN_NAME = { fa: '玄元御道', ti: '龍象真身', hun: '太虛神遊', 'fa,ti': '道紋仙軀', 'fa,hun': '觀想演天', 'hun,ti': '神軀同鑄', 'fa,hun,ti': '混元一炁' };
+const XSHEN_NAME_T = { fa: '言出法隨', ti: '混元聖體', hun: '太虛仙魂', 'fa,ti': '大道法身', 'fa,hun': '一念衍天', 'hun,ti': '神魔不滅', 'fa,hun,ti': '鴻蒙無極' };   // 登天後進化
+const xshenName = (s = L()) => (isTian(s) ? XSHEN_NAME_T : XSHEN_NAME)[s.xshen.key];
 const XSHEN_GROW = [1, 1.2, 1.4, 1.6];   // 入門／小成／大成／圓滿
 function xshenForm(s = L()) {
   if (!isXian(s) || s.xshen) return;
   const src = (s.shenEquip && s.shenEquip.length ? s.shenEquip : (s.shen || []).slice(0, maxShen(s))).filter(id => SHENS[id]);
   s.xshen = { key: pathKey(s), src: src.slice() }; s.shenEquip = [];
-  log(`成仙之後，${src.length ? src.map(id => `「${SHENS[id].name}」`).join('') + '融成了一門' : '神魂凝成了一門'}${XPATH_LABEL[s.xshen.key]}神通「${XSHEN_NAME[s.xshen.key]}」，往後隨根本仙法一同精進。`);
+  log(`成仙之後，${src.length ? src.map(id => `「${SHENS[id].name}」`).join('') + '融成了一門' : '神魂凝成了一門'}${XPATH_LABEL[s.xshen.key]}神通「${xshenName(s)}」，往後隨根本仙法一同精進。`);
 }
 // 融合後的三段（開場／整場／危急），每次戰鬥現算
 function xshenParts(s = L()) {
-  const X = s.xshen, name = XSHEN_NAME[X.key], ps = X.key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .75 : .6;
+  const X = s.xshen, name = xshenName(s), ps = X.key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .75 : .6;
   const g = XSHEN_GROW[xpStage(s)], gp = 1 + (g - 1) / 2, pe = pathElem(s), src = X.src.map(id => SHENS[id]);
   const o = { name, trig: 'open', nuke: 0, burn: 0, shield: 0, brk: 0, stun: 0, clones: [] }, fd = { name, trig: 'field' }, le = { name, trig: 'lethal' };
   let fa = null; const add = (k, v) => { fd[k] = (fd[k] || 0) + v; };
@@ -1681,7 +1685,7 @@ function usePill(id) {
   if (!count(id)) return;
   const pe = 1 + eff('pillEff'), tf = toxFactor(), addTox = n => { s.tox = Math.min(100, s.tox + n * (1 - toxRes())); };
   let msg;
-  if (it.kind === 'heal') { if (!s.injury && (s.hpNow ?? 1) >= 1) return; s.injury = 0; s.hpNow = 1; msg = '服下療傷丹，傷勢痊癒，氣血回滿。'; }
+  if (it.kind === 'heal') { if (s.broken > 0 || (!s.injury && (s.hpNow ?? 1) >= 1)) return; s.injury = 0; s.hpNow = 1; msg = '服下療傷丹，傷勢痊癒，氣血回滿。'; }
   else if (it.kind === 'xiu') {
     if (s.xiu >= need) return;
     const diff = stg().major - it.major;
@@ -1894,13 +1898,16 @@ function renderAscend() {
     <p>你的名字${s.name ? `「${s.name}」` : ''}刻上了無字碑。</p>
     <p>碑上的名字一路往前延伸，看不到盡頭。在很前面、很前面的位置，有一個被劃掉的名字。你認得那個筆跡——那是你自己寫的字。</p>
     <p>你飛升過，也隕落過。這一次，碑上的你，還會被劃掉嗎？</p>
-    <p class="small muted">仙界的規矩：重與重之間照常突破；每個大境界都要渡仙劫，渡不過就隕落，名字被劃掉。自動突破和離線都不會替你渡劫，修為滿了會停在大圓滿，繼續修煉的修為化為劫前淬鍊。仙人壽元很長，但仙界的歲月流得快，壽元剩兩成時會出現天人五衰。</p>
+    <p class="small muted">仙界的規矩：重與重之間照常突破；每個大境界都要渡仙劫，渡不過會跌一重、根基破裂；壽元用盡才會隕落，名字被劃掉。自動突破和離線都不會替你渡劫，修為滿了會停在大圓滿，繼續修煉的修為化為劫前淬鍊。仙人壽元很長，但仙界的歲月流得快，壽元剩兩成時會出現天人五衰。</p>
     <div class="btnrow"><button class="primary" onclick="closeAscend()">踏入仙界</button></div></section>`;
 }
-// ---------- 仙劫：仙界每個大境界都要渡，連戰幾道、中間不回滿，失敗就隕落 ----------
-const JIE_N = { 9: 3, 10: 5, 11: 7 };   // 從哪個大境界往上：人仙→地仙 三道、地仙→真仙 五道、真仙→玄仙 七道
-const JIE_NAME = { 9: '地仙劫', 10: '真仙劫', 11: '玄仙劫' };
-const JIE_BASE = { 9: .5, 10: .45, 11: .4 };   // 修為剛滿就渡的成功率
+// ---------- 仙劫：仙界每個大境界都要渡，看成功率一道一道落；失敗跌境、根基破裂，不會隕落 ----------
+const JIE_N = { 9: 3, 10: 5, 11: 7, 12: 9, 13: 9, 14: 9, 15: 9, 16: 9 };   // 從哪個大境界往上：人仙→地仙 三道、地仙→真仙 五道、真仙→玄仙 七道；登天和天仙界都是九道
+const JIE_NAME = { 9: '地仙劫', 10: '真仙劫', 11: '玄仙劫', 12: '登天劫', 13: '金仙劫', 14: '太乙劫', 15: '大羅劫', 16: '道祖劫' };
+const JIE_BASE = { 9: .5, 10: .45, 11: .4, 12: .35, 13: .4, 14: .35, 15: .3, 16: .25 };   // 修為剛滿就渡的成功率
+// 渡劫失敗不再隕落：跌境＋根基破裂（療傷丹治不了、只能閉關）。登天失敗跌回玄仙一重
+const BROKEN_SEC = mj => mj === 12 ? 900 : mj >= TIAN_MJ ? 600 : 300;
+const jieDrop = mj => mj === 12 ? '跌回玄仙一重' : '跌一重';
 const PRESS_CAP = .3;   // 劫前淬鍊上限
 // 仙劫成功率：基本 ＋ 劫前淬鍊 ＋ 渡劫仙丹 15%，天人五衰每個 -5%、負傷減半（不擲戰鬥，免得某些流派怎麼準備都過不了）
 function jieChance(s = L()) {
@@ -1927,20 +1934,29 @@ function xianJie() {
   log(`你引動了${name}。劫雲從四面八方湧來——仙界的天，也會降劫。`);
   const r = runJie(s); s.flags.jiedan = 0;
   if (!r.ok) {
-    if (tl('wenxin') && pct(.7)) {   // 道心穩固：七成機率撐住一口氣，跌一重、重傷，淬鍊散去
-      s.stage--; s.xiu = Math.floor(stg().need * .5); s.press = 0; injure(1800);
-      log(`第${NUM9[r.i]}道劫雷落下，你沒能撐住——可道心沒有散。你從雷光裡爬出來，跌回${stg().name}，傷得很重。`); save(); render(); return;
+    const mj = stg(s).major; s.press = 0;
+    if (tl('wenxin') && pct(.3)) {   // 道心穩固：三成機率境界保住，只散去這一重的修為、受傷（療傷丹治得好），不會根基破裂
+      s.xiu = 0; injure(600);
+      log(`第${NUM9[r.i]}道劫雷落下，你沒能撐住——可道心沒有散。境界保住了，這一重的修為卻散得一乾二淨，傷得不輕。`); save(); render(); return;
     }
-    log(`第${NUM9[r.i]}道劫雷落下，你沒能撐住。`); s.jieFail = 1; die(); save(); render(); return;
+    const sec = BROKEN_SEC(mj);
+    if (mj === 12) s.stage = STAGES.findIndex(x => x.major === 12); else s.stage--;
+    s.xiu = Math.floor(stg().need * .5); s.broken = sec; injure(sec); s.mode = 'closed';
+    log(`第${NUM9[r.i]}道劫雷落下，你沒能撐住。劫雷把你打回${stg().name}，根基也裂了：${sec / 60} 分鐘內療傷丹無效，只能閉關慢慢養。`); save(); render(); return;
   }
   s.press = 0;
+  const up = stg(s).major === 12, before = up ? evolveNames(s) : null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
+  if (up) { S.meta.dengtian = (S.meta.dengtian || 0) + 1; xpathForm(s); }
   if (s.wsLog) { s.wsLog = 0; log('壽元一下子寬了，天人五衰的徵兆退去。'); }
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
+  if (up) { const after = evolveNames(s), ch = before.map((x, i) => x && x !== after[i] ? `${x}化為${after[i]}` : '').filter(Boolean); log(`你登上了天門，從此是天仙界的仙人。${ch.length ? ch.join('，') + '。' : ''}${S.meta.dengtian === 1 ? '往後轉世從仙人開始，地仙界的路會走得快得多（修煉 ×3）。' : ''}`); }
   { const np = PLACES.find(q => q.min === s.stage && q.xian); if (np) log(`以你現在的境界，已經能去${np.name}遊歷了（上方的地點選單）。那裡的妖物更強，仙元石和掉落也多得多。`); }
   pathSkillCheck(s); pathArtCheck(s); giftXiuPills(s);
   save(); render();
 }
+// 登天時會進化的名字：根本仙法、流派神通、大道至簡那一招
+const evolveNames = s => [xpOn(s) ? `《${TECHS[s.tech].name}》` : '', s.xshen ? `「${xshenName(s)}」` : '', SKILLS[yiId(s)] ? `「${SKILLS[yiId(s)].name}」` : ''];
 // 藥囊傳家：突破大境界（成仙、渡仙劫也算）送幾顆新境界的修為丹
 function giftXiuPills(s) { const n = 2 * tl('kaijudan'), id = XIU_PILLS[stg(s).major]; if (n && id) { addItem(id, n); log(`藥囊裡多了 ${n} 顆${ITEMS[id].name}。`, true); } }
 // ---------- 仙籍（取代宗門）：名冊、差事、仙功兌換 ----------
@@ -2077,6 +2093,7 @@ function applyOffline(sec) {
   if (s.stage > stage0) log(`${how}期間突破到了${stg().name}。`);
   growTechs(off * offRate() * (s.mode === 'travel' ? .5 : 1));
   s.injury = Math.max(0, s.injury - off);
+  if (s.broken > 0) { s.broken = Math.max(0, s.broken - off); s.injury = Math.max(s.injury, s.broken); if (!s.broken) log('閉關期間，根基的裂痕癒合了。'); }
   tickBuffs(off, s);   // 離線期間藥效照樣過
   brewTick(off, s); forgeTick(off, s); arrayTick(off * offRate(), s);   // 爐子離線也照煉，藥園礦脈照離線效率長
   // 離線也會變老，但比較慢；最多老到壽元剩一成，不會在離線時坐化
@@ -2184,7 +2201,7 @@ function render() {
       <div class="small same" id="buffs"></div>
       <div class="btns">
         <button class="${s.mode === 'closed' ? 'on' : ''}" onclick="setMode('closed')">閉關</button>
-        <button class="${s.mode === 'travel' ? 'on' : ''}" onclick="setMode('travel')">遊歷</button>
+        <button class="${s.mode === 'travel' ? 'on' : ''}" onclick="setMode('travel')" ${s.broken > 0 ? 'disabled' : ''}>遊歷</button>
         <button class="${showSecret ? 'on' : ''}" onclick="toggleSecret()" ${stg().major >= 1 ? '' : 'disabled'}>秘境</button>
         ${isXian(s) ? `<button class="${showXj ? 'on' : ''}" onclick="toggleXj()">仙籍</button>` : `<button class="${showSect ? 'on' : ''}" onclick="toggleSect()">宗門</button>`}
         <select onchange="setPlace(this.value)" ${s.mode === 'travel' ? '' : 'disabled'}>
@@ -2237,16 +2254,16 @@ function updateDyn() {
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
     const tip = atTop ? (w.length ? '飛升還差：' + w.join('、') + (noDao ? '（道心在坐化或兵解時才會增加，這一世多半飛升不了）' : '') : '九道天雷之後就能飛升，但失敗就會身死。') : noDao ? `道心 ${S.meta.dao}/${ASCEND_DAO}，這一世多半飛升不了`
-      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗即隕落 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= pressCap() - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ` · 渡劫仙丹 +${15 * s.flags.jiedan}%` : ''}`
-      : s.stage >= STAGES.length - 1 ? '玄仙圓滿。再往上是登天——仙界篇下半部製作中。' : '';
+      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗${jieDrop(stg().major)}、根基破裂 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= pressCap() - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ` · 渡劫仙丹 +${15 * s.flags.jiedan}%` : ''}`
+      : s.stage >= STAGES.length - 1 ? '道祖。再往前就是碑前，超脫——製作中。' : '';
     $('buffs').textContent = cur(bt + (tip ? (bt ? '　' : '') + tip : '') + (ws ? `　天人五衰 ${ws}/5（修煉、氣血、攻擊 -${5 * ws}%）` : '')); } $('realm').textContent = realmName(s);
   $('res').innerHTML = `${cur('靈石')} ${fmt(s.stone)}${s.found >= .01 ? ` · <span class="same">根基 +${Math.round(s.found * 100)}%</span>` : ''}${s.tox >= 1 ? ` · <span class="${s.tox > 50 ? 'hurt' : ''}">丹毒 ${Math.ceil(s.tox)}%</span>` : ''}`;
-  $('inj').innerHTML = s.injury > 0 ? `<span class="hurt">負傷 ${Math.ceil(s.injury)} 秒</span>${count('heal') ? ' <button class="mini" onclick="useHeal()">服療傷丹</button>' : ''}` : (s.mode === 'travel' ? `遊歷${place().name}` : '閉關中');
+  $('inj').innerHTML = s.broken > 0 ? `<span class="hurt">根基破裂 ${Math.ceil(s.broken)} 秒（療傷丹無效，只能閉關）</span>` : s.injury > 0 ? `<span class="hurt">負傷 ${Math.ceil(s.injury)} 秒</span>${count('heal') ? ' <button class="mini" onclick="useHeal()">服療傷丹</button>' : ''}` : (s.mode === 'travel' ? `遊歷${place().name}` : '閉關中');
   const b = $('brk'), last = s.stage === MORTAL_TOP, u = brkPillsUsed(), xj = isXian(s) && jieNext(s), end = s.stage >= STAGES.length - 1;
   const why = last ? ascendWhy(s) : [];
   b.disabled = end || (last ? why.length > 0 : s.xiu < need);
   b.className = 'primary' + (armed === 'trib' || armed === 'xjie' ? ' danger' : '');
-  b.textContent = end ? '登天（製作中）' : xj ? (armed === 'xjie' ? `確定渡劫？${Math.round(jieChance() * 100)}%，失敗即隕落` : `渡${JIE_NAME[stg().major]} ${Math.round(jieChance() * 100)}%`) : last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
+  b.textContent = end ? '超脫（製作中）' : xj ? (armed === 'xjie' ? `確定渡劫？${Math.round(jieChance() * 100)}%，失敗${jieDrop(stg().major)}` : `渡${JIE_NAME[stg().major]} ${Math.round(jieChance() * 100)}%`) : last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
   b.textContent = cur(b.textContent);
   $('recent').innerHTML = s.log.slice(0, 4).map(l => `<li${l.m ? ' class="main"' : ''}>${l.text}</li>`).join('');
   if ($('shopT')) { if (ensureShop()) { render(); return; } $('shopT').textContent = dur2(Math.max(0, (s.shop.next - Date.now()) / 1000)); }
@@ -2314,7 +2331,7 @@ function renderGen() {
 // 神通：哪些學會了、哪些裝進了神通欄
 function renderShenTab() {
   const s = L(), shen = s.shen || [];
-  if (s.xshen) return `<h3>流派神通</h3><div class="item"><div class="row"><b class="gben">${XSHEN_NAME[s.xshen.key]}</b><span class="small muted">${XPATH_LABEL[s.xshen.key]} · ${XP_STAGE[xpStage(s)]}（${xT(XSHEN_GROW[xpStage(s)])}）</span></div>${xshenDesc(s).map(l => `<div class="small">${l}</div>`).join('')}<div class="small muted">${s.xshen.src.length ? '融合自：' + s.xshen.src.map(id => SHENS[id].name).join('、') + '。' : ''}根本仙法每升一個收集階段，神通也跟著變強（入門 ×1、小成 ×1.2、大成 ×1.4、圓滿 ×1.6；閃避、暴擊只加一半）。</div></div>`;
+  if (s.xshen) return `<h3>流派神通</h3><div class="item"><div class="row"><b class="gben">${xshenName(s)}</b><span class="small muted">${XPATH_LABEL[s.xshen.key]} · ${XP_STAGE[xpStage(s)]}（${xT(XSHEN_GROW[xpStage(s)])}）</span></div>${xshenDesc(s).map(l => `<div class="small">${l}</div>`).join('')}<div class="small muted">${s.xshen.src.length ? '融合自：' + s.xshen.src.map(id => SHENS[id].name).join('、') + '。' : ''}根本仙法每升一個收集階段，神通也跟著變強（入門 ×1、小成 ×1.2、大成 ×1.4、圓滿 ×1.6；閃避、暴擊只加一半）。</div></div>`;
   return `<h3>神通欄（${(s.shenEquip || []).length}/${maxShen()}）</h3>${shen.length ? shen.map(id => { const x = SHENS[id], on = (s.shenEquip || []).includes(id);
       return `<div class="item"><div class="row"><b class="g4">${x.name}</b><span class="small muted">${x.type} · ${{ open: '開場發動', field: '整場生效', lethal: '危急時發動' }[x.trig]}</span></div>
         <div class="small">${x.desc}</div>
@@ -2342,7 +2359,7 @@ function techHint(id) {
 function pathSection(s = L()) {
   if (s.flags.pathFree) return `<p class="small">這一世還沒定下修行的路（目前照法修算），可以選一次，選了就不能改：</p><div class="btns">${Object.entries(PATHS).map(([id, x]) => `<button onclick="choosePathLate('${id}')">${x.name}</button>`).join('')}</div>`;
   return pathList(s).map(([id, w]) => `<div class="item"><div class="row"><b>${PATHS[id].name}</b><span class="small muted">${w < 1 ? '兼修（效果五折）' : '主修路線'} · 目前加成 ×${(pathGrow(s) * w).toFixed(2)}</span></div><div class="small">${PATHS[id].desc}</div></div>`).join('')
-    + '<p class="muted small">路線的加成隨大境界成長（練氣 ×0.6，到渡劫 ×1.6，成仙後繼續長到玄仙 ×2.1）；代價不隨境界變。</p>';
+    + '<p class="muted small">路線的加成隨大境界成長（練氣 ×0.6，到渡劫 ×1.6，成仙後繼續長到大羅金仙 ×2.6）；代價不隨境界變。</p>';
 }
 function renderGong() {
   const s = L();
@@ -2940,7 +2957,7 @@ const HELP = [
   ['靈根後期路線', '踏入化神後，靈根會走上自己的路：五行齊全的是「五行圓滿」，修煉和突破大增；天靈根、變異靈根是「靈根化道」，專精自己的屬性；空靈根是「萬法歸空」，專精無屬性。雙、三、四靈根沒有路線，但可以煉化五行之精補齊五行。'],
   ['坐化與輪迴', '壽元用盡就會坐化，也可以自己兵解轉世。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
   ['飛升', `渡劫後期修為滿了，要挨九道天雷，撐過就飛升仙界。飛升還要道心 ${ASCEND_DAO}，並且走完守碑人的故事；道心不夠的話，這一世多半飛升不了，可以考慮兵解。`],
-  ['仙界', '成仙後一身術法反璞歸真，按修行路線化成一招（大道至簡），熟練度跟著境界走，仙界也不再賣術法。仙界每個大境界都要渡仙劫，渡不過就隕落；壽元剩兩成時會出現天人五衰。仙界隕落也會轉世，飛升過一次以後，轉世可以選擇跳過凡界，直接從人仙一重開始。'],
+  ['仙界', '成仙後一身術法反璞歸真，按修行路線化成一招（大道至簡），熟練度跟著境界走，仙界也不再賣術法。仙界每個大境界都要渡仙劫，渡不過會跌境、根基破裂（療傷丹無效，只能閉關一陣子），壽元用盡才會隕落；玄仙圓滿之後登天，進入天仙界；壽元剩兩成時會出現天人五衰。仙界隕落也會轉世，飛升過一次以後，轉世可以選擇跳過凡界，直接從人仙一重開始。'],
   ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括化身（自動處理雜事）、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
 ];
 function renderTitle() {

@@ -347,6 +347,9 @@ SKILLS.yi_fahun = K('念起法生', 6, '無', 'dmg', 8.5, 3, { crit: .3, pierce:
 SKILLS.yi_tihun = K('神軀同鑄', 6, '無', 'dmg', 8.5, 3, { pierce: 1, stun: 1, only: 'combo', yi: 1 });
 SKILLS.yi_san = K('三元歸一', 6, '無', 'dmg', 10, 3, { crit: .3, pierce: 1, stun: 1, only: 'combo', yi: 1 });
 for (const id of ['yi_fati', 'yi_fahun', 'yi_tihun', 'yi_san']) Object.defineProperty(SKILLS[id], 'sch', { get: () => { try { return myPaths(L())[0] || 'fa'; } catch (e) { return 'fa'; } }, enumerable: true });
+// 登天以後招式換成天仙界的名字（一樣的招，只是進化了）
+const YI_TIAN = { yi_fa: '萬法歸一', yi_ti: '以力證道', yi_hun: '一念永恆', yi_fati: '萬法加身', yi_fahun: '萬法由心生', yi_tihun: '神魔滅世', yi_san: '混元無極' };
+for (const id in YI_TIAN) { const n0 = SKILLS[id].name; Object.defineProperty(SKILLS[id], 'name', { get: () => { try { return isTian(L()) ? YI_TIAN[id] : n0; } catch (e) { return n0; } }, enumerable: true }); }
 
 // ---------- 仙界坊市只賣仙階：多補一批靈寶、仙術，免得人仙時貨架很快就空 ----------
 // 仙術：照天階的輔助、範圍型術法放大

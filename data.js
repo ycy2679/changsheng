@@ -17,8 +17,15 @@ const MAJORS = [
   { name: '地仙', subs: NINE_CHONG, life: 6500, brk: 0 },
   { name: '真仙', subs: NINE_CHONG, life: 8000, brk: 0 },
   { name: '玄仙', subs: NINE_CHONG, life: 12000, brk: 0 },
+  // 天仙界：玄仙九重圓滿後渡登天劫；道祖只有一個境界，到了就是終點（超脫）
+  { name: '天仙', subs: NINE_CHONG, life: 16000, brk: 0 },
+  { name: '金仙', subs: NINE_CHONG, life: 20000, brk: 0 },
+  { name: '太乙金仙', subs: NINE_CHONG, life: 25000, brk: 0 },
+  { name: '大羅金仙', subs: NINE_CHONG, life: 32000, brk: 0 },
+  { name: '道祖', subs: [''], life: 50000, brk: 0 },
 ];
 const XIAN_MJ = 9;   // 第一個仙界大境界
+const TIAN_MJ = 13;  // 第一個天仙界大境界（天仙）
 
 // 攤平成小境界（凡界 33 個、地仙界 36 個），need = 修為上限
 const STAGES = [];
@@ -326,13 +333,13 @@ const RECIPES = {
   xisui: { g: 3, n: 4 }, pozhang: { g: 3, n: 4 }, humai: { g: 3, n: 5 }, xingshen: { g: 3, n: 4 }, tianjidan: { g: 3, n: 4 }, zhuyan: { g: 4, n: 5 },
 };
 // 修為丹、突破丹：品階跟著大境界（練氣黃、築基金丹玄、元嬰化神地、煉虛以上天）
-const XIAN_GRADE = { 9: 6, 10: 7, 11: 8, 12: 8 };   // 仙界：人仙下品、地仙中品、真仙玄仙上品
+const XIAN_GRADE = { 9: 6, 10: 7, 11: 8, 12: 8, 13: 8, 14: 8, 15: 8, 16: 8, 17: 8 };   // 仙界：人仙下品、地仙中品、真仙玄仙上品（天仙界的道階之後補）
 const majorGrade = mj => mj >= XIAN_MJ ? XIAN_GRADE[mj] : mj === 0 ? 1 : mj <= 2 ? 2 : mj <= 4 ? 3 : 4;
 const DAN_COMMON = ['yanshou', 'xisui', 'wudao', 'guben', 'julingdan', 'qizhidan', 'kuangxue', 'jingangdan', 'ningshendan', 'huichundan', 'qingxindan', 'yinyuan', 'xunbaodan'];
 const DAN_RARE = ['pozhang', 'humai', 'zhuyan', 'xingshen', 'tianjidan'];
 const ROOT_ITEMS = ['gengjing', 'yimujing', 'guishuijing', 'binghuojing', 'wutujing'];
 const TC_ITEMS = ['xuanhuang', 'chiyang', 'ninghun', 'shenmu', 'xukong', 'liangyi', 'jiujie', 'tianxin'];
-const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due', 'ningxian', 'diling', 'zhenyi', 'xuanyuan'];
+const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due', 'ningxian', 'diling', 'zhenyi', 'xuanyuan', 'xuanyuan', 'xuanyuan', 'xuanyuan', 'xuanyuan', 'xuanyuan'];   // 天仙界暫用玄仙的，道階修為丹之後補
 const BRK_PILLS = ['zhuji', 'ningyuan', 'huaying', 'tongxuan', 'poxu', 'heyuan', 'dacheng', 'yinjie'];
 for (let i = 0; i < XIAN_MJ; i++) RECIPES[XIU_PILLS[i]] = { g: majorGrade(i), n: 3 };
 for (let i = 0; i < BRK_PILLS.length; i++) RECIPES[BRK_PILLS[i]] = { g: majorGrade(i), n: 6 };
