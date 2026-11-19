@@ -609,14 +609,14 @@ const pathSlots = (s = L()) => xpOn(s) ? [] : [...new Set(['fa', 'ti', 'hun'].fi
 const pathMains = (s = L()) => pathSlots(s).map(ty => (s.ptech || {})[ty]).filter(id => id && TECHS[id] && id in s.techs && id !== s.tech && id !== s.tech2 && canMain(id, s));
 function setPathMain(id) {
   const s = L(), ty = TECHS[id].type, nm = PATHS[MAIN_PATH[ty]].name; s.ptech = s.ptech || {};
-  if (s.ptech[ty] === id && pathMains(s).includes(id)) { delete s.ptech[ty]; log(`放下${nm}主修《${TECHS[id].name}》。`); save(); render(); return; }
+  if (s.ptech[ty] === id && pathMains(s).includes(id)) { delete s.ptech[ty]; s.flags.mainManual = 1; log(`放下${nm}主修《${TECHS[id].name}》。`); save(); render(); return; }
   if (!pathSlots(s).includes(ty) || !canMain(id, s) || id === s.tech || id === s.tech2) return;
   const old = pathMains(s).includes(s.ptech[ty]);
   if (old && armed !== 'pm:' + id) { armed = 'pm:' + id; render(); return; }
   armed = '';
   if (old) { s.xiu /= 2; log(`散功改修，${nm}主修換成《${TECHS[id].name}》，修為折半。`); }
   else log(`以《${TECHS[id].name}》為${nm}主修（效果五折）。`);
-  s.ptech[ty] = id; s.subs = s.subs.filter(x => x !== id); save(); render();
+  s.ptech[ty] = id; s.subs = s.subs.filter(x => x !== id); s.flags.mainManual = 1; save(); render();   // 手動排過：這一世「擇法而修」不再自動換
 }
 // ---------- 自創功法（v2.2.4 起拿掉融合功能；以前融出來的只留到那一世結束，存在 s.custom，讀檔時再登記回 TECHS） ----------
 const FUSE_SKIP = ['name', 'grade', 'type', 'elem', 'custom', 'xpath', 'fixed'];
@@ -1360,8 +1360,15 @@ function autoActs() {
   if (autoOn('a_main') && !s.flags.mainManual && !xpOn(s)) {   // 這一世自己換過主修，化身就不再自動換
     // 比潛力（圓滿後的修煉速度，也就是基礎速度），不看目前層數；沒當主修的功法不會長層數，看層數會永遠換不上高階功法
     const pot = id => TECHS[id].rate || 0;
-    const best = Object.keys(s.techs).filter(id => canMain(id) && id !== s.tech2 && !pathMains(s).includes(id)).sort((a, b) => pot(b) - pot(a))[0];   // 副主修交給玩家自己安排
-    if (best && pot(best) > pot(s.tech)) switchTech(best, true);
+    // 依路線換：主修只挑主路的類型（法修吐納、體修鍛體、魂修觀想），兼修路線的主修欄各挑自己類型最好的
+    const pick1 = ty => Object.keys(s.techs).filter(id => TECHS[id].type === ty && canMain(id) && id !== s.tech2 && id !== s.tech).sort((a, b) => pot(b) - pot(a))[0];   // 副主修交給玩家自己安排
+    const mty = PATH_MAIN[myPaths(s)[0]], best = mty && pick1(mty);
+    if (best && (TECHS[s.tech].type !== mty || pot(best) > pot(s.tech))) switchTech(best, true);
+    for (const ty of pathSlots(s)) {
+      const cur = pathMains(s).find(x => TECHS[x].type === ty), b = pick1(ty);
+      if (b && (!cur || pot(b) > pot(cur))) { s.ptech = s.ptech || {}; if (cur) s.xiu /= 2; s.ptech[ty] = b; s.subs = s.subs.filter(x => x !== b);
+        log(`${cur ? '散功改修，' : ''}以《${TECHS[b].name}》為${PATHS[MAIN_PATH[ty]].name}主修${cur ? '，修為折半' : ''}。`); }
+    }
   }
   // 隨緣應變：普通事件 30 秒沒選就自動選（人物劇情、前世羈絆不算）
   if (autoOn('a_event') && s.ev && s.ev.ev && (s.ev.w = (s.ev.w || 0) + 1) >= 30) autoChoose();
@@ -2344,7 +2351,7 @@ function renderGong() {
     .sort((a, b) => techSort === 'layer' ? techLayer(b) - techLayer(a) || TECHS[b].grade - TECHS[a].grade : TECHS[b].grade - TECHS[a].grade || techLayer(b) - techLayer(a));
   // 兼修：主修欄固定照法、體、魂由上到下排（自己的主路那欄放原本的主修）
   const mainTy = TECHS[s.tech] && TECHS[s.tech].type, slotTys = pathSlots(s), ordTys = ['fa', 'ti', 'hun'].map(p => PATH_MAIN[p]).filter((ty, i, a) => a.indexOf(ty) === i && myPaths(s).map(p => PATH_MAIN[p]).includes(ty));
-  const mainHtml = `${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換，轉世後恢復。</p>' : ''}${techCard(s.tech, mainN(s) > 1 ? `<span class="small same">效果、修煉跟其他主修相加後 ÷${mainN(s)}</span>` : "")}`;
+  const mainHtml = `${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換（各路線主修欄也是），轉世後恢復。</p>' : ''}${techCard(s.tech, mainN(s) > 1 ? `<span class="small same">效果、修煉跟其他主修相加後 ÷${mainN(s)}</span>` : "")}`;
   const multi = slotTys.length && ordTys.includes(mainTy);
   return `${multi ? '' : `<h3>主修</h3>${mainHtml}`}
     ${(multi ? ordTys : slotTys).map(ty => { if (ty === mainTy && multi) return `<h3>${PATHS[MAIN_PATH[ty]].name}主修（${ty}）</h3>${mainHtml}`; const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉跟其他主修相加後 ÷${mainN(s)}，精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度跟其他主修相加後 ÷ 有裝的主修數（空著不算），精進五折。</p>`); }).join('')}
