@@ -77,6 +77,9 @@ function load() {
   for (const id in s.custom || {}) TECHS[id] = s.custom[id];   // 自創功法、仙界流派功法
   m.codex = m.codex || {}; m.codexPaid = m.codexPaid || 0;
   for (const id in s.techs) if (!TECHS[id]) delete s.techs[id];
+  // v2.3.5 以前「從仙人開始」可能抽到上一世的根本仙法而中斷：主修已經不存在就退回一部還在的主修類功法，之後照常化成根本仙法
+  if (!TECHS[s.tech]) s.tech = Object.keys(s.techs).filter(id => isMainType(TECHS[id].type)).sort((a, b) => TECHS[b].grade - TECHS[a].grade)[0] || (s.techs.yinqi = s.techs.yinqi || 0, 'yinqi');
+  if (s.root && isXian(s) && !s.dead && !s.draw && !s.mortal) xjOpen(s);
   s.subs = (s.subs || []).filter(id => id in s.techs);
   if (!TECHS[s.tech] || !isMainType(TECHS[s.tech].type)) {
     if (TECHS[s.tech] && !s.subs.length) s.subs.push(s.tech);   // 原本主修的煉體功法改成輔修
@@ -672,7 +675,7 @@ function xpathForm(s = L()) {
   if (xpOn(s)) {   // 每次讀檔都照目前的流派數值重設（舊版繼承凡界主修、或數值調整過）
     const d = TECHS[s.tech];
     for (const k of Object.keys(d)) if (!FUSE_SKIP.includes(k)) delete d[k];
-    Object.assign(d, xpBase(d.xpath), { fixed: 1, elem: xpElem(s) }); s.custom[s.tech] = d; return;
+    Object.assign(d, xpBase(d.xpath), { fixed: 1, elem: xpElem(s) }); (s.custom = s.custom || {})[s.tech] = d; return;
   }
   const key = pathKey(s), main = TECHS[s.tech], parts = [[s.tech], ...pathMains(s).map(id => [id]), ...(dualOn(s) ? [[s.tech2]] : [])];
   const d = { name: XPATH_TECH[key][0], grade: 6, type: main.type, elem: xpElem(s), xpath: key, fixed: 1, ...xpBase(key) };
@@ -938,10 +941,12 @@ function renderCodex() {
   return `<p class="small">已收錄 ${n} 項。每收錄 ${CODEX_STEP} 項悟得道果 ${CODEX_GUO}，下一次在 ${next} 項。</p>
     ${nav(LUN_TABS.map(([k, name]) => [k, name]), codexTab, 'tab')}${body}`;
 }
+// 自創功法、仙界根本仙法是某一世專屬的，不能出現在任何隨機池（上一世的根本仙法在重新整理前還留在 TECHS 裡）
+const ownTech = id => !!(TECHS[id] && (TECHS[id].custom || TECHS[id].xpath));
 function randomUnowned(kind, grades, filter) {
   const s = L(), pool = { tech: TECHS, skill: SKILLS, art: ARTS }[kind], owned = { tech: s.techs, skill: s.skills, art: s.arts }[kind];
   if (kind === 'skill' && isXian(s)) return null;   // 仙界只有一招，不再得到仙術
-  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && (!filter || filter(pool[id])));
+  const ids = Object.keys(pool).filter(id => grades.includes(pool[id].grade) && !(id in owned) && !(kind === 'tech' && ownTech(id)) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && (!filter || filter(pool[id])));
   return ids.length ? (kind === 'tech' ? pickTech(ids, s) : pick(ids)) : null;
 }
 // 抽功法：三成五機會從自己路線修得了的主修類功法裡抽（鍛體、觀想功法比吐納少，免得一直撿不到）
@@ -1209,7 +1214,7 @@ function sectPromote() {
 // 藏經閣：宗門專長類型的功法（身分夠的品階）、專屬功法（真傳起）、丹宗的突破丹
 function sectShop(s = L()) {
   const x = SECTS[s.sect.id], maxG = s.sect.rank + 1, list = [];
-  Object.keys(TECHS).filter(id => x.types.includes(TECHS[id].type) && !TECHS[id].sect && !TECHS[id].custom && TECHS[id].grade <= maxG && !(id in s.techs))
+  Object.keys(TECHS).filter(id => x.types.includes(TECHS[id].type) && !TECHS[id].sect && !ownTech(id) && TECHS[id].grade <= maxG && !(id in s.techs))
     .sort((a, b) => TECHS[b].grade - TECHS[a].grade).slice(0, 6).forEach(id => list.push({ k: 'tech', id, cost: TECH_CONTRIB[TECHS[id].grade] }));
   if (!(x.excl in s.techs)) list.unshift({ k: 'tech', id: x.excl, cost: 800, need: 2 });
   if (x.pills) unknownRecipes().filter(id => RECIPES[id].g <= Math.min(s.sect.rank + 2, matGrade(s) + 1)).slice(0, 2).forEach(id => list.push({ k: 'recipe', id, cost: 60 * RECIPES[id].g * RECIPES[id].g }));
@@ -1744,7 +1749,7 @@ function restock() {
   if (isXian(s)) delete kinds.skill;   // 仙界沒有仙術可賣：空出來的格子給仙法和靈寶
   for (const k in kinds) {
     const [pool, owned, prices] = kinds[k], per = isXian(s) ? (k === 'art' ? Math.ceil(per0 * 1.5) : per0 + Math.floor(per0 / 2)) : per0;
-    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && !(k === 'tech' && isXian(s) && ((s.xpGot || {})[id] || !(subOk(pool[id]) || xpTypes(s).includes(pool[id].type)))) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
+    const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && !(k === 'tech' && isXian(s) && ((s.xpGot || {})[id] || !(subOk(pool[id]) || xpTypes(s).includes(pool[id].type)))) && !(k === 'tech' && ownTech(id)) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
     for (let i = 0; i < per; i++) {
       // 第一格保證玄階以上（玄階還沒解鎖就照常抽）
       const low = isXian(s) ? (tj && grades.includes(7) ? 7 : 6) : tj && grades.some(g => g >= 3) ? 3 : 2;   // 天機丹：保證地階以上（仙界：中品以上）
@@ -1946,7 +1951,7 @@ function xjOpen(s = L()) { if (!s.xj) { s.xj = { gong: 0, task: 0, shop: null };
 // 兌換清單：渡劫仙丹、延壽仙丹、當前境界修為丹、三部沒學過的仙階功法（優先挑當得了主修的）
 function xjRestock(s = L()) {
   const gs = [6, 7, 8].filter(g => s.stage >= GRADE_MIN_STAGE[g]);
-  const ids = Object.keys(TECHS).filter(id => gs.includes(TECHS[id].grade) && !(id in s.techs) && !(s.xpGot || {})[id] && (subOk(TECHS[id]) || xpTypes(s).includes(TECHS[id].type)));   // 輔修類，或自己體系要收集的主修類
+  const ids = Object.keys(TECHS).filter(id => gs.includes(TECHS[id].grade) && !(id in s.techs) && !ownTech(id) && !(s.xpGot || {})[id] && (subOk(TECHS[id]) || xpTypes(s).includes(TECHS[id].type)));   // 輔修類，或自己體系要收集的主修類
   const main = ids.filter(id => xpTypes(s).includes(TECHS[id].type)), list = [];
   for (let i = 0; i < 3 + tl('xjshop') && (main.length || ids.length); i++) { const pool = main.length && i < 2 ? main : ids, id = pick(pool); list.push({ k: 'tech', id, cost: XJ_TECH_COST[TECHS[id].grade] }); main.splice(main.indexOf(id), 1); ids.splice(ids.indexOf(id), 1); }
   s.xj.shop = list;
@@ -1996,8 +2001,8 @@ function xianEnter(s) {
   s.mortal = null; s.stage = MORTAL_TOP + 1; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
   s.age = 300 + Math.floor(Math.random() * 200); s.place = topPlace(s).id;   // 剛成仙的年紀：比飛升上來的人年輕，壽元才夠走得遠
   // 有前世功法（天賦）而且修得了，就直接當主修；不然接引仙官送一部合得來的仙階下品
-  const keep = S.meta.keepTech && S.meta.keepTech.id, kept = keep && keep in s.techs && canMain(keep, s);
-  const tech = kept ? [] : Object.keys(TECHS).filter(id => TECHS[id].grade === 6 && canMain(id, s)), tid = tech.length ? pick(tech) : null;
+  const keep = S.meta.keepTech && S.meta.keepTech.id, kept = keep && keep in s.techs && !ownTech(keep) && canMain(keep, s);
+  const tech = kept ? [] : Object.keys(TECHS).filter(id => TECHS[id].grade === 6 && !ownTech(id) && canMain(id, s)), tid = tech.length ? pick(tech) : null;
   if (kept) s.tech = keep; else if (tid) { learnTech(tid); s.tech = tid; }
   // 大道至簡：凡界帶來的入門術法化成這條路線的那一招
   s.skills = {}; s.equip = []; yiForm(s, false);
