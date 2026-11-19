@@ -661,7 +661,7 @@ function xpAbsorb(id, s = L()) {
 // 每種流派一組固定數值（不繼承凡界主修）：修煉都一樣，其他效果雙修加總打七五折、三修打六折；實際效果再 ×收集境界（入門 ×2 起）×大境界
 const XPATH_BASE = { fa: { mp: .5, skillUp: .3, crit: .1 }, ti: { hp: 1, def: .6, normalAtk: .6 }, hun: { shenUp: .6, crit: .15, techXp: .2 } };
 function xpBase(key) {
-  const ps = key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .9 : .8, d = { rate: 3, brk: [0, .06, .09, .12][ps.length] };   // 突破率：單修 6%、雙修 9%、三修 12%，隨收集階段 ×1～×4
+  const ps = key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .9 : .8, d = { rate: 3, brk: [0, .03, .045, .06][ps.length] };   // 突破率：隨收集階段 ×1～×4，圓滿時單修 12%、雙修 18%、三修 24%
   for (const p of ps) for (const k in XPATH_BASE[p]) d[k] = +((d[k] || 0) + XPATH_BASE[p][k] * f).toFixed(3);
   return d;
 }
