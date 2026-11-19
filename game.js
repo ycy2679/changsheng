@@ -724,7 +724,6 @@ function tickBuffs(sec, s = L()) { if (s.buffs) for (const k in s.buffs) if ((s.
 function talentEff(key) {
   const fu = tl('tianming');
   switch (key) {
-    case 'rate': return .05 * tl('suhui');
     case 'stone': return .1 * tl('caiyun') + fu;
     case 'drop': return .2 * tl('qiyu') + fu;   // 天降機緣（合併了天材地寶）
     case 'evRate': return .15 * tl('qiyu');
@@ -747,7 +746,7 @@ const mainAff = (s = L()) => s.root.type === 'void' || (TECHS[s.tech].elem !== '
 function rate(s = L(), mode = s.mode) {
   const main = TECHS[s.tech];
   return (1 + .2 * s.stage) * rootRate(s) * (mainAff(s) ? 1.15 : 1)
-    * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao)
+    * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao) * (1 + .05 * tl('suhui'))   // 宿慧自己一個乘區
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
     * xianRateMul(s) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? 1 : CLOSED_XIU) * (1 + qualBonus(s))   // 遊歷是閉關的一半
     * pathRate(s) * (1 + .08 * arrEff('juling', s));
