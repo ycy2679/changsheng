@@ -634,11 +634,10 @@ const XP_STAGE = ['入門', '小成', '大成', '圓滿'];
 const xpTypes = (s = L()) => myPaths(s).map(p => PATH_MAIN[p]);
 const xpPool = (g, s = L()) => Object.keys(TECHS).filter(id => TECHS[id].grade === g && xpTypes(s).includes(TECHS[id].type) && !TECHS[id].custom && !TECHS[id].xpath && !TECHS[id].boss && !TECHS[id].xs && !TECHS[id].sect && !TECHS[id].path && !TECHS[id].char);
 const xpCount = (g, s = L()) => { const pool = xpPool(g, s), got = s.xpGot || {}; return [pool.filter(id => got[id]).length, pool.length]; };
-// 融合進度：每個品階、每種類型列出要化入的功法，已化入的打勾
-function xpList(s = L()) {
-  const got = s.xpGot || {}, tys = xpTypes(s);
-  return `<div class="item">${[6, 7, 8].map(g => { const pool = xpPool(g, s), [a, b] = xpCount(g, s);
-    return `<div class="small"><b class="g${g}">${GRADES[g]}</b> ${a}/${b}${a >= b ? '（已收齊）' : ''}</div>` + tys.map(ty => { const ids = pool.filter(id => TECHS[id].type === ty); return ids.length ? `<div class="small">${tys.length > 1 ? `<span class="muted">${ty}：</span>` : ''}${ids.map(id => got[id] ? `<span class="g${g}">✓${TECHS[id].name}</span>` : `<span class="muted">${TECHS[id].name}</span>`).join('、')}</div>` : ''; }).join(''); }).join('')}</div>`;
+// 仙界：自己體系的仙階功法標示有沒有化入根本仙法（不是體系功法回 null）
+function xpTag(id, s = L()) {
+  const t = TECHS[id]; if (!xpOn(s) || !t || t.grade < 6 || !xpTypes(s).includes(t.type) || t.custom || t.xpath) return null;
+  return (s.xpGot || {})[id] ? `<span class="same">已融入《${TECHS[s.tech].name}》</span>` : `<span class="g${t.grade}">尚未融入《${TECHS[s.tech].name}》，學到就會化入</span>`;
 }
 const xpStage0 = (s = L()) => { let st = 0; for (const g of [6, 7, 8]) { const [a, b] = xpCount(g, s); if (b && a >= b) st++; else break; } return st; };
 // 境界倍率：入門 ×2（基礎數值的圓滿）；小成＝體系仙階下品功法圓滿的 1.5 倍，大成＝中品的 1.5 倍，圓滿＝上品的 1.5 倍
@@ -1982,7 +1981,7 @@ function renderXianji() {
     <p class="small muted">仙籍就是碑的另一面：碑上刻著誰，仙籍上就記著誰。接引仙官會派些差事給你，辦妥了有仙功和仙元石，仙功可以換仙丹和功法。</p>
     <h3>差事</h3>${autoOn('a_xj') ? `<p class="small muted">仙官代勞：冷卻好了會自動接「${XJ_TASKS.find(k => k.id === (S.meta.xjAuto || 'dang')).name}」（悟道樹可以換或關掉）。</p>` : ''}${s.injury > 0 ? '<p class="small hurt">傷勢未癒，先養傷。</p>' : tw ? `<p class="small muted">剛辦完差事，${tw} 年後可以再接。</p>` : XJ_TASKS.map(k => `<div class="item"><div class="row"><b>${k.name}</b></div><div class="small">${k.desc}</div><div class="btnrow"><button class="mini" onclick="doXjTask('${k.id}')">接下（仙功約 ${Math.round(xjGain(s) * (k.id === 'men' ? 1.5 : k.id === 'dang' ? .7 : 1))}）</button></div></div>`).join('')}
     <h3>兌換</h3>${xjList(s).map((o, i) => { const nm = o.k === 'tech' ? `《${TECHS[o.id].name}》` : o.k === 'recipe' ? `丹方・${ITEMS[o.id].name}` : ITEMS[o.id].name, sub = o.k === 'tech' ? gradeTag(TECHS[o.id].grade, `${TECHS[o.id].type} · ${TECHS[o.id].elem}`) : '';
-      return `<div class="item"><div class="row"><b>${nm}</b> ${sub}</div><div class="small muted">${o.k === 'tech' ? effText(TECHS[o.id]) : ITEMS[o.id].desc}</div><div class="btnrow"><button class="mini" ${s.xj.gong >= o.cost ? '' : 'disabled'} onclick="xjBuy(${i})">${o.cost} 仙功</button></div></div>`; }).join('')}
+      return `<div class="item"><div class="row"><b>${nm}</b> ${sub}</div><div class="small muted">${o.k === 'tech' ? effText(TECHS[o.id]) : ITEMS[o.id].desc}</div>${o.k === 'tech' && xpTag(o.id) ? `<div class="small">${xpTag(o.id)}</div>` : ''}<div class="btnrow"><button class="mini" ${s.xj.gong >= o.cost ? '' : 'disabled'} onclick="xjBuy(${i})">${o.cost} 仙功</button></div></div>`; }).join('')}
     <h3>名冊</h3><ul class="log">${names || '<li class="muted">你在凡間認識的人，仙籍上一個也找不到。</li>'}</ul>
     <p class="small muted">還有成千上萬個名字，你一個也不認得。</p></section>`;
 }
@@ -2325,8 +2324,9 @@ function setTechView(k, v) { if (k === 'tab') techTab = v; else if (k === 'sort'
 function techHint(id) {
   const s = L(), t = TECHS[id];
   // 比的是算上層數之後的修煉加成：現在就比主修快，或練到圓滿才會比主修快
+  const xt = xpTag(id, s); if (xt !== null) return xt;
   if (isMainType(t.type) && (t.type !== '鍛體' || canMain(id))) {
-    if (!canMain(id)) return '';
+    if (!canMain(id) || xpOn(s)) return '';   // 仙界主修固定，不比修煉速度
     const cur = effOf(s.tech, 'rate', s), now = effOf(id, 'rate', s), full = (t.rate || 0) * 2;
     return now > cur ? '<span class="same">比主修快</span>' : full > cur ? '<span class="muted">練到圓滿後比主修快</span>' : '';
   }
@@ -2367,7 +2367,6 @@ function renderGong() {
   const multi = slotTys.length && ordTys.includes(mainTy);
   return `${multi ? '' : `<h3>主修</h3>${mainHtml}`}
     ${(multi ? ordTys : slotTys).map(ty => { if (ty === mainTy && multi) return `<h3>${PATHS[MAIN_PATH[ty]].name}主修（${ty}）</h3>${mainHtml}`; const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉跟其他主修相加後 ÷${mainN(s)}，精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度跟其他主修相加後，裝兩部 ÷1.5、三部 ÷2（空著不算），精進五折。</p>`); }).join('')}
-    ${xpOn(s) ? xpList(s) : ''}
     ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（小成的效果是體系仙階下品功法圓滿的 1.5 倍，大成是中品的 1.5 倍，圓滿是上品的 1.5 倍）。</p>` : ''}
     ${tl('liangyi') && !xpOn(s) ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
@@ -2588,7 +2587,7 @@ function renderShop() {
   const slot = (o, i) => {
     if (o.sold) return `<div class="item row muted"><span>（已售出）</span></div>`;
     const deal = o.deal ? ' <span class="deal">奇貨</span>' : '';
-    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><span><b>《${t.name}》</b>${deal}</span> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}</div>${(n => n ? `<div class="small">${n}</div>` : '')([techAff(t).replace(/^ · /, ''), isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? '<span class="muted">你只能輔修</span>' : `<span class="hurt">${mainBlock(o.id)}</span>`) : ''].filter(Boolean).join(' · '))}<div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
+    if (o.k === 'tech') { const t = TECHS[o.id]; return `<div class="item"><div class="row"><span><b>《${t.name}》</b>${deal}</span> ${gradeTag(t.grade, `${t.type} · ${t.elem}`)}</div><div class="small">${effText(t) || '<span class="muted">沒有特別加成</span>'}</div>${(n => n ? `<div class="small">${n}</div>` : '')([techAff(t).replace(/^ · /, ''), xpTag(o.id), xpTag(o.id) === null && isMainType(t.type) && !canMain(o.id) ? (subOk(t) ? '<span class="muted">你只能輔修</span>' : `<span class="hurt">${mainBlock(o.id)}</span>`) : ''].filter(Boolean).join(' · '))}<div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     if (o.k === 'skill') { const k = SKILLS[o.id]; return `<div class="item"><div class="row"><span><b>${k.name}</b>${deal}</span> ${gradeTag(k.grade, `${SCHOOL_NAME[skillSchool(k)]} · ${k.elem} · ${KIND_LABEL[k.kind]}`)}</div><div class="small">${k.pow ? `威力 ${k.pow} · ` : ''}冷卻 ${k.cd}${skillDesc(k) ? ' · ' + skillDesc(k) : ''}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     if (o.k === 'art') { const a = ARTS[o.id]; return `<div class="item"><div class="row"><span><b>${a.name}</b>${deal}</span> ${gradeTag(a.grade, `法寶 · ${a.slot}`)}</div><div class="small">${effText(a)}</div><div class="btnrow">${btn(o.price, `buySlot(${i})`)}</div></div>`; }
     const it = ITEMS[o.id];
