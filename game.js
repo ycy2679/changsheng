@@ -2659,12 +2659,14 @@ function brewTick(dt, s = L()) {
     if (!(autoOn('a_lu') && tryBrew(f.id, 1, s))) return;
   }
 }
+// 修為仙丹：高品階的草貴、丹的價格卻跟著修為走，所以一爐出得多（仙階中品 ×2、上品 ×4）
+const xiuYield = id => ITEMS[id].kind === 'xiu' && RECIPES[id].g >= 7 ? (RECIPES[id].g === 7 ? 2 : 4) : 1;
 function brewDone(f, s) {
   const g = RECIPES[f.id].g, nm = ITEMS[f.id].name;
   if (pct(brewChance(f.id, s))) {
     const sc = .5 * craftQ(alchLv(s)) + .5 * eff('pillEff', s) + Math.random() * 2, q = sc >= 2.4 ? 3 : sc >= 1.6 ? 2 : sc >= .9 ? 1 : 0;
-    addItem(f.id, q + 1); s.alch = (s.alch || 0) + BREW_XP[g] * (q === 3 ? 2 : 1);
-    log(`丹成！${QUAL_RANK[q]}${nm} ${q + 1} 顆出爐。`, true);
+    const n = (q + 1) * xiuYield(f.id); addItem(f.id, n); s.alch = (s.alch || 0) + BREW_XP[g] * (q === 3 ? 2 : 1);
+    log(`丹成！${QUAL_RANK[q]}${nm} ${n} 顆出爐。`, true);
   } else {
     s.alch = (s.alch || 0) + Math.ceil(BREW_XP[g] / 2);
     if (g >= 3 && pct(.3)) { injure(60 * g); log(`煉${nm}時丹爐炸了，你受了點傷，靈草全毀。`, true); }
@@ -2834,7 +2836,7 @@ function renderCraft() {
     <p class="small">${isXian(s) ? '仙草' : '靈草'}：${herbs}</p>
     <h3${gx()}>丹方（${known.length}/${total}）</h3>
     ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))((isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => known.some(id => RECIPES[id].g === g)))}
-    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種（仙界的修為仙丹，更低仙境的也能煉），突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
+    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4${isXian(s) ? "（仙階中品修為仙丹 ×2、上品 ×4）" : ""}。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種（仙界的修為仙丹，更低仙境的也能煉），突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [

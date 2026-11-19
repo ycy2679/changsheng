@@ -291,6 +291,9 @@ for (const [src, id, name, g, base, desc, ex] of XIAN_DAN) {
   ITEMS[id] = { ...o, name, base, desc, xian: 1, ...(ex || {}) };
   RECIPES[id] = { g, n: RECIPES[src].n + 2 };
 }
+// 仙丹（修為仙丹以外）的原價照配方草藥市價定：草藥價 ×1.6，高品階的草貴，丹自然也貴；買草來煉，極品四顆約賺兩倍半
+const XIAN_DAN_K = 1.6;
+for (const id in RECIPES) { const r = RECIPES[id], it = ITEMS[id]; if (r.g >= 6 && it && it.xian && it.kind !== 'xiu') it.base = r.n * MAT_PRICE[r.g] * XIAN_DAN_K; }
 const X_DAN_COMMON = XIAN_DAN.filter(x => !ITEMS[x[0]].rare).map(x => x[1]);
 const X_DAN_RARE = XIAN_DAN.filter(x => ITEMS[x[0]].rare).map(x => x[1]);
 
