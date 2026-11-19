@@ -603,8 +603,8 @@ function dualFactor(id, main = L().tech) {
   return SHENG[a] === b || SHENG[b] === a ? .5 : .3;
 }
 const dualOn = (s = L()) => s.tech2 && tl('liangyi') && !xpOn(s) ? s.tech2 : null;
-// 兼修：主路以外，每條路再一個主修欄（法修吐納、體修鍛體、魂修觀想），效果、修煉跟主修相加後 ÷ 路線數，精進五折
-const mainN = (s = L()) => xpOn(s) ? 1 : Math.max(1, new Set(myPaths(s).map(p => PATH_MAIN[p]).filter(Boolean)).size);
+// 兼修：主路以外，每條路再一個主修欄（法修吐納、體修鍛體、魂修觀想），效果、修煉跟主修相加後 ÷ 有裝的主修數，精進五折
+const mainN = (s = L()) => xpOn(s) ? 1 : 1 + pathMains(s).length;   // 只算有裝的主修
 const pathSlots = (s = L()) => xpOn(s) ? [] : [...new Set(['fa', 'ti', 'hun'].filter(p => myPaths(s).includes(p)).map(p => PATH_MAIN[p]))].filter(ty => !TECHS[s.tech] || ty !== TECHS[s.tech].type);
 const pathMains = (s = L()) => pathSlots(s).map(ty => (s.ptech || {})[ty]).filter(id => id && TECHS[id] && id in s.techs && id !== s.tech && id !== s.tech2 && canMain(id, s));
 function setPathMain(id) {
@@ -695,7 +695,7 @@ function physVal(key, s = L()) { const ph = PHYSIQUES[s.phys], v = (ph[key] || 0
 const physName = (s = L()) => (isXian(s) ? '仙蛻・' : '') + PHYSIQUES[s.phys].name;
 // 所有加成來源：主修＋輔修功法、法寶（隨祭煉放大）、體質
 function eff(key, s = L()) {
-  const mn = mainN(s);   // 兼修：所有主修相加後 ÷ 路線數（雙修 ÷2、三修 ÷3）
+  const mn = mainN(s);   // 兼修：所有主修相加後 ÷ 有裝的主修數
   let v = equipped(s).reduce((a, id, i) => a + (i && key === 'rate' ? 0 : effOf(id, key, s) * (i ? subBoost(id, s) : 1 / mn)), 0) + pathEff(key, s);   // 輔修不算修煉速度
   const t2 = dualOn(s); if (t2) v += effOf(t2, key, s) * dualFactor(t2, s.tech);   // 副主修打折
   for (const id of pathMains(s)) v += effOf(id, key, s) / mn;
@@ -2348,7 +2348,7 @@ function renderGong() {
   const mainHtml = `${s.flags.mainManual && tl('a_main') ? '<p class="muted small">你這一世親手換過主修，化身「擇法而修」這一世不再替你換，轉世後恢復。</p>' : ''}${techCard(s.tech, mainN(s) > 1 ? `<span class="small same">效果、修煉跟其他主修相加後 ÷${mainN(s)}</span>` : "")}`;
   const multi = slotTys.length && ordTys.includes(mainTy);
   return `${multi ? '' : `<h3>主修</h3>${mainHtml}`}
-    ${(multi ? ordTys : slotTys).map(ty => { if (ty === mainTy && multi) return `<h3>${PATHS[MAIN_PATH[ty]].name}主修（${ty}）</h3>${mainHtml}`; const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉跟其他主修相加後 ÷${mainN(s)}，精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度跟其他主修相加後 ÷${mainN(s)}（空著也照樣 ÷${mainN(s)}），精進五折。</p>`); }).join('')}
+    ${(multi ? ordTys : slotTys).map(ty => { if (ty === mainTy && multi) return `<h3>${PATHS[MAIN_PATH[ty]].name}主修（${ty}）</h3>${mainHtml}`; const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉跟其他主修相加後 ÷${mainN(s)}，精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度跟其他主修相加後 ÷ 有裝的主修數（空著不算），精進五折。</p>`); }).join('')}
     ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（小成的效果是體系仙階下品功法圓滿的 1.5 倍，大成是中品的 1.5 倍，圓滿是上品的 1.5 倍）。</p>` : ''}
     ${tl('liangyi') && !xpOn(s) ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
