@@ -661,7 +661,7 @@ function xpAbsorb(id, s = L()) {
 // 每種流派一組固定數值（不繼承凡界主修）：修煉都一樣，其他效果雙修加總打七五折、三修打六折；實際效果再 ×收集境界（入門 ×2 起）×大境界
 const XPATH_BASE = { fa: { mp: .5, skillUp: .3, crit: .1 }, ti: { hp: 1, def: .6, normalAtk: .6 }, hun: { shenUp: .6, crit: .15, techXp: .2 } };
 function xpBase(key) {
-  const ps = key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .9 : .8, d = { rate: 3 };
+  const ps = key.split(','), f = ps.length === 1 ? 1 : ps.length === 2 ? .9 : .8, d = { rate: 3, brk: [0, .06, .09, .12][ps.length] };   // 突破率：單修 6%、雙修 9%、三修 12%，隨收集階段 ×1～×4
   for (const p of ps) for (const k in XPATH_BASE[p]) d[k] = +((d[k] || 0) + XPATH_BASE[p][k] * f).toFixed(3);
   return d;
 }
@@ -696,7 +696,7 @@ function setDual(id) {
 function techNeed(id, l) { return l * l * 60 * TECHS[id].grade; }
 function techLayer(id, s = L()) { return Math.min(9, Math.floor(Math.sqrt((s.techs[id] || 0) / (60 * TECHS[id].grade)))); }
 function techMul(id, s = L()) { const l = techLayer(id, s); return 1 + .1 * l + (l >= 9 ? .1 : 0); }
-function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return NO_SCALE.includes(key) ? v : TECHS[id].xpath ? v * xpInfo(s).mul : v * techMul(id, s); }   // 仙界流派功法隨大境界變強
+function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return TECHS[id].xpath ? v * (key === 'brk' ? xpInfo(s).st + 1 : NO_SCALE.includes(key) ? 1 : xpInfo(s).mul) : NO_SCALE.includes(key) ? v : v * techMul(id, s); }   // 仙界流派功法隨大境界變強
 // 法寶祭煉倍率
 // 本命法寶隨大境界變強：化神 ×1，之後每個大境界 +25%（渡劫 ×2、人仙 ×2.25、玄仙 ×3）
 const benMul = (s = L()) => 1 + .25 * Math.max(0, stg(s).major - 4);
@@ -1899,7 +1899,7 @@ const JIE_BASE = { 9: .5, 10: .45, 11: .4 };   // 修為剛滿就渡的成功率
 const PRESS_CAP = .3;   // 劫前淬鍊上限
 // 仙劫成功率：基本 ＋ 劫前淬鍊 ＋ 渡劫仙丹 15%，天人五衰每個 -5%、負傷減半（不擲戰鬥，免得某些流派怎麼準備都過不了）
 function jieChance(s = L()) {
-  const p = (JIE_BASE[stg(s).major] || 0) + (s.press || 0) + .15 * (s.flags.jiedan || 0) + .025 * tl('pojing') - .05 * wuShuai(s);   // 破境如竹在仙界減半；海量可以吃兩顆渡劫仙丹
+  const p = (JIE_BASE[stg(s).major] || 0) + (s.press || 0) + .15 * (s.flags.jiedan || 0) + .025 * tl('pojing') - .05 * wuShuai(s) + (xpOn(s) ? effOf(s.tech, 'brk', s) : 0);   // 根本仙法的突破率也算進仙劫   // 破境如竹在仙界減半；海量可以吃兩顆渡劫仙丹
   return Math.max(.01, Math.min(.9, p * (s.injury > 0 ? .5 : 1)));   // 上限 90%：準備再足也有一成風險
 }
 // 停在大圓滿時繼續修煉：修為化為劫前淬鍊，閉關、遊歷都約一個半小時到上限
