@@ -518,9 +518,13 @@ function rollRoot(dao) {
   return { type: t.id, elems: t.id === 'void' ? [] : pool.slice(0, t.n) };
 }
 const rootType = (s = L()) => ROOT_TYPES.find(r => r.id === s.root.type);
-// 靈根的修煉倍率：法修全算，體修只算三成（靠氣血肉身），魂修算一半（看神魂）；兼修照主路線
+// 靈根的修煉倍率：法修全算，體修只算三成（靠氣血肉身），魂修算一半（看神魂）；兼修取各路線平均（不分主次）
 const ROOT_WEIGHT = { fa: 1, ti: .3, hun: .5 };
-const rootRate = (s = L()) => +(1 + (rootType(s).rate - 1) * ROOT_WEIGHT[myPaths(s)[0]]).toFixed(3);
+const rootW = (s = L()) => { const ps = myPaths(s).filter(p => p in ROOT_WEIGHT); return ps.length ? ps.reduce((a, p) => a + ROOT_WEIGHT[p], 0) / ps.length : 1; };
+const rootRate = (s = L()) => +(1 + (rootType(s).rate - 1) * rootW(s)).toFixed(3);
+// 路線數倍率：單修最快、雙修次之、三修最慢
+const PATH_N_RATE = [1, 1, .8, .6];
+const pathNRate = (s = L()) => PATH_N_RATE[Math.min(3, myPaths(s).length)];
 // ---------- 靈根後期路線（化神後啟動） ----------
 // five 五行圓滿（金木水火土齊全）、pure 靈根化道（天靈根、變異靈根）、void 萬法歸空（空靈根）
 const PATH_STAGE = 18;
@@ -749,7 +753,7 @@ function rate(s = L(), mode = s.mode) {
     * (1 + eff('rate', s)) * (mode === 'closed' ? 1 + .15 * s.cave : 1) * (1 + .03 * S.meta.dao) * (1 + .05 * tl('suhui'))   // 宿慧自己一個乘區
     * (s.age / lifespan(s) > .7 ? 1 + eff('lateRate', s) : 1)
     * xianRateMul(s) * (s.injury > 0 ? .5 : 1) * (1 - .05 * wuShuai(s)) * (mode === 'travel' ? 1 : CLOSED_XIU) * (1 + qualBonus(s))   // 遊歷是閉關的一半
-    * pathRate(s) * (1 + .08 * arrEff('juling', s));
+    * pathRate(s) * pathNRate(s) * (1 + .08 * arrEff('juling', s));
 }
 // 靈根後期路線的修煉倍率
 function pathRate(s = L()) {
@@ -2097,7 +2101,7 @@ const TABS = [['cult', '修行'], ['skill', '術法'], ['art', '法寶'], ['bag'
 const physDesc = id => { const x = PHYSIQUES[id]; return (x.desc || [x.boost ? `${x.boost}屬性術法 +30%` : '', effText(x)].filter(Boolean).join(' · ')) + (x.path ? ` · 適合${PATHS[x.path].name}（對上效果 ×1.3）` : '') + (PHYS_SHEN[id] ? ` · 天賦神通「${SHENS[PHYS_SHEN[id]].name}」` : ''); };
 function rootDesc(root) {
   const t = ROOT_TYPES.find(r => r.id === root.type);
-  return `修煉 ×${t.rate}（體修只算三成、魂修一半）${t.aff ? ` · 親和術法 +${Math.round(t.aff * 100)}%` : ''}${t.desc ? ' · ' + t.desc : ''}`;
+  return `修煉 ×${t.rate}（體修只算三成、魂修一半，兼修取平均）${t.aff ? ` · 親和術法 +${Math.round(t.aff * 100)}%` : ''}${t.desc ? ' · ' + t.desc : ''}`;
 }
 function renderDraw() {
   const s = L(), d = s.draw, fake = r => rootName({ root: r });
@@ -2282,7 +2286,7 @@ function renderCult() {
 function renderGen() {
   const s = L(), st = stats(), rt = rootType();
   return `<h3>靈根</h3>
-    <div class="item"><div class="row"><b>${rootName()}</b><span class="small">修煉 ×${rootRate()}${rootRate() !== rt.rate ? `（${PATHS[myPaths()[0]].name}只算${ROOT_WEIGHT[myPaths()[0]] === .3 ? '三成' : '一半'}，原本 ×${rt.rate}）` : ''}${rt.aff ? ` · 親和屬性術法 +${Math.round(rt.aff * 100)}%` : ''}</span></div>
+    <div class="item"><div class="row"><b>${rootName()}</b><span class="small">修煉 ×${rootRate()}${rootRate() !== rt.rate ? `（${myPaths().length > 1 ? '兼修取各路線平均' : PATHS[myPaths()[0]].name}只算${Math.round(rootW() * 100)}%，原本 ×${rt.rate}）` : ''}${rt.aff ? ` · 親和屬性術法 +${Math.round(rt.aff * 100)}%` : ''}</span></div>
       <div class="muted small">${rt.desc || (s.root.elems.length ? `親和：${s.root.elems.join('、')}。主修同屬性功法再快 15%，地階以上只能修這些屬性（或無屬性）的功法${myPaths()[0] === 'ti' ? '；鍛體功法不挑靈根' : ''}。` : '')}</div>
       <div class="small">${pathLine(s)}</div></div>
     <h3>修行路線</h3>${pathSection(s)}
