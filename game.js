@@ -1917,7 +1917,7 @@ function xianJie() {
   log(`你引動了${name}。劫雲從四面八方湧來——仙界的天，也會降劫。`);
   const r = runJie(s); s.flags.jiedan = 0;
   if (!r.ok) {
-    if (tl('wenxin') && pct(.3)) {   // 道心穩固：三成機率撐住一口氣，跌一重、重傷，淬鍊散去
+    if (tl('wenxin') && pct(.7)) {   // 道心穩固：七成機率撐住一口氣，跌一重、重傷，淬鍊散去
       s.stage--; s.xiu = Math.floor(stg().need * .5); s.press = 0; injure(1800);
       log(`第${NUM9[r.i]}道劫雷落下，你沒能撐住——可道心沒有散。你從雷光裡爬出來，跌回${stg().name}，傷得很重。`); save(); render(); return;
     }
