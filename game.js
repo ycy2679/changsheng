@@ -2637,9 +2637,9 @@ const brewNeed = id => ({ id: MAT_HERB[RECIPES[id].g], n: RECIPES[id].n });
 const brewFee = id => Math.round(itemPrice(id) * .3);
 const brewSec = (g, s = L()) => BREW_SEC[g] * (1 - arrSpeed(arrEff('danshi', s)));
 const brewMax = (id, s = L()) => s.furnace || !brewOk(id, s) ? 0 : Math.min(Math.floor(count(brewNeed(id).id) / brewNeed(id).n) || 0, Math.floor(s.stone / brewFee(id)) || 0);
-// 修為丹只能煉目前大境界的那一種；突破丹目前和更低境界的都能煉
+// 修為丹只能煉目前大境界的那一種（仙界的修為仙丹，目前和更低仙境的都能煉）；突破丹目前和更低境界的都能煉
 const brewMajor = id => ITEMS[id].kind === 'xiu' ? XIU_PILLS.indexOf(id) : ITEMS[id].kind === 'brk' ? BRK_PILLS.indexOf(id) : -1;
-const brewOk = (id, s = L()) => brewMajor(id) < 0 || (ITEMS[id].kind === 'brk' ? brewMajor(id) <= stg(s).major : brewMajor(id) === stg(s).major);
+const brewOk = (id, s = L()) => { const m = brewMajor(id), mj = stg(s).major; return m < 0 || (ITEMS[id].kind === 'brk' || (isXian(s) && m >= XIAN_MJ) ? m <= mj : m === mj); };
 function tryBrew(id, qty = 1, s = L()) {
   const r = RECIPES[id], nd = brewNeed(id);
   if (s.furnace || !r || !knowRecipe(id) || !brewOk(id, s) || qty < 1 || count(nd.id) < nd.n * qty || s.stone < brewFee(id) * qty) return false;
@@ -2834,7 +2834,7 @@ function renderCraft() {
     <p class="small">${isXian(s) ? '仙草' : '靈草'}：${herbs}</p>
     <h3${gx()}>丹方（${known.length}/${total}）</h3>
     ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))((isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => known.some(id => RECIPES[id].g === g)))}
-    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種，突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
+    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種（仙界的修為仙丹，更低仙境的也能煉），突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
