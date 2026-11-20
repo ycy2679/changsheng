@@ -398,9 +398,13 @@ const xGs = (s = L()) => isTian(s) ? [9, 10, 11] : isXian(s) ? [6, 7, 8] : [1, 2
 let XIAN_RATE = 170, XIAN_GROW = 1.17, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008, 13: .006, 14: .005, 15: .004, 16: .003, 17: .003 };
 // 照修為百分比給的東西（頓悟、擊殺得修為、奇遇給的修為）在仙界跟仙丹一樣打折，不然九重一下就衝完
 // 仙界閉關：倍率跟著重數長（需求每重 ×1.2），只靠閉關每重的時間大致一樣，閉關約占修為一半，另一半靠丹藥、頓悟
-const xianRateMul = (s = L()) => isXian(s) ? XIAN_RATE * Math.pow(XIAN_GROW, s.stage - MORTAL_TOP - 1) * (s.xianStart && S.meta.dengtian && !isTian(s) ? 3 : 1) : 1;   // 登天過一次以後，從仙人開始的世地仙界修煉 ×3
-const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 : 1;   // 仙丹每顆補幾成修為：越往上越補不動
-const yearSec = (s = L()) => isXian(s) ? 6 : YEAR_SEC;                   // 仙界歲月流得快：線上 6 秒一年
+const xianRateMul = (s = L()) => isXian(s) ? XIAN_RATE * Math.pow(XIAN_GROW, s.stage - MORTAL_TOP - 1) * (s.xianStart && S.meta.dengtian && !isTian(s) ? 3 : 1) * (isTian(s) ? tianRateK() : 1) : 1;   // 登天過一次以後，從仙人開始的世地仙界修煉 ×3
+// 天仙界修煉：基準 TIAN_K；之前每登天過一次（不算這一世這次）+50%，最多 +150%——碑上的真靈記得路，一世比一世快
+let TIAN_K = .3;
+const tianRateK = () => TIAN_K * (1 + .5 * Math.min(3, Math.max(0, (S.meta.dengtian || 0) - 1)));
+const xianDamp = (s = L()) => isXian(s) ? XIAN_PILL[stg(s).major] / .25 * (isTian(s) ? tianRateK() : 1) : 1;   // 仙丹每顆補幾成修為：越往上越補不動
+let TIAN_YEAR = 2;
+const yearSec = (s = L()) => isTian(s) ? TIAN_YEAR : isXian(s) ? 6 : YEAR_SEC;   // 天仙界歲月更快：線上 2 秒一年（壽元是天仙界的關卡，一世一世越走越遠）                   // 仙界歲月流得快：線上 6 秒一年
 // 下一步要渡劫：渡劫後期 → 九道天雷；仙界每個大境界 → 仙劫。自動突破、離線都不會碰
 const jieNext = (s = L()) => s.stage === MORTAL_TOP || (isXian(s) && s.stage < STAGES.length - 1 && STAGES[s.stage + 1].major !== stg(s).major);
 // 成仙之後的用詞：畫面和紀事一律換掉。飛升前的舊紀事、道途分頁（跨世共用）用 keepWords 加隔字，就不會被換
@@ -1110,7 +1114,7 @@ const SECRETS = [
 ];
 SECRETS.push(...XIAN_SECRETS);
 const SECRET_CD = 30;   // 冷卻（遊戲年）
-const secretCd = (s = L()) => isXian(s) ? Math.round(300 * (1 - .25 * tl('mijing'))) : SECRET_CD;   // 仙界歲月快十倍，冷卻也拉長，一樣約 30 分鐘
+const secretCd = (s = L()) => isXian(s) ? Math.round(300 * (isTian(s) ? 3 : 1) * (1 - .25 * tl('mijing'))) : SECRET_CD;   // 仙界歲月快十倍，冷卻也拉長，一樣約 30 分鐘
 // 各秘境的難度倍率：前期角色弱、後期角色強，所以前低後高
 const SECRET_SCALE = [0, .58, .75, .9, 1.2, 1.4, 1.6, 1.85, 2.1, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3];   // 9 以後是仙界秘境（機器人調）   // 築基、金丹兩座調低：剛開的時候第一次闖大約一半到七成能過
 const secretOpen = (x, s = L()) => stg(s).major >= x.mj;
@@ -1695,7 +1699,7 @@ function usePill(id) {
     const diff = stg().major - it.major;
     const low = Math.pow(.25, diff);
     const xp = it.major >= XIAN_MJ;   // 仙丹：每顆只補一成，丹毒也重
-    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) : .25) * (1 + .04 * tl('yaoli')) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨；藥力精純（合併了丹心通明）
+    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) * (isTian(s) ? tianRateK() : 1) : .25) * (1 + .04 * tl('yaoli')) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨；藥力精純（合併了丹心通明）
     if (diff < 0) { amt = .5 * tf; injure(150); }
     const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 17.5 : 10);   // 修為丹丹毒（原本 35／20，減半讓遊歷賺的錢能換成修為）
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
@@ -1960,7 +1964,7 @@ function xianJie() {
   if (up) { S.meta.dengtian = (S.meta.dengtian || 0) + 1; xpathForm(s); if (xpOn(s)) { s.xpGot = s.xpGot || {}; for (const g of [6, 7, 8]) for (const id of xpPool(g, s)) s.xpGot[id] = 1; } }   // 登天時仙階的收集一併圓滿
   if (s.wsLog) { s.wsLog = 0; log('壽元一下子寬了，天人五衰的徵兆退去。'); }
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
-  if (up) { const after = evolveNames(s), ch = before.map((x, i) => x && x !== after[i] ? `${x}化為${after[i]}` : '').filter(Boolean); log(`你登上了天門，從此是天仙界的仙人。${ch.length ? ch.join('，') + '。' : ''}${S.meta.dengtian === 1 ? '往後轉世從仙人開始，地仙界的路會走得快得多（修煉 ×3）。' : ''}`); }
+  if (up) { const after = evolveNames(s), ch = before.map((x, i) => x && x !== after[i] ? `${x}化為${after[i]}` : '').filter(Boolean); log(`你登上了天門，從此是天仙界的仙人。${ch.length ? ch.join('，') + '。' : ''}${S.meta.dengtian === 1 ? '往後轉世從仙人開始，地仙界的路會走得快得多（修煉 ×3）；天仙界的歲月流得快，壽元不一定撐得到頂，但每多登天一次，天仙界的修煉就快一截。' : `碑上的真靈記得這條路，這一世天仙界修煉 +${Math.round(50 * Math.min(3, S.meta.dengtian - 1))}%。`}`); }
   { const np = PLACES.find(q => q.min === s.stage && q.xian); if (np) log(`以你現在的境界，已經能去${np.name}遊歷了（上方的地點選單）。那裡的妖物更強，仙元石和掉落也多得多。`); }
   pathSkillCheck(s); pathArtCheck(s); giftXiuPills(s);
   save(); render();

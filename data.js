@@ -19,10 +19,10 @@ const MAJORS = [
   { name: '玄仙', subs: NINE_CHONG, life: 12000, brk: 0 },
   // 天仙界：玄仙九重圓滿後渡登天劫；道祖只有一個境界，到了就是終點（超脫）
   { name: '天仙', subs: NINE_CHONG, life: 16000, brk: 0 },
-  { name: '金仙', subs: NINE_CHONG, life: 20000, brk: 0 },
-  { name: '太乙金仙', subs: NINE_CHONG, life: 25000, brk: 0 },
-  { name: '大羅金仙', subs: NINE_CHONG, life: 32000, brk: 0 },
-  { name: '道祖', subs: [''], life: 50000, brk: 0 },
+  { name: '金仙', subs: NINE_CHONG, life: 17000, brk: 0 },
+  { name: '太乙金仙', subs: NINE_CHONG, life: 18000, brk: 0 },
+  { name: '大羅金仙', subs: NINE_CHONG, life: 19000, brk: 0 },
+  { name: '道祖', subs: [''], life: 20000, brk: 0 },
 ];
 const XIAN_MJ = 9;   // 第一個仙界大境界
 const TIAN_MJ = 13;  // 第一個天仙界大境界（天仙）
