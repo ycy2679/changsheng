@@ -1430,7 +1430,7 @@ const ARC_PER_LIFE = 3;
 const arcsMet = (s = L()) => Object.keys(s.arcs).filter(id => id !== 'bei' && (s.arcs[id].step > 0 || s.arcs[id].ended)).length;
 function popEvent(storyOnly) {
   const s = L(), m = S.meta, c = [], full = arcsMet(s) >= ARC_PER_LIFE, xian = isXian(s);
-  // 仙界：凡界的人物劇情、前世羈絆、一般事件都不再出現，只有仙界事件（e.xian）
+  // 仙界：凡界的人物劇情、前世羈絆、一般事件都不再出現，只有仙界事件（e.xian）；天仙界只有天仙界事件（e.tian）
   if (!xian) for (const id in ARCS) {
     const a = arc(id), step = ARCS[id].steps[a.step];
     if (full && id !== 'bei' && !a.step && !a.ended) continue;
@@ -1440,7 +1440,7 @@ function popEvent(storyOnly) {
   // 一般事件一世只發生一次；標了 repeat 的可以重複，但一世最多 4 次，而且要隔 40 年
   if (!storyOnly) for (const e of EVENTS) {
     const seen = s.flags['ev_' + e.id], times = s.flags['evn_' + e.id] || 0;
-    if (!e.xian !== !xian || s.stage < (e.min || 0) || (e.cond && !e.cond(s)) || (seen !== undefined && !e.free && (!e.repeat || times >= (e.xian ? 2 : 4) || s.age - seen < (e.xian ? 2000 : 40)))) continue;
+    if (!e.xian !== !xian || !e.tian !== !isTian(s) || s.stage < (e.min || 0) || (e.cond && !e.cond(s)) || (seen !== undefined && !e.free && (!e.repeat || times >= (e.xian ? 2 : 4) || s.age - seen < (e.xian ? 2000 : 40)))) continue;
     c.push({ ref: { ev: e.id }, w: 1 });
   }
   for (const e of STORY) if (e.cond(s)) c.push({ ref: { story: e.id }, w: 8 });
@@ -1816,7 +1816,7 @@ function buySlot(i) {
 // ---------- 死亡與轉世 ----------
 function daoGain(s = L()) { const p = Math.min(s.peak, MORTAL_TOP), x = 2 * Math.max(0, s.peak - MORTAL_TOP); return s.xianStart ? Math.max(1, x) : Math.max(1, Math.round((p + 1) * (p + 1) / 20)) + x; }   // 仙界每重 +2；從仙人開始的那一世只算仙界   // 仙界改成每重 +2，不再平方暴漲
 // ---------- 主線（碑與名）：節點記在 meta.story，也收進輪迴錄「主線」 ----------
-const STORY_NODES = [['n1', '殘夢'], ['n2', '似曾相識'], ['n3', '碑的傳說'], ['n4', '守碑人'], ['n4a', '被劃掉的名字'], ['n5', '第九道天雷'], ['n6', '刻名'], ['n7', '仙籍'], ['n8', '隕落'], ['n9', '舊檔'], ['n10', '誰藏了你']];
+const STORY_NODES = [['n1', '殘夢'], ['n2', '似曾相識'], ['n3', '碑的傳說'], ['n4', '守碑人'], ['n4a', '被劃掉的名字'], ['n5', '第九道天雷'], ['n6', '刻名'], ['n7', '仙籍'], ['n8', '隕落'], ['n9', '舊檔'], ['n10', '誰藏了你'], ['n11', '不該在這裡的人'], ['n12', '環']];
 function storyMark(id) { const m = S.meta; m.story = m.story || {}; if (!m.story[id]) { m.story[id] = 1; codexAdd('m', id); } }
 // 主線事件：n1 每一世一次（夢會越來越清楚），n2、n3 整個遊戲一次；閉關時也會出現
 const STORY = [
