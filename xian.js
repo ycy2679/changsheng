@@ -411,3 +411,73 @@ for (const [i, [elem, n6, n7, n8, kind, pow, cd, ex]] of [
 ].entries()) {
   [n6, n7, n8].forEach((name, j) => { const g = XG[j]; SKILLS[`x${g}_fa${i}`] = K(name, g, elem, kind, Math.round(pow * XK[g] / XK[6] * 100) / 100, cd, { ...ex, sch: 'fa' }); });
 }
+
+// ==================== 天仙界：道階（品階 9 下品、10 中品、11 上品） ====================
+// 登天以後坊市只賣道階；仙界沒有仙術（大道至簡），所以不出道階術法
+GRADES.push('道階下品', '道階中品', '道階上品');
+const DG = [9, 10, 11];
+Object.assign(XF, { 9: 4, 10: 5.5, 11: 7.5 });
+const TIAN_STAGE = mj => STAGES.findIndex(x => x.major === mj);
+for (const arr of [TECH_PRICE, SKILL_PRICE, ART_PRICE]) { arr[9] = arr[6] * 27; arr[10] = arr[6] * 81; arr[11] = arr[6] * 243; }
+GRADE_MIN_STAGE[9] = TIAN_STAGE(13); GRADE_MIN_STAGE[10] = TIAN_STAGE(14); GRADE_MIN_STAGE[11] = TIAN_STAGE(15);   // 天仙、金仙、太乙金仙起
+GRADE_WEIGHT[9] = 50; GRADE_WEIGHT[10] = 20; GRADE_WEIGHT[11] = 6;
+// 功法：[範本 id, 下品名, 中品名, 上品名]，範本跟仙階同一批
+const TIAN_TECH = {
+  jin4: ['太白金章', '西極斷金錄', '金天道經'], mu4: ['東極青華經', '建木參天錄', '長生道經'], shui4: ['天一生水經', '四海歸墟錄', '玄冥道經'],
+  huo4: ['南明離火經', '丙丁天火錄', '太陽道經'], tu4: ['戊己中央經', '厚德載道錄', '后土道經'], lei4: ['神霄玉樞經', '九天應元錄', '雷祖道經'],
+  bing4: ['太陰玄霜經', '廣寒冰魄錄', '北冥道經'], feng4: ['太虛罡風經', '八荒巽風錄', '風后道經'], hunyuan: ['混元太一經', '太始無名錄', '道一經'],
+  d_wu4: ['金身不壞經', '萬古長存錄', '不滅道體經'], d_huo4: ['赤帝焚身經', '九陽煉骨錄', '大日道體經'], g_wu4: ['太上忘情經', '照見本心錄', '觀道經'],
+  g_feng4: ['逍遙遊天經', '神遊太虛錄', '齊物道經'], tianya: ['方寸山河', '咫尺天涯', '一步乾坤'], kaitian: ['問道劍經', '天外飛劍錄', '一劍開天經'],
+  changchun: ['長生久視經', '萬壽無疆錄', '不死道經'], danzu: ['九轉金丹經', '太清丹典', '造化玄丹經'], tushen: ['殺生成道經', '血海無涯錄', '修羅道經'],
+  tiandaolu: ['天機玄妙經', '洞玄真解錄', '天道經'], jubao: ['聚寶天府經', '萬寶歸宗錄', '寶藏道經'],
+  wanjie: ['萬劫不磨身', '歷劫長生錄', '劫外金身經'], xingdou: ['周天星斗經', '二十八宿錄', '紫微鎮身經'], taichu: ['太初道骨訣', '先天道體錄', '鴻蒙聖體經'],
+  dx_jin: ['金剛道骨訣', '庚金不朽錄', '太白道身經'], dx_tu: ['后土道骨訣', '山河鎮身錄', '坤元道體經'], dx_lei: ['雷霆道骨訣', '神霄煉體錄', '雷祖法身經'],
+  dx_bing: ['玄冰道骨訣', '寒冥凝魄錄', '太陰道體經'], gx_shui: ['觀海聽潮經', '滄海一粟錄', '上善若水經'], gx_bing: ['冰壺照心經', '明鏡止水錄', '廣寒觀道經'],
+  gx_lei: ['雷音觀心經', '驚蟄照神錄', '九霄觀道經'], gx_mu: ['菩提觀心經', '一葉知秋錄', '青蓮觀道經'], gx_huo: ['心燈觀照經', '薪火相傳錄', '朱明觀道經'],
+  gx_jin: ['金燈觀星經', '鏡花水月錄', '太白觀道經'], gx_tu: ['坐忘觀山經', '心齋守一錄', '鎮嶽觀道經'],
+};
+for (const tid in TIAN_TECH) {
+  const ex = XIAN_TECH_EXTRA.find(x => x[0] === tid), tpl = ex ? (typeof ex[1] === 'string' ? TECHS[ex[1]] : ex[1]) : TECHS[tid];
+  DG.forEach((g, i) => { TECHS[`x${g}_${tid}`] = { name: TIAN_TECH[tid][i], grade: g, type: tpl.type, elem: tpl.elem, ...xianScale(tpl, XF[g]) }; });
+}
+const TIAN_ART = { taixu: ['青冥道劍', '斬塵神劍', '開天道劍'], panlong: ['鎮天神戟', '雷祖金鞭', '開天神斧'], jiulong: ['混元道甲', '九天玄甲', '不滅金甲'],
+  xingchen: ['霞光道袍', '紫綬仙衣', '太極道衣'], xingpan: ['太極圖', '河洛天書', '周天星圖'], hunyuanzhu: ['定海神珠', '混元金斗', '乾坤道珠'] };
+for (const aid in TIAN_ART) { const a = ARTS[aid]; DG.forEach((g, i) => { ARTS[`x${g}_${aid}`] = { name: TIAN_ART[aid][i], slot: a.slot, grade: g, ...xianScale(a, XF[g]) }; }); }
+// 天仙界秘境頭目專屬
+ARTS.tianmenyin = { name: '天門古印', slot: '飾品', grade: 11, hp: 1.5, def: 1, rate: 1.2, shenUp: 1, boss: 1 };
+ARTS.jinxiaqiang = { name: '金霞神槍', slot: '武器', grade: 11, atk: 2, crit: .2, rate: 1.1, boss: 1 };
+ARTS.xingxuguan = { name: '星墟冠', slot: '飾品', grade: 11, hp: 1.6, def: 1, rate: 1.2, regen: .03, boss: 1 };
+ARTS.wumingbei = { name: '無名碑片', slot: '飾品', grade: 11, atk: 1.5, crit: .25, lifesteal: .1, rate: 1.3, boss: 1 };
+// 材料
+Object.assign(ITEMS, {
+  daozhi:   { name: '天元道芝', kind: 'mat', mat: 'herb', grade: 9, desc: '凌霄雲闕的雲根上長的芝，煉道階下品丹藥用。' },
+  jinlian:  { name: '金霞仙蓮', kind: 'mat', mat: 'herb', grade: 10, desc: '金霞天原上開的蓮，煉道階中品丹藥用。' },
+  daoguo:   { name: '太乙道果', kind: 'mat', mat: 'herb', grade: 11, desc: '星墟裡一棵老樹結的果，煉道階上品丹藥用。' },
+  daojin:   { name: '凌霄道金', kind: 'mat', mat: 'ore', grade: 9, desc: '天門底下採出的金，煉道階下品靈寶用。' },
+  xingtie:  { name: '星墟玄鐵', kind: 'mat', mat: 'ore', grade: 10, desc: '死去的星辰留下的鐵，煉道階中品靈寶用。' },
+  hundun:   { name: '混沌石', kind: 'mat', mat: 'ore', grade: 11, desc: '天外飄來的石頭，煉道階上品靈寶用。' },
+});
+MAT_HERB[9] = 'daozhi'; MAT_HERB[10] = 'jinlian'; MAT_HERB[11] = 'daoguo';
+MAT_ORE[9] = 'daojin'; MAT_ORE[10] = 'xingtie'; MAT_ORE[11] = 'hundun';
+MAT_PRICE[9] = 7.5e5; MAT_PRICE[10] = 1.8e6; MAT_PRICE[11] = 4.5e6;
+BREW_SEC[9] = 150; BREW_SEC[10] = 180; BREW_SEC[11] = 240;
+BREW_RATE[9] = .22; BREW_RATE[10] = .2; BREW_RATE[11] = .18;
+BREW_XP[9] = 80; BREW_XP[10] = 110; BREW_XP[11] = 150;
+FORGE_ORE[9] = 9; FORGE_ORE[10] = 10; FORGE_ORE[11] = 11;
+// 陣法升到 10 級（道階下、中、上品），洞天升到 20 級
+ARRAY_GROW.push(12, 10, 8);
+ARRAY_STONE.push(1.35e7, 4e7, 1.2e8);
+XJ_TECH_COST[9] = 2500; XJ_TECH_COST[10] = 6000; XJ_TECH_COST[11] = 15000;
+// 遊歷地點、秘境
+PLACES.push(
+  { id: 'lingxiao', name: '凌霄雲闕', min: TIAN_STAGE(13), lv: TIAN_STAGE(13) + 3, mult: 1.2, foes: [['天門守將', '金'], ['雲闕仙鶴', '風'], ['墮天殘仙', '無']], grades: [9], xian: 1 },
+  { id: 'jinxiayuan', name: '金霞天原', min: TIAN_STAGE(14), lv: TIAN_STAGE(14) + 3, mult: 1.25, foes: [['金霞麒麟', '火'], ['天原巨靈', '土'], ['霞光神鵬', '風']], grades: [9, 10], xian: 1 },
+  { id: 'xingxu', name: '太乙星墟', min: TIAN_STAGE(15), lv: TIAN_STAGE(15) + 3, mult: 1.3, foes: [['星骸古獸', '土'], ['太乙星靈', '雷'], ['墟中劍魂', '金']], grades: [10, 11], xian: 1 },
+  { id: 'tianwai', name: '大羅天外', min: TIAN_STAGE(16), lv: TIAN_STAGE(16) + 3, mult: 1.35, foes: [['天外魔影', '無'], ['混沌古蛟', '水'], ['無名的大羅', '無']], grades: [11], xian: 1 },
+);
+XIAN_SECRETS.push(
+  { id: 'tianmen', mj: 13, name: '天門舊闕', elem: '金', elites: ['舊闕守門將', '金甲天兵'], boss: '天門舊主', uniq: ['art', 'tianmenyin'], desc: '天門以前不在這裡。舊的那一座塌了，守門的人沒有走。' },
+  { id: 'jinxiadian', mj: 14, name: '金霞神殿', elem: '火', elites: ['霞光神衛', '殿前金獅'], boss: '金霞殿主', uniq: ['art', 'jinxiaqiang'], desc: '殿裡供著一尊沒有臉的神像，香火卻從來沒斷過。' },
+  { id: 'xingmu', mj: 15, name: '星墟古墓', elem: '雷', elites: ['守墓星傀', '太乙殘魂'], boss: '星墟墓主', uniq: ['art', 'xingxuguan'], desc: '一顆星死了，有人在它的殘骸裡給自己修了墓。' },
+  { id: 'beilin', mj: 16, name: '無字碑林', elem: '無', elites: ['碑林守靈', '沒有名字的劍客'], boss: '碑林裡的影子', uniq: ['art', 'wumingbei'], desc: '天外有一片碑林，每一塊碑都沒有字，像是在等誰把名字刻上去。' },
+);

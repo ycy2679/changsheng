@@ -264,6 +264,10 @@ const ITEMS = {
   diling:   { name: '地靈丹', kind: 'xiu', major: 10, desc: '地仙的修為丹。' },
   zhenyi:   { name: '真一丹', kind: 'xiu', major: 11, desc: '真仙的修為丹。' },
   xuanyuan: { name: '玄元丹', kind: 'xiu', major: 12, desc: '玄仙的修為丹。' },
+  tianyuan: { name: '天元道丹', kind: 'xiu', major: 13, desc: '天仙的修為丹。' },
+  jinxia:   { name: '金霞道丹', kind: 'xiu', major: 14, desc: '金仙的修為丹。' },
+  taiyi:    { name: '太乙道丹', kind: 'xiu', major: 15, desc: '太乙金仙的修為丹。' },
+  daluo:    { name: '大羅道丹', kind: 'xiu', major: 16, desc: '大羅金仙的修為丹。' },
   zhuji:    { name: '築基丹', kind: 'brk', major: 0, desc: '練氣九層突破築基時自動服用。' },
   ningyuan: { name: '凝元丹', kind: 'brk', major: 1, desc: '築基後期突破金丹時自動服用。' },
   huaying:  { name: '化嬰丹', kind: 'brk', major: 2, desc: '金丹後期突破元嬰時自動服用。' },
@@ -333,23 +337,23 @@ const RECIPES = {
   xisui: { g: 3, n: 4 }, pozhang: { g: 3, n: 4 }, humai: { g: 3, n: 5 }, xingshen: { g: 3, n: 4 }, tianjidan: { g: 3, n: 4 }, zhuyan: { g: 4, n: 5 },
 };
 // 修為丹、突破丹：品階跟著大境界（練氣黃、築基金丹玄、元嬰化神地、煉虛以上天）
-const XIAN_GRADE = { 9: 6, 10: 7, 11: 8, 12: 8, 13: 8, 14: 8, 15: 8, 16: 8, 17: 8 };   // 仙界：人仙下品、地仙中品、真仙玄仙上品（天仙界的道階之後補）
+const XIAN_GRADE = { 9: 6, 10: 7, 11: 8, 12: 8, 13: 9, 14: 10, 15: 11, 16: 11, 17: 11 };   // 仙界：人仙下品、地仙中品、真仙玄仙上品；天仙界：天仙道階下品、金仙中品、太乙大羅上品
 const majorGrade = mj => mj >= XIAN_MJ ? XIAN_GRADE[mj] : mj === 0 ? 1 : mj <= 2 ? 2 : mj <= 4 ? 3 : 4;
 const DAN_COMMON = ['yanshou', 'xisui', 'wudao', 'guben', 'julingdan', 'qizhidan', 'kuangxue', 'jingangdan', 'ningshendan', 'huichundan', 'qingxindan', 'yinyuan', 'xunbaodan'];
 const DAN_RARE = ['pozhang', 'humai', 'zhuyan', 'xingshen', 'tianjidan'];
 const ROOT_ITEMS = ['gengjing', 'yimujing', 'guishuijing', 'binghuojing', 'wutujing'];
 const TC_ITEMS = ['xuanhuang', 'chiyang', 'ninghun', 'shenmu', 'xukong', 'liangyi', 'jiujie', 'tianxin'];
-const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due', 'ningxian', 'diling', 'zhenyi', 'xuanyuan', 'xuanyuan', 'xuanyuan', 'xuanyuan', 'xuanyuan', 'xuanyuan'];   // 天仙界暫用玄仙的，道階修為丹之後補
+const XIU_PILLS = ['juqi', 'peiyuan', 'jinsui', 'yanghun', 'taiqing', 'ningxu', 'hedao', 'wanxiangdan', 'due', 'ningxian', 'diling', 'zhenyi', 'xuanyuan', 'tianyuan', 'jinxia', 'taiyi', 'daluo', 'daluo'];   // 道祖用不到修為丹，跟大羅的一樣
 const BRK_PILLS = ['zhuji', 'ningyuan', 'huaying', 'tongxuan', 'poxu', 'heyuan', 'dacheng', 'yinjie'];
 for (let i = 0; i < XIAN_MJ; i++) RECIPES[XIU_PILLS[i]] = { g: majorGrade(i), n: 3 };
 for (let i = 0; i < BRK_PILLS.length; i++) RECIPES[BRK_PILLS[i]] = { g: majorGrade(i), n: 6 };
 const BREW_SEC = [0, 10, 20, 40, 60];          // 出爐時間（秒）
 const BREW_RATE = [0, .8, .65, .5, .35];       // 基礎成功率
-const ALCH_RANK = ['學徒', '丹師', '大師', '宗師', '丹王', '丹聖', '丹仙'], ALCH_NEED = [0, 20, 100, 400, 2000, 6000, 15000];   // 煉丹術等級與經驗門檻；宗師之後三級只有成仙後升得上去
+const ALCH_RANK = ['學徒', '丹師', '大師', '宗師', '丹王', '丹皇', '丹帝', '丹聖', '丹仙'], ALCH_NEED = [0, 20, 100, 400, 2000, 6000, 15000, 35000, 70000];   // 煉丹術等級與經驗門檻；宗師之後三級只有成仙後升得上去
 const BREW_XP = [0, 1, 3, 8, 20];
 // 煉器：選部位和品階，出爐隨機得到一件還沒有的法寶；品質決定出爐時的祭煉重數
 const FORGE_ORE = [0, 3, 4, 5, 6];             // 要幾份同階礦材
-const FORGE_RANK = ['學徒', '器師', '大師', '宗師', '器王', '器聖', '器仙'];
+const FORGE_RANK = ['學徒', '器師', '大師', '宗師', '器王', '器皇', '器帝', '器聖', '器仙'];
 // 陣法：佈在洞府裡，洞府 0／3／5／8 級各開一座陣位；每座最多 4 級，第 N 級要 N 階材料 5 份（藥園用靈草，其他用礦材）和靈石
 const ARRAYS = {
   juling:   { name: '聚靈陣', desc: l => `修煉速度 +${8 * l}%` },

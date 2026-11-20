@@ -394,6 +394,7 @@ const L = () => S.life;
 const stg = (s = L()) => STAGES[s.stage];
 const isXian = (s = L()) => s.stage > MORTAL_TOP;                       // 已經成仙（地仙界）
 const isTian = (s = L()) => !!s && stg(s).major >= TIAN_MJ;                 // 登天了（天仙界）
+const xGs = (s = L()) => isTian(s) ? [9, 10, 11] : isXian(s) ? [6, 7, 8] : [1, 2, 3, 4];   // 這一界坊市、煉器、掉丹方用的品階
 let XIAN_RATE = 170, XIAN_GROW = 1.17, XIAN_PILL = { 9: .04, 10: .015, 11: .01, 12: .008, 13: .006, 14: .005, 15: .004, 16: .003, 17: .003 };
 // 照修為百分比給的東西（頓悟、擊殺得修為、奇遇給的修為）在仙界跟仙丹一樣打折，不然九重一下就衝完
 // 仙界閉關：倍率跟著重數長（需求每重 ×1.2），只靠閉關每重的時間大致一樣，閉關約占修為一半，另一半靠丹藥、頓悟
@@ -435,8 +436,8 @@ const pillDisc = () => (1 - .1 * tl('zhekou')) * (L().sect && L().sect.id === 'd
 const healPrice = () => px(Math.round(20 * (1 + est()) * pillDisc()));
 const mpPillPrice = () => px(Math.round(15 * (1 + est()) * pillDisc()));
 const cavePrice = () => isXian() ? Math.round(40 * Math.pow(2, Math.min(8, L().cave)) * Math.pow(1.5, Math.max(0, L().cave - 8))) : 80 * Math.pow(2, L().cave);   // 仙界重新開闢洞府（洞天），收仙元石
-const caveMax = () => isXian() ? 16 : 8;
-const caveMats = (s = L()) => isXian(s) && s.cave === 8 ? [[MAT_HERB[6], 10], [MAT_ORE[6], 10]] : [];   // 洞府升洞天那一級要仙材
+const caveMax = () => isTian() ? 20 : isXian() ? 16 : 8;
+const caveMats = (s = L()) => isXian(s) && s.cave === 8 ? [[MAT_HERB[6], 10], [MAT_ORE[6], 10]] : isTian(s) && s.cave === 16 ? [[MAT_HERB[9], 10], [MAT_ORE[9], 10]] : [];   // 洞府升洞天那一級要仙材，16 升 17 要道材
 // 仙界修為丹：照「補滿一重要花多少」定價（每重 ×1.08，跟收入差不多一起長），人仙不會太便宜、真仙不會買不起
 const XIAN_PER_CHONG = 81000, xianXiuPrice = (major, i) => XIAN_PER_CHONG * Math.pow(1.08, i) * XIAN_PILL[major];
 const xiuPillPrice = () => Math.round((isXian() ? xianXiuPrice(stg().major, xs()) : 25 * Math.pow(1.5, L().stage)) * pillDisc());
@@ -634,7 +635,7 @@ const XPATH_LABEL = { fa: '法修', ti: '體修', hun: '魂修', 'fa,ti': '法�
 const pathKey = (s = L()) => [...myPaths(s)].sort().join(',');
 const xpOn = (s = L()) => !!(TECHS[s.tech] && TECHS[s.tech].xpath);
 // 流派功法的境界：收齊自己體系（法修吐納、體修鍛體、魂修觀想）的仙階功法——下品收齊小成、中品大成、上品圓滿；學到就自動化入
-const XP_STAGE = ['入門', '小成', '大成', '圓滿'];
+const XP_STAGE = ['入門', '小成', '大成', '圓滿', '通玄', '合道', '無極'];   // 登天後收齊道階下、中、上品再升三階
 const xpTypes = (s = L()) => myPaths(s).map(p => PATH_MAIN[p]);
 const xpPool = (g, s = L()) => Object.keys(TECHS).filter(id => TECHS[id].grade === g && xpTypes(s).includes(TECHS[id].type) && !TECHS[id].custom && !TECHS[id].xpath && !TECHS[id].boss && !TECHS[id].xs && !TECHS[id].sect && !TECHS[id].path && !TECHS[id].char);
 const xpCount = (g, s = L()) => { const pool = xpPool(g, s), got = s.xpGot || {}; return [pool.filter(id => got[id]).length, pool.length]; };
@@ -643,13 +644,13 @@ function xpTag(id, s = L()) {
   const t = TECHS[id]; if (!xpOn(s) || !t || t.grade < 6 || !xpTypes(s).includes(t.type) || t.custom || t.xpath) return null;
   return (s.xpGot || {})[id] ? `<span class="same">已融入《${TECHS[s.tech].name}》</span>` : `<span class="g${t.grade}">尚未融入《${TECHS[s.tech].name}》，學到就會化入</span>`;
 }
-const xpStage0 = (s = L()) => { let st = 0; for (const g of [6, 7, 8]) { const [a, b] = xpCount(g, s); if (b && a >= b) st++; else break; } return st; };
+const xpStage0 = (s = L()) => { let st = 0; for (const g of [6, 7, 8, 9, 10, 11]) { const [a, b] = xpCount(g, s); if (b && a >= b) st++; else break; } return st; };
 // 境界倍率：入門 ×2（基礎數值的圓滿）；小成＝體系仙階下品功法圓滿的 1.5 倍，大成＝中品的 1.5 倍，圓滿＝上品的 1.5 倍
 // （基礎修煉是 3，所以倍率剛好是那個品階體系功法的平均修煉值：平均 × 圓滿 2 × 1.5 ÷ 3）
 let xpMemo = { k: '' };
 function xpInfo(s = L()) {
   const k = pathKey(s) + '|' + Object.keys(s.xpGot || {}).length;
-  if (xpMemo.k !== k) { const st = xpStage0(s), g = [0, 6, 7, 8][st], pool = g ? xpPool(g, s) : []; xpMemo = { k, st, mul: g ? pool.reduce((a, id) => a + (TECHS[id].rate || 0), 0) / pool.length : 2 }; }
+  if (xpMemo.k !== k) { const st = xpStage0(s), g = [0, 6, 7, 8, 9, 10, 11][st], pool = g ? xpPool(g, s) : []; xpMemo = { k, st, mul: g ? pool.reduce((a, id) => a + (TECHS[id].rate || 0), 0) / pool.length : 2 }; }
   return xpMemo;
 }
 const xpStage = (s = L()) => xpInfo(s).st;
@@ -700,7 +701,7 @@ function setDual(id) {
 function techNeed(id, l) { return l * l * 60 * TECHS[id].grade; }
 function techLayer(id, s = L()) { return Math.min(9, Math.floor(Math.sqrt((s.techs[id] || 0) / (60 * TECHS[id].grade)))); }
 function techMul(id, s = L()) { const l = techLayer(id, s); return 1 + .1 * l + (l >= 9 ? .1 : 0); }
-function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return TECHS[id].xpath ? v * (key === 'brk' ? xpInfo(s).st + 1 : NO_SCALE.includes(key) ? 1 : xpInfo(s).mul) : NO_SCALE.includes(key) ? v : v * techMul(id, s); }   // 仙界流派功法隨大境界變強
+function effOf(id, key, s = L()) { const v = TECHS[id][key] || 0; return TECHS[id].xpath ? v * (key === 'brk' ? Math.min(3, xpInfo(s).st) + 1 : NO_SCALE.includes(key) ? 1 : xpInfo(s).mul) : NO_SCALE.includes(key) ? v : v * techMul(id, s); }   // 仙界流派功法隨大境界變強
 // 法寶祭煉倍率
 // 本命法寶隨大境界變強：化神 ×1，之後每個大境界 +25%（渡劫 ×2、人仙 ×2.25、玄仙 ×3）
 const benMul = (s = L()) => 1 + .25 * Math.max(0, stg(s).major - 4);
@@ -909,7 +910,7 @@ function codexSync(s = L()) {
   codexPay();
 }
 // 輪迴錄分頁：第一排選類別，功法、術法、法寶再分第二排；有品階的照天地玄黃分段排成格子
-const GRADE_NAMES = ['', '黃階', '玄階', '地階', '天階', '', '仙階下品', '仙階中品', '仙階上品'];
+const GRADE_NAMES = ['', '黃階', '玄階', '地階', '天階', '', '仙階下品', '仙階中品', '仙階上品', '道階下品', '道階中品', '道階上品'];
 const LUN_TABS = [['m', '主線'], ['t', '功法'], ['k', '術法'], ['a', '法寶'], ['s', '神通'], ['p', '體質'], ['r', '靈根'], ['v', '事件'], ['j', '人物']];
 let codexTab = 't', codexSub = '';
 function setCodexView(k, v) { if (k === 'tab') { codexTab = v; codexSub = ''; } else codexSub = v; render(); }
@@ -924,7 +925,7 @@ function renderCodex() {
     if (!keys.includes(codexSub)) codexSub = keys[0];
     const ids = Object.keys(P).filter(id => P[id][key] === codexSub && !P[id].custom && !P[id].xpath && ok(id));
     return nav(keys.map(g => { const l = Object.keys(P).filter(id => P[id][key] === g && !P[id].custom && !P[id].xpath && ok(id)); return [g, `${g} ${l.filter(id => has(codexTab, id)).length}/${l.length}`]; }), codexSub, 'sub')
-      + [8, 7, 6, 4, 3, 2, 1].map(g => section(GRADE_NAMES[g], 'g' + g, codexTab, ids.filter(id => P[id].grade === g), id => P[id].name)).join('');
+      + [11, 10, 9, 8, 7, 6, 4, 3, 2, 1].map(g => section(GRADE_NAMES[g], 'g' + g, codexTab, ids.filter(id => P[id].grade === g), id => P[id].name)).join('');
   };
   let body = '';
   if (codexTab === 't') body = graded(TECHS, 'type', TECH_TYPES);
@@ -963,7 +964,7 @@ function tryDrop(p) {
 }
 // 法寶：得到時如果那一格空著就直接裝上
 // 法寶境界門檻（依品階）：玄階築基、地階金丹、天階元嬰
-const ART_REALM = [0, 0, 9, 12, 15, 0, 33, 42, 51], ART_REALM_NAME = ['', '', '築基', '金丹', '元嬰', '', '人仙', '地仙', '真仙'];
+const ART_REALM = [0, 0, 9, 12, 15, 0, 33, 42, 51, ...[13, 14, 15].map(TIAN_STAGE)], ART_REALM_NAME = ['', '', '築基', '金丹', '元嬰', '', '人仙', '地仙', '真仙', '天仙', '金仙', '太乙金仙'];
 const artOk = (id, s = L()) => s.stage >= ART_REALM[ARTS[id].grade] && (!ARTS[id].path || myPaths(s).includes(ARTS[id].path));
 // 法寶穿不上的原因：境界不夠，或路線專屬不是自己這條路
 const artBlock = (id, s = L()) => s.stage < ART_REALM[ARTS[id].grade] ? `需${ART_REALM_NAME[ARTS[id].grade]}` : `需走${PATHS[ARTS[id].path].name}`;
@@ -1110,9 +1111,9 @@ SECRETS.push(...XIAN_SECRETS);
 const SECRET_CD = 30;   // 冷卻（遊戲年）
 const secretCd = (s = L()) => isXian(s) ? Math.round(300 * (1 - .25 * tl('mijing'))) : SECRET_CD;   // 仙界歲月快十倍，冷卻也拉長，一樣約 30 分鐘
 // 各秘境的難度倍率：前期角色弱、後期角色強，所以前低後高
-const SECRET_SCALE = [0, .58, .75, .9, 1.2, 1.4, 1.6, 1.85, 2.1, 1.6, 1.8, 2, 2.2];   // 9 以後是仙界秘境（機器人調）   // 築基、金丹兩座調低：剛開的時候第一次闖大約一半到七成能過
+const SECRET_SCALE = [0, .58, .75, .9, 1.2, 1.4, 1.6, 1.85, 2.1, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3];   // 9 以後是仙界秘境（機器人調）   // 築基、金丹兩座調低：剛開的時候第一次闖大約一半到七成能過
 const secretOpen = (x, s = L()) => stg(s).major >= x.mj;
-const secretShown = (x, s = L()) => (x.mj >= XIAN_MJ) === isXian(s);   // 仙界只看得到仙界的秘境
+const secretShown = (x, s = L()) => (x.mj >= XIAN_MJ) === isXian(s) && (x.mj >= TIAN_MJ) === isTian(s);   // 仙界只看得到仙界的秘境，天仙界只看得到天仙界的
 const secretWait = (x, s = L()) => { const t = s.flags['sj_' + x.id]; return t === undefined ? 0 : Math.max(0, Math.ceil(t + secretCd(s) - s.age)); };
 // 第 floor 層（0、1 精英，2 頭目）的強度
 function secretFoe(x, floor, s = L()) {
@@ -1143,7 +1144,7 @@ function enterSecret(id) {
   const st0 = s.stone, gift = pick(isXian(s) ? [giftArt, giftTech] : [giftArt, giftTech, giftSkill])(gr), extra = gift.startsWith('靈石') ? s.stone - st0 : 0;
   if (!extra) got.push(gift);
   got.push(`靈石 ${addStone(stoneUnit(lv) * 30) + extra}`, `${addPill(2)} 2 顆`, addMat(matGrade(), 'herb', 3), addMat(matGrade(), 'ore', 3));
-  { const r = randomRecipe((isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => g <= matGrade() + 1)); if (r) got.push(r); }
+  { const r = randomRecipe(xGs(s).filter(g => g <= matGrade() + 1)); if (r) got.push(r); }
   const first = !s.flags['sjc_' + id]; s.flags['sjc_' + id] = 1;
   const [kind, uid] = x.uniq, owned = kind === 'art' ? uid in s.arts : uid in s.skills;
   if (!owned && (first || Math.random() < .25)) { if (kind === 'art') gainArt(uid); else learnSkill(uid); got.push(`頭目專屬「${(kind === 'art' ? ARTS : SKILLS)[uid].name}」`); }
@@ -1506,7 +1507,7 @@ const shenSum = (key, s = L()) => shenList(s).reduce((a, x) => a + (x[key] || 0)
 const XSHEN_NAME = { fa: '玄元御道', ti: '龍象真身', hun: '太虛神遊', 'fa,ti': '道紋仙軀', 'fa,hun': '觀想演天', 'hun,ti': '神軀同鑄', 'fa,hun,ti': '混元一炁' };
 const XSHEN_NAME_T = { fa: '言出法隨', ti: '混元聖體', hun: '太虛仙魂', 'fa,ti': '大道法身', 'fa,hun': '一念衍天', 'hun,ti': '神魔不滅', 'fa,hun,ti': '鴻蒙無極' };   // 登天後進化
 const xshenName = (s = L()) => (isTian(s) ? XSHEN_NAME_T : XSHEN_NAME)[s.xshen.key];
-const XSHEN_GROW = [1, 1.2, 1.4, 1.6];   // 入門／小成／大成／圓滿
+const XSHEN_GROW = [1, 1.2, 1.4, 1.6, 1.8, 2, 2.2];   // 入門／小成／大成／圓滿
 function xshenForm(s = L()) {
   if (!isXian(s) || s.xshen) return;
   const src = (s.shenEquip && s.shenEquip.length ? s.shenEquip : (s.shen || []).slice(0, maxShen(s))).filter(id => SHENS[id]);
@@ -1742,12 +1743,12 @@ function setTab(t) { tab = t; armed = ''; render(); }
 
 // ---------- 坊市貨架 ----------
 // 坊市品階權重：「奇珍滿架」讓地階、天階更常出現
-const shopWeight = g => isXian() ? (g === 4 ? 15 / (1 + tl('qizhen')) : GRADE_WEIGHT[g] * (g === 7 ? 1 + .5 * tl('qizhen') : g === 8 ? 1 + tl('qizhen') : 1))   // 仙界：中品、上品變多，天階變少
+const shopWeight = g => isTian() ? GRADE_WEIGHT[g] * (g === 10 ? 1 + .5 * tl('qizhen') : g === 11 ? 1 + tl('qizhen') : 1) : isXian() ? (g === 4 ? 15 / (1 + tl('qizhen')) : GRADE_WEIGHT[g] * (g === 7 ? 1 + .5 * tl('qizhen') : g === 8 ? 1 + tl('qizhen') : 1))   // 仙界：中品、上品變多，天階變少
   : GRADE_WEIGHT[g] * (g === 3 ? 1 + .5 * tl('qizhen') : g === 4 ? 1 + tl('qizhen') : 1);
 function restock() {
   const s = L(), slots = [], per0 = SHOP_PER + tl('huojia'), per = per0, tj = !!s.flags.tianji;
   s.flags.tianji = 0;
-  const grades = (isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => s.stage >= GRADE_MIN_STAGE[g]);   // 仙界只賣仙階
+  const grades = xGs(s).filter(g => s.stage >= GRADE_MIN_STAGE[g]);   // 仙界只賣仙階，天仙界只賣道階
   // 功法、術法、法寶各擺 per 格，各有自己的圖鑑和價格表；抽到的品階沒貨就從其他品階補
   const kinds = { tech: [TECHS, s.techs, TECH_PRICE], skill: [SKILLS, s.skills, SKILL_PRICE], art: [ARTS, s.arts, ART_PRICE] };
   if (isXian(s)) delete kinds.skill;   // 仙界沒有仙術可賣：空出來的格子給仙法和靈寶
@@ -1756,7 +1757,7 @@ function restock() {
     const unowned = gs => Object.keys(pool).filter(id => gs.includes(pool[id].grade) && !(id in owned) && !(k === 'tech' && isXian(s) && ((s.xpGot || {})[id] || !(subOk(pool[id]) || xpTypes(s).includes(pool[id].type)))) && !(k === 'tech' && ownTech(id)) && id !== 'hunyuan' && id !== 'xueying' && !pool[id].boss && !pool[id].xs && !pool[id].sect && !pool[id].only && !pool[id].path && !pool[id].char && !slots.some(x => x.id === id));
     for (let i = 0; i < per; i++) {
       // 第一格保證玄階以上（玄階還沒解鎖就照常抽）
-      const low = isXian(s) ? (tj && grades.includes(7) ? 7 : 6) : tj && grades.some(g => g >= 3) ? 3 : 2;   // 天機丹：保證地階以上（仙界：中品以上）
+      const low = isTian(s) ? (tj && grades.includes(10) ? 10 : 9) : isXian(s) ? (tj && grades.includes(7) ? 7 : 6) : tj && grades.some(g => g >= 3) ? 3 : 2;   // 天機丹：保證地階以上（仙界：中品以上）
       const gs = i === 0 && grades.some(g => g >= low) ? grades.filter(g => g >= low) : grades;
       let ids = unowned([pickW(gs, shopWeight)]);
       if (!ids.length) ids = unowned(grades);
@@ -1947,7 +1948,7 @@ function xianJie() {
   s.press = 0;
   const up = stg(s).major === 12, before = up ? evolveNames(s) : null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
-  if (up) { S.meta.dengtian = (S.meta.dengtian || 0) + 1; xpathForm(s); }
+  if (up) { S.meta.dengtian = (S.meta.dengtian || 0) + 1; xpathForm(s); if (xpOn(s)) { s.xpGot = s.xpGot || {}; for (const g of [6, 7, 8]) for (const id of xpPool(g, s)) s.xpGot[id] = 1; } }   // 登天時仙階的收集一併圓滿
   if (s.wsLog) { s.wsLog = 0; log('壽元一下子寬了，天人五衰的徵兆退去。'); }
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
   if (up) { const after = evolveNames(s), ch = before.map((x, i) => x && x !== after[i] ? `${x}化為${after[i]}` : '').filter(Boolean); log(`你登上了天門，從此是天仙界的仙人。${ch.length ? ch.join('，') + '。' : ''}${S.meta.dengtian === 1 ? '往後轉世從仙人開始，地仙界的路會走得快得多（修煉 ×3）。' : ''}`); }
@@ -1966,7 +1967,7 @@ const xjGain = (s = L()) => Math.round(40 * (1 + xs() / 9) * (1 + .25 * tl('jiyi
 function xjOpen(s = L()) { if (!s.xj) { s.xj = { gong: 0, task: 0, shop: null }; xjRestock(s); } }
 // 兌換清單：渡劫仙丹、延壽仙丹、當前境界修為丹、三部沒學過的仙階功法（優先挑當得了主修的）
 function xjRestock(s = L()) {
-  const gs = [6, 7, 8].filter(g => s.stage >= GRADE_MIN_STAGE[g]);
+  const gs = (isTian(s) ? [9, 10, 11] : [6, 7, 8]).filter(g => s.stage >= GRADE_MIN_STAGE[g]);
   const ids = Object.keys(TECHS).filter(id => gs.includes(TECHS[id].grade) && !(id in s.techs) && !ownTech(id) && !(s.xpGot || {})[id] && (subOk(TECHS[id]) || xpTypes(s).includes(TECHS[id].type)));   // 輔修類，或自己體系要收集的主修類
   const main = ids.filter(id => xpTypes(s).includes(TECHS[id].type)), list = [];
   for (let i = 0; i < 3 + tl('xjshop') && (main.length || ids.length); i++) { const pool = main.length && i < 2 ? main : ids, id = pick(pool); list.push({ k: 'tech', id, cost: XJ_TECH_COST[TECHS[id].grade] }); main.splice(main.indexOf(id), 1); ids.splice(ids.indexOf(id), 1); }
@@ -2299,7 +2300,7 @@ const techAff = t => (isMainType(t.type) && L().root.type === 'void') || (t.elem
 function techCard(id, btns = '', hint = '', lock = false) {
   const s = L(), t = TECHS[id], l = techLayer(id);
   return `<div class="item"><div class="row"><span>${lock ? lockBtn('tech', id) : ''}<b>《${t.name}》</b></span>${(x => t.xpath ? `<span class="gben small">${XPATH_LABEL[t.xpath]} · ${t.type} · ${t.elem} · ${XP_STAGE[xpStage(s)]}</span>` : t.custom ? `<span class="gben small">自創 · ${x}</span>` : gradeTag(t.grade, x))(`${t.type} · ${t.elem} · 第 ${l} 層${l >= 9 ? '（圓滿）' : `（${fmt(s.techs[id] || 0)}/${fmt(techNeed(id, l + 1))}）`}`)}</div>
-    <div class="small">${effText(t, id) || '<span class="muted">沒有特別加成</span>'}</div>${t.xpath ? `<div class="small">收集 ${[6, 7, 8].map(g => { const [a, b] = xpCount(g, s); return `<span class="g${g}">${GRADES[g].replace('仙階', '')}</span> ${a}/${b}`; }).join(' · ')}</div>` : ''}
+    <div class="small">${effText(t, id) || '<span class="muted">沒有特別加成</span>'}</div>${t.xpath ? `<div class="small">收集 ${(isTian(s) ? [9, 10, 11] : [6, 7, 8]).map(g => { const [a, b] = xpCount(g, s); return `<span class="g${g}">${GRADES[g]}</span> ${a}/${b}`; }).join(' · ')}</div>` : ''}
     ${techAff(t) || hint ? `<div class="small">${[techAff(t).replace(/^ · /, ''), hint].filter(Boolean).join(' · ')}</div>` : ''}
     ${l < 9 ? bar('xiu thin', ((s.techs[id] || 0) - techNeed(id, l)) / (techNeed(id, l + 1) - techNeed(id, l))) : ''}
     ${btns ? `<div class="btnrow">${btns}</div>` : ''}</div>`;   // 按鈕一律放在卡片右下
@@ -2621,7 +2622,7 @@ function renderShop() {
     <div class="item"><div class="row"><b>回氣丹</b></div><div class="small">戰鬥中法力不夠又受傷時自動服用</div><div class="btnrow">${btn(mpPillPrice(), "buy('mp')")}</div></div>
     ${[['herb', '靈草', '煉丹用的靈草。', MAT_HERB], ['ore', '礦材', '煉器、祭煉法寶用的礦材。', MAT_ORE]].map(([k, name, desc, M]) => {
       const top = matGrade(), chosen = (s.matG || {})[k] || 0, g = Math.min(chosen || top, top), p = herbPrice(g), max = Math.max(1, Math.floor(s.stone / p)), q = getQty('mat:' + k, max);
-      const sel = `<select class="mini" onchange="setMatG('${k}', this.value)"><option value="0" ${!chosen ? 'selected' : ''}>最高（${GRADES[top]}・${ITEMS[M[top]].name}）</option>${[1, 2, 3, 4, 6, 7, 8].filter(x => x <= top && M[x]).map(x => `<option value="${x}" ${chosen === x ? 'selected' : ''}>${GRADES[x]}・${ITEMS[M[x]].name}</option>`).join('')}</select>`;
+      const sel = `<select class="mini" onchange="setMatG('${k}', this.value)"><option value="0" ${!chosen ? 'selected' : ''}>最高（${GRADES[top]}・${ITEMS[M[top]].name}）</option>${[1, 2, 3, 4, 6, 7, 8, 9, 10, 11].filter(x => x <= top && M[x]).map(x => `<option value="${x}" ${chosen === x ? 'selected' : ''}>${GRADES[x]}・${ITEMS[M[x]].name}</option>`).join('')}</select>`;
       return `<div class="item"><div class="row"><b>${name}</b></div><div class="small">${desc}選擇：${sel}</div><div class="btnrow">${max > 1 ? qtyPicker('mat:' + k, max) : ''}${btn(p * q, `buy('${k}', ${g}, ${q})`).replace('</button>', `${q > 1 ? ` ×${q}` : ''} 買</button>`)}</div></div>`; }).join('')}
     <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
@@ -2643,8 +2644,8 @@ function randomRecipe(grades) {
   const ids = unknownRecipes().filter(id => !grades || grades.includes(RECIPES[id].g));
   if (!ids.length) return ''; const id = pick(ids); learnRecipe(id); return `「${ITEMS[id].name}」丹方`;
 }
-// 凡界最多到宗師（3），成仙後才能升丹王、丹聖、丹仙（器王、器聖、器仙）
-const craftTop = (s = L()) => isXian(s) ? ALCH_NEED.length - 1 : 3;
+// 凡界最多到宗師（3），成仙後升丹王、丹皇、丹帝（6），登天後再升丹聖、丹仙（器同）
+const craftTop = (s = L()) => isTian(s) ? ALCH_NEED.length - 1 : isXian(s) ? 6 : 3;
 const craftLvOf = (xp, s) => Math.min(craftTop(s), ALCH_NEED.filter(n => (xp || 0) >= n).length - 1);
 // 品質加成：宗師以前每級 1，之後每級 0.4（不然丹仙每爐都是極品）
 const craftQ = lv => Math.min(lv, 3) + .4 * Math.max(0, lv - 3);
@@ -2702,7 +2703,7 @@ const forgeChance = (g, s = L()) => Math.min(.95, BREW_RATE[g] + .1 * forgeLv(s)
 const forgeFee = g => px(Math.round(ART_PRICE[g] * .3));
 // 這個部位、品階還有沒拿過的法寶（頭目專屬、宗門賞賜不算）
 const forgePool = (slot, g, s = L()) => Object.keys(ARTS).filter(id => ARTS[id].slot === slot && ARTS[id].grade === g && !ARTS[id].boss && !ARTS[id].sect && !ARTS[id].only && !ARTS[id].path && !ARTS[id].char);
-const forgeGrades = (s = L()) => (isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => s.stage >= ART_REALM[g]);   // 成仙以後只煉靈器（仙階）   // 驅使得動的品階才煉得出來
+const forgeGrades = (s = L()) => xGs(s).filter(g => s.stage >= ART_REALM[g]);   // 成仙以後只煉靈器（仙階）   // 驅使得動的品階才煉得出來
 const forgeSec = (g, s = L()) => BREW_SEC[g] * (1 - arrSpeed(arrEff('dihuo', s)));
 const forgeMax = (slot, g, s = L()) => s.anvil ? 0 : Math.min(Math.floor(count(MAT_ORE[g]) / FORGE_ORE[g]) || 0, Math.floor(s.stone / forgeFee(g)) || 0);
 function startForge(slot, g, qty = 1) { if (tryForge(slot, g, qty)) { log(`開爐煉製${GRADES[g]}${slot}${qty > 1 ? ` ×${qty} 爐` : ''}。`); save(); render(); } }
@@ -2750,7 +2751,7 @@ function renderForge() {
       <div class="btnrow">${ok ? qtyPicker(key, max) : ''}<button class="mini" ${ok ? '' : 'disabled'} onclick="startForge('${slot}', ${g}, ${q})">開爐${q > 1 ? `×${q}` : ''}</button></div></div>`;
   };
   return `<h3${gx()}>${isXian() ? '靈器術' : '煉器術'}・${FORGE_RANK[lv]}</h3>
-    ${lv < craftTop(s) ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : `<p class="small same">已是${FORGE_RANK[lv]}。${lv === 3 ? '成仙之後還能再往上升。' : ''}</p>`}
+    ${lv < craftTop(s) ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${FORGE_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : `<p class="small same">已是${FORGE_RANK[lv]}。${lv === 3 ? '成仙之後還能再往上升。' : lv === 6 ? '登天之後還能再往上升。' : ''}</p>`}
     <h3${gx()}>器爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b><span class="g${f.g}">${GRADES[f.g]}</span>${f.slot}</b></span><span>還要 <span id="forT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'forB')}</div>` : '<p class="small muted">爐火已熄。選部位和品階開爐，關掉網頁也會照煉。</p>'}
     <p class="small">礦材：${ores}</p>
     ${gradeNav('qi', gs)}${ART_SLOTS.map(slot => cell(slot, craftG('qi', gs))).join('')}
@@ -2758,7 +2759,7 @@ function renderForge() {
 }
 // ---------- 百藝・陣法 ----------
 const arrLv = (id, s = L()) => (s.arrays && s.arrays[id]) || 0;
-const arrMax = (s = L()) => isXian(s) ? 7 : 4;
+const arrMax = (s = L()) => isTian(s) ? 10 : isXian(s) ? 7 : 4;
 // 陣名：升到仙階（第 5 級起）的那座換成仙界的名字；還沒升的在仙界也保留原名（不被換詞）
 const arrName = (id, s = L(), l = arrLv(id, s)) => l >= 5 ? XIAN_ARR_NAME[id] : isXian(s) ? keepWords(ARRAYS[id].name) : ARRAYS[id].name;
 const arraySlots = (s = L()) => ARRAY_SLOT_CAVE.filter(c => s.cave >= c).length;   // 最多能同時啟用幾座（跟洞府等級一樣，最高 4）
@@ -2816,7 +2817,7 @@ function renderArrays() {
     const onBtn = l ? `<button class="mini ${isOn ? 'on' : ''}" ${!isOn && on >= slots ? 'disabled' : ''} onclick="toggleArrOn('${id}')">${isOn ? '停用' : '啟用'}</button>` : '';
     return `<div class="item"><div class="row"><b>${arrName(id, s)}</b>${l ? ` <span class="g${arrLvGrade(l)}">${GRADES[arrLvGrade(l)]}${isOn ? '' : '・未啟用'}</span>` : ''}</div>
       <div class="small muted">${!l ? '佈下後：' + a.desc(1) : isOn ? '目前：' + a.desc(l) : '已蓋好，但沒有啟用，沒有效果'}${l && l < arrMax(s) ? `；升到${GRADES[arrLvGrade(l + 1)]}${l === 4 ? `（成為${XIAN_ARR_NAME[id]}）` : ''}：${a.desc(l + 1)}` : ''}</div>
-      ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[arrLvGrade(l)]}）</option>${[1, 2, 3, 4, 6, 7, 8].filter(g => g <= arrLvGrade(l)).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}
+      ${l && (id === 'yaoyuan' || id === 'kuangmai') ? `<div class="small">種：<select class="mini" onchange="setArrGrade('${id}', this.value)"><option value="0" ${!(s.arrG || {})[id] ? 'selected' : ''}>最高（${GRADES[arrLvGrade(l)]}）</option>${[1, 2, 3, 4, 6, 7, 8, 9, 10, 11].filter(g => g <= arrLvGrade(l)).map(g => `<option value="${g}" ${(s.arrG || {})[id] === g ? 'selected' : ''}>${GRADES[g]}・${ITEMS[(id === 'yaoyuan' ? MAT_HERB : MAT_ORE)[g]].name}</option>`).join('')}</select></div>` : ''}
       <div class="btnrow">${buildBtn}${onBtn}${l ? `<button class="mini ${armed === 'arr:' + id ? 'danger' : ''}" onclick="breakArray('${id}')">${armed === 'arr:' + id ? '確定撤陣？材料不退' : '撤陣'}</button>` : ''}</div></div>`;
   };
   return `<h3${gx()}>啟用中 ${on}/${slots}</h3><p class="small muted">六座陣法都能蓋，但同時間只能啟用 ${slots} 座（${next !== undefined ? `洞府升到 ${next} 級多一座，最高 4 座` : '已經是上限'}），沒啟用的不算效果。${isXian(s) ? '每座陣可以從黃階一路升到天階，再升到仙階下品、中品、上品；升到仙階的那座會換成仙界的名字。' : '每座陣最多升到天階。'}佈陣、升級要材料和靈石（陣法是哪一階，就用哪一階的靈草、礦材），撤陣材料不退。藥園、礦脈能長到陣法那一階的材料。</p>
@@ -2853,11 +2854,11 @@ function renderCraft() {
   if (craftTab === 'zhen') return craftNav() + renderArrays();
   return `${craftNav()}
     <h3${gx()}>${isXian(s) ? '仙丹術' : '煉丹術'}・${ALCH_RANK[lv]}</h3>
-    ${lv < craftTop(s) ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${ALCH_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : `<p class="small same">已是${ALCH_RANK[lv]}。${lv === 3 ? '成仙之後還能再往上升。' : ''}</p>`}
+    ${lv < craftTop(s) ? `${bar('xiu thin', (xp - ALCH_NEED[lv]) / (ALCH_NEED[lv + 1] - ALCH_NEED[lv]))}<p class="small muted">經驗 ${xp}/${ALCH_NEED[lv + 1]}，升到${ALCH_RANK[lv + 1]}成功率 +10%，也更容易煉出好品質。</p>` : `<p class="small same">已是${ALCH_RANK[lv]}。${lv === 3 ? '成仙之後還能再往上升。' : lv === 6 ? '登天之後還能再往上升。' : ''}</p>`}
     <h3${gx()}>丹爐</h3>${f ? `<div class="item"><div class="row small"><span>正在煉 <b>${ITEMS[f.id].name}</b></span><span>還要 <span id="furT">${Math.ceil(f.t)} 秒</span></span></div>${bar('xiu thin', 1 - f.t / f.total, 'furB')}</div>` : '<p class="small muted">爐火已熄，選一張丹方開爐。關掉網頁也會照煉。</p>'}
     <p class="small">${isXian(s) ? '仙草' : '靈草'}：${herbs}</p>
     <h3${gx()}>丹方（${known.length}/${total}）</h3>
-    ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))((isXian(s) ? [6, 7, 8] : [1, 2, 3, 4]).filter(g => known.some(id => RECIPES[id].g === g)))}
+    ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))((isXian(s) ? [6, 7, 8, 9, 10, 11] : [1, 2, 3, 4]).filter(g => known.some(id => RECIPES[id].g === g)))}
     <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4${isXian(s) ? "（仙階中品修為仙丹 ×2、上品 ×4）" : ""}。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種（仙界的修為仙丹，更低仙境的也能煉），突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
