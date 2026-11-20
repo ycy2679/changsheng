@@ -911,7 +911,7 @@ function codexSync(s = L()) {
 }
 // 輪迴錄分頁：第一排選類別，功法、術法、法寶再分第二排；有品階的照天地玄黃分段排成格子
 const GRADE_NAMES = ['', '黃階', '玄階', '地階', '天階', '', '仙階下品', '仙階中品', '仙階上品', '道階下品', '道階中品', '道階上品'];
-const LUN_TABS = [['m', '主線'], ['t', '功法'], ['k', '術法'], ['a', '法寶'], ['s', '神通'], ['p', '體質'], ['r', '靈根'], ['v', '事件'], ['j', '人物']];
+const LUN_TABS = [['m', '主線'], ['t', '功法'], ['k', '術法'], ['a', '法寶'], ['s', '神通'], ['p', '體質'], ['r', '靈根'], ['v', '事件'], ['j', '人物'], ['e', '結局']];
 let codexTab = 't', codexSub = '';
 function setCodexView(k, v) { if (k === 'tab') { codexTab = v; codexSub = ''; } else codexSub = v; render(); }
 function renderCodex() {
@@ -936,6 +936,7 @@ function renderCodex() {
   else if (codexTab === 'r') body = section('靈根種類', 'g3', 'r', ROOT_TYPES.map(x => x.id), id => ROOT_TYPES.find(x => x.id === id).name)
     + section('靈根屬性', 'g2', 'el', [...FIVE, ...MUTANT], e => e + '靈根');
   else if (codexTab === 'm') body = section('碑與名', 'g4', 'm', STORY_NODES.map(x => x[0]), id => STORY_NODES.find(x => x[0] === id)[1]) + '<p class="muted small">主線的線索散落在一世又一世裡。</p>';
+  else if (codexTab === 'e') body = section('結局', 'g4', 'e', ENDINGS.map(x => x.id), id => ENDINGS.find(x => x.id === id).name) + `<p class="muted small">修到道祖，在碑前選一個結局。${ENDINGS.filter(e => e.ok).map(e => `${e.name}：${e.hint(S.meta)}`).join('；')}。</p>`;
   else if (codexTab === 'v') body = section('遊歷事件', 'g2', 'v', EVENTS.map(e => e.id), id => EVENTS.find(e => e.id === id).title);
   else body = `<div class="small" style="margin-top:8px">${Object.keys(ARCS).map(id => { const end = S.meta.arcDone[id];
       return `<div class="row item"><b class="who">${ARCS[id].name}</b><span>${end ? ARC_END_LABEL[end] || end : '<span class="muted">未結緣</span>'}</span></div>`; }).join('')}</div>
@@ -1485,7 +1486,9 @@ function choose(i) {
 function setMode(m) { if (m === 'travel' && L().broken > 0) return; L().mode = m; L().encT = 8; dirty = true; render(); }
 function setPlace(id) { L().place = id; dirty = true; render(); }
 function breakthrough() {
-  const s = L(); if (s.stage === MORTAL_TOP) { tribulation(); return; } if (s.xiu < stg().need || s.stage >= STAGES.length - 1) return;
+  const s = L(); if (s.stage === MORTAL_TOP) { tribulation(); return; }
+  if (s.stage >= STAGES.length - 1) { if (!s.dead) { s.ev = { story: 'n13' }; save(); render(); } return; }   // 道祖：到碑前（節點 13）
+  if (s.xiu < stg().need) return;
   if (jieNext()) { xianJie(); return; }
   // 突破成功那一行要排在本命法寶、神通、新地點這些附帶結果前面（紀事是新的在上）
   const top = s.log[0], r = tryBreak(), k = top ? s.log.indexOf(top) : s.log.length;
@@ -1816,7 +1819,13 @@ function buySlot(i) {
 // ---------- 死亡與轉世 ----------
 function daoGain(s = L()) { const p = Math.min(s.peak, MORTAL_TOP), x = 2 * Math.max(0, s.peak - MORTAL_TOP); return s.xianStart ? Math.max(1, x) : Math.max(1, Math.round((p + 1) * (p + 1) / 20)) + x; }   // 仙界每重 +2；從仙人開始的那一世只算仙界   // 仙界改成每重 +2，不再平方暴漲
 // ---------- 主線（碑與名）：節點記在 meta.story，也收進輪迴錄「主線」 ----------
-const STORY_NODES = [['n1', '殘夢'], ['n2', '似曾相識'], ['n3', '碑的傳說'], ['n4', '守碑人'], ['n4a', '被劃掉的名字'], ['n5', '第九道天雷'], ['n6', '刻名'], ['n7', '仙籍'], ['n8', '隕落'], ['n9', '舊檔'], ['n10', '誰藏了你'], ['n11', '不該在這裡的人'], ['n12', '環']];
+const STORY_NODES = [['n1', '殘夢'], ['n2', '似曾相識'], ['n3', '碑的傳說'], ['n4', '守碑人'], ['n4a', '被劃掉的名字'], ['n5', '第九道天雷'], ['n6', '刻名'], ['n7', '仙籍'], ['n8', '隕落'], ['n9', '舊檔'], ['n10', '誰藏了你'], ['n11', '不該在這裡的人'], ['n12', '環'], ['n13', '選擇']];
+// 超脫：選了結局，這一世就此結束（記進輪迴錄「結局」，之後照常轉世）
+function chaotuo(id, s = L()) {
+  const m = S.meta, e = ENDINGS.find(x => x.id === id); m.endings = m.endings || {}; m.endings[id] = (m.endings[id] || 0) + 1; codexAdd('e', id);
+  s.chaotuo = id; die(); const h = m.history[m.history.length - 1]; h.chaotuo = id; h.stageName = `道祖・${e.name}`;
+  return `你在碑前做出了選擇：${e.name}。`;
+}
 function storyMark(id) { const m = S.meta; m.story = m.story || {}; if (!m.story[id]) { m.story[id] = 1; codexAdd('m', id); } }
 // 主線事件：n1 每一世一次（夢會越來越清楚），n2、n3 整個遊戲一次；閉關時也會出現
 const STORY = [
@@ -2256,15 +2265,15 @@ function updateDyn() {
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
     const tip = atTop ? (w.length ? '飛升還差：' + w.join('、') + (noDao ? '（道心在坐化或兵解時才會增加，這一世多半飛升不了）' : '') : '九道天雷之後就能飛升，但失敗就會身死。') : noDao ? `道心 ${S.meta.dao}/${ASCEND_DAO}，這一世多半飛升不了`
       : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗${jieDrop(stg().major)}、根基破裂 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= pressCap() - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ` · 渡劫仙丹 +${15 * s.flags.jiedan}%` : ''}`
-      : s.stage >= STAGES.length - 1 ? '道祖。再往前就是碑前，超脫——製作中。' : '';
+      : s.stage >= STAGES.length - 1 ? '道祖。按「超脫」，到碑前做出選擇。' : '';
     $('buffs').textContent = cur(bt + (tip ? (bt ? '　' : '') + tip : '') + (ws ? `　天人五衰 ${ws}/5（修煉、氣血、攻擊 -${5 * ws}%）` : '')); } $('realm').textContent = realmName(s);
   $('res').innerHTML = `${cur('靈石')} ${fmt(s.stone)}${s.found >= .01 ? ` · <span class="same">根基 +${Math.round(s.found * 100)}%</span>` : ''}${s.tox >= 1 ? ` · <span class="${s.tox > 50 ? 'hurt' : ''}">丹毒 ${Math.ceil(s.tox)}%</span>` : ''}`;
   $('inj').innerHTML = s.broken > 0 ? `<span class="hurt">根基破裂 ${Math.ceil(s.broken)} 秒（療傷丹無效，只能閉關）</span>` : s.injury > 0 ? `<span class="hurt">負傷 ${Math.ceil(s.injury)} 秒</span>${count('heal') ? ' <button class="mini" onclick="useHeal()">服療傷丹</button>' : ''}` : (s.mode === 'travel' ? `遊歷${place().name}` : '閉關中');
   const b = $('brk'), last = s.stage === MORTAL_TOP, u = brkPillsUsed(), xj = isXian(s) && jieNext(s), end = s.stage >= STAGES.length - 1;
   const why = last ? ascendWhy(s) : [];
-  b.disabled = end || (last ? why.length > 0 : s.xiu < need);
+  b.disabled = !end && (last ? why.length > 0 : s.xiu < need);
   b.className = 'primary' + (armed === 'trib' || armed === 'xjie' ? ' danger' : '');
-  b.textContent = end ? '超脫（製作中）' : xj ? (armed === 'xjie' ? `確定渡劫？${Math.round(jieChance() * 100)}%，失敗${jieDrop(stg().major)}` : `渡${JIE_NAME[stg().major]} ${Math.round(jieChance() * 100)}%`) : last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
+  b.textContent = end ? '超脫' : xj ? (armed === 'xjie' ? `確定渡劫？${Math.round(jieChance() * 100)}%，失敗${jieDrop(stg().major)}` : `渡${JIE_NAME[stg().major]} ${Math.round(jieChance() * 100)}%`) : last ? (why.length ? '飛升條件未滿' : armed === 'trib' ? '確定渡劫？失敗即身死' : '引動九天雷劫') : `突破 ${Math.round(realChance() * 100)}%${u ? `（服${ITEMS[BRK_PILLS[stg().major]].name} ${u}）` : ''}${tiCost() ? (s.stone < tiCost() ? `（淬體要 ${fmt(tiCost())} 靈石，不夠，成功率八折）` : `（淬體 ${fmt(tiCost())} 靈石）`) : ''}`;
   b.textContent = cur(b.textContent);
   $('recent').innerHTML = s.log.slice(0, 4).map(l => `<li${l.m ? ' class="main"' : ''}>${l.text}</li>`).join('');
   if ($('shopT')) { if (ensureShop()) { render(); return; } $('shopT').textContent = dur2(Math.max(0, (s.shop.next - Date.now()) / 1000)); }
@@ -2284,7 +2293,7 @@ function renderEvent() {
   return `<section class="panel card${story ? ' main-ev' : ''}">
     <div class="row"><b>${main ? '<span class="tag-main">主線</span>' : ''}${e.title}</b>${e.who ? `<span class="who">${e.who}</span>` : ''}</div>
     <p>${val(e.text, s)}</p>
-    <div class="choices">${visible(e).map((c, i) => `<button ${i === best ? 'class="main-choice" ' : ''}onclick="choose(${i})">${val(c.t, s)}</button>`).join('')}</div>
+    <div class="choices">${visible(e).map((c, i) => `<button ${i === best ? 'class="main-choice" ' : ''}onclick="choose(${i})">${val(c.t, s)}</button>`).join('')}${(e.locked ? e.locked(s) : []).map(x => `<button disabled>${x}</button>`).join('')}</div>
     ${autoOn('a_event') && s.ev.ev ? `<p class="muted small">隨緣應變：30 秒內沒選，會照「${EV_MODES[S.meta.evMode || 'safe']}」自動選。</p>` : ''}
   </section>`;
 }
@@ -2928,19 +2937,21 @@ function renderDao() {
 function renderDeath() {
   const s = L(), h = S.meta.history[S.meta.history.length - 1];
   const fall = isXian(s), old = s.ascended && !fall;   // old：v1.6 以前飛升就結束的存檔
-  const head = `<header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag(s)} · ${s.bingjie ? '兵解' : fall ? '隕落' : old ? '飛升' : '坐化'}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
+  const head = `<header><div class="brand"><h1>長生閒記</h1>${themeBtn()}</div><span class="muted">第 ${S.meta.lives} 世${nameTag(s)} · ${s.chaotuo ? '超脫' : s.bingjie ? '兵解' : fall ? '隕落' : old ? '飛升' : '坐化'}<button class="mini" onclick="goTitle()">首頁</button></span></header>`;
   if (deathView === 'tree') return `${head}<section class="panel card">
     <div class="row"><b>悟道</b><span>可用道果 <b class="same">${S.meta.guo}</b></span></div>
     <p class="small muted">天賦永久保留，下一世開始就生效。點好了就轉世，重新抽根骨。</p>
     <div class="choices"><button onclick="setDeathView('sum')">回顧這一世</button><button class="primary" onclick="rebirth()">轉世</button></div></section>
     <section class="panel">${renderTree()}</section>`;
   return `${head}<section class="panel card">
-    ${fall ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.jieFail ? '渡仙劫隕落' : s.bingjie ? '兵解' : '壽盡隕落'}</b>
+    ${s.chaotuo ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${ENDINGS.find(x => x.id === s.chaotuo).name}</b>
+    <p>${ENDINGS.find(x => x.id === s.chaotuo).text(s)}</p>
+    <p class="same">結局已記進輪迴錄（結局）。往後照常轉世，還可以走向別的結局。</p>` : fall ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.jieFail ? '渡仙劫隕落' : s.bingjie ? '兵解' : '壽盡隕落'}</b>
     <p>${s.jieFail ? '劫雷散去的時候，你已經不在了。' : s.bingjie ? '你散去一身仙元，仙軀化成一道清光。' : '五衰走到了盡頭。'}無字碑上，你的名字${s.name ? `「${s.name}」` : ''}被一筆劃掉。</p>
     <p>你感覺自己往下墜，穿過雲層、穿過天門，一路墜回凡界。前世的記憶一點一點被抹去——只剩一縷，怎麼也抹不掉。</p>` : old ? `<b>第 ${S.meta.lives} 世${nameTag(s)} · 飛升</b>
     <p>你的名字${s.name ? `「${s.name}」` : ''}刻上了無字碑。碑上很前面的位置，有一個被劃掉的名字，是你自己的筆跡。</p>
     <p class="same">仙界篇（地仙界）已經開放：轉世時可以選擇直接從仙人開始。</p>` : `<b>第 ${S.meta.lives} 世${nameTag(s)} · ${s.tribFail ? '渡劫失敗' : s.bingjie ? '兵解' : '坐化'}</b>`}
-    <p>${s.bingjie ? `你在 ${h.age} 歲兵解。` : fall ? `你在 ${h.age} 歲隕落。` : old ? `你在 ${h.age} 歲飛升。` : `你在 ${h.age} 歲走到了盡頭。`}這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
+    <p>${s.chaotuo ? `你在 ${h.age} 歲超脫。` : s.bingjie ? `你在 ${h.age} 歲兵解。` : fall ? `你在 ${h.age} 歲隕落。` : old ? `你在 ${h.age} 歲飛升。` : `你在 ${h.age} 歲走到了盡頭。`}這一世身負${rootName()}，最高修到${h.stageName}，擊敗敵人 ${s.wins} 次。</p>
     <p>這一世的感悟化為道心 +${s.daoGot}、道果 +${s.daoGot}。現在共有道果 <b class="same">${S.meta.guo}</b>，可以到悟道樹點天賦。</p>
     <div class="choices"><button class="primary" onclick="setDeathView('tree')">入悟道</button></div></section>
     <section class="panel"><h3>這一世的紀事</h3>${renderLog(true)}</section>`;
@@ -2958,17 +2969,17 @@ const HELP = [
   ['靈根後期路線', '踏入化神後，靈根會走上自己的路：五行齊全的是「五行圓滿」，修煉和突破大增；天靈根、變異靈根是「靈根化道」，專精自己的屬性；空靈根是「萬法歸空」，專精無屬性。雙、三、四靈根沒有路線，但可以煉化五行之精補齊五行。'],
   ['坐化與輪迴', '壽元用盡就會坐化，也可以自己兵解轉世。依這一世到過的最高境界，會得到道心和道果。道心讓之後每一世修煉更快、更容易抽到好根骨。'],
   ['飛升', `渡劫後期修為滿了，要挨九道天雷，撐過就飛升仙界。飛升還要道心 ${ASCEND_DAO}，並且走完守碑人的故事；道心不夠的話，這一世多半飛升不了，可以考慮兵解。`],
-  ['仙界', '成仙後一身術法反璞歸真，按修行路線化成一招（大道至簡），熟練度跟著境界走，仙界也不再賣術法。仙界每個大境界都要渡仙劫，渡不過會跌境、根基破裂（療傷丹無效，只能閉關一陣子），壽元用盡才會隕落；玄仙圓滿之後登天，進入天仙界；壽元剩兩成時會出現天人五衰。仙界隕落也會轉世，飛升過一次以後，轉世可以選擇跳過凡界，直接從人仙一重開始。'],
+  ['仙界', '成仙後一身術法反璞歸真，按修行路線化成一招（大道至簡），熟練度跟著境界走，仙界也不再賣術法。仙界每個大境界都要渡仙劫，渡不過會跌境、根基破裂（療傷丹無效，只能閉關一陣子），壽元用盡才會隕落；玄仙圓滿之後登天，進入天仙界，修到道祖就能到碑前超脫、選一個結局（之後照常轉世，可以再走別的結局）；壽元剩兩成時會出現天人五衰。仙界隕落也會轉世，飛升過一次以後，轉世可以選擇跳過凡界，直接從人仙一重開始。'],
   ['悟道樹', '道果用來點悟道樹上的天賦，天賦永久保留，包括化身（自動處理雜事）、離線效率、開局資源等等。一世一世累積，就能走得更遠。'],
 ];
 function renderTitle() {
   const s = L(), m = S.meta;
-  const where = s.dead ? `第 ${m.lives} 世已${s.bingjie ? '兵解' : s.peak > MORTAL_TOP ? '隕落' : '坐化'}，等待轉世` : s.draw ? `第 ${m.lives} 世，正在測靈根` : s.mortal ? `第 ${m.lives} 世 · 凡人 · ${Math.floor(s.age)} 歲` : `第 ${m.lives} 世 · ${stg().name} · ${Math.floor(s.age)} 歲`;
+  const where = s.dead ? `第 ${m.lives} 世已${s.chaotuo ? '超脫' : s.bingjie ? '兵解' : s.peak > MORTAL_TOP ? '隕落' : '坐化'}，等待轉世` : s.draw ? `第 ${m.lives} 世，正在測靈根` : s.mortal ? `第 ${m.lives} 世 · 凡人 · ${Math.floor(s.age)} 歲` : `第 ${m.lives} 世 · ${stg().name} · ${Math.floor(s.age)} 歲`;
   return `<section class="title">
     <div class="brand"><h1>長生閒記</h1>${themeBtn()}</div>
     <p class="lead">凡人百年，修士千載，仙人不記歲月。<br>你只是一縷不肯散去的念頭，一世又一世地回到人間。<br>這一世，能走多遠？</p>
     <button class="primary big" onclick="enterGame()">${fresh ? '踏入仙途' : '繼續修行'}</button>
-    ${fresh ? '' : `<p class="small muted">${where} · 道心 ${m.dao}</p>`}
+    ${fresh ? '' : `<p class="small muted">${where} · 道心 ${m.dao}${m.endings ? ` · <span class="same">已超脫（${Object.keys(m.endings).length}/${ENDINGS.length} 個結局）</span>` : ''}</p>`}
   </section>
   <section class="panel"><details><summary>玩法說明</summary>
     ${HELP.map(([h, t]) => `<p><b>${h}</b><br><span class="small">${t}</span></p>`).join('')}

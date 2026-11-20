@@ -555,3 +555,37 @@ XIAN_STORY.push(
       { t: '問他為什麼不讓碑停下來', run() { xsMark('n12c'); storyMark('n12'); defy(); return '「因為我試過。」他看著你，那眼神你在鏡子裡見過，「也許你會做得比我好。」（主線最後一段：成為道祖之後，到碑前做出選擇。）'; } },
       { t: '在他身邊坐下', run() { xsMark('n12c'); storyMark('n12'); addLife(200); return '你們並肩坐著，誰也沒說話。碑林裡起了風，每一塊碑都發出很輕的聲音，像是很多人在同時呼吸。壽元 +200 年。（主線最後一段：成為道祖之後，到碑前做出選擇。）'; } }] },
 );
+
+// ---------- 超脫：主線節點 13「選擇」與五個結局 ----------
+// 重要人物最好的結局（渡眾生、留下用）
+const BEST_END = { su: 'cultivated', mu: 'together', ye: 'zhiji', hu: 'friend', xie: 'redeemed', shen: 'founded', yin: 'honest', lu: 'crossed', gu: 'ascended' };
+const DUZHONG_N = 7, POTIAN_N = 3;
+const bestEnds = (m = S.meta) => Object.keys(BEST_END).filter(id => m.arcDone[id] === BEST_END[id]);
+// 留下：最好的結局，而且之後哪一世看過他的前世羈絆回憶
+const stayWho = (m = S.meta) => bestEnds(m).filter(id => MEMORIES.some(e => e.bond === id && e.end === BEST_END[id] && m.memSeen[e.id]));
+const ENDINGS = [
+  { id: 'duzi', name: '獨自超脫', hint: () => '',
+    text: () => '你從碑旁邊走了過去。碑後面什麼也沒有：沒有天，沒有地，也沒有名字。你回頭看了一眼，守碑人朝你揮揮手，像在送一個要出遠門的人。你走進那片空白裡，從此不在任何一本冊子上。輪迴到這裡停了一下——只是一下。' },
+  { id: 'duzhong', name: '渡眾生', hint: m => `${DUZHONG_N} 位重要人物走到最好的結局（目前 ${bestEnds(m).length}/${DUZHONG_N}）`, ok: m => bestEnds(m).length >= DUZHONG_N,
+    text: () => `你把手按在碑上，一個一個念出那些被劃掉的名字。${bestEnds().map(id => ARCS[id].name).join('、')}……念到後來，你已經分不清哪些是你認識的人。每念一個，就有一道劃痕慢慢褪去。碑上的名字越來越亮，亮到整個仙界都看得見。你沒有走。超脫的那一步，你分給了所有人。` },
+  { id: 'potian', name: '破天', hint: m => `在主線裡做出 ${POTIAN_N} 次對抗的選擇（目前 ${m.defy || 0}/${POTIAN_N}）`, ok: m => (m.defy || 0) >= POTIAN_N,
+    text: () => '「碑上容不下那麼多人，該劃就劃。」你想起上古仙人說過的話，抬起手，往碑上劈了下去。第一下，碑上多了一道裂縫；第二下，裂縫裡湧出千千萬萬縷真靈；第三下，碑碎了。仙界的靈氣一夜之間薄了一半，可從那天起，再也沒有誰的名字會被劃掉。守碑人站在碎石中間，笑得像個孩子：「我那時候，沒敢劈下去。」' },
+  { id: 'shoubei', name: '守碑', hint: () => '在凡界答應守碑人換班', ok: m => m.arcDone.bei === 'vow',
+    text: () => '「換我吧。」你說。守碑人愣了一下，慢慢站起來，把那張舊蒲團讓給你。「你答應過的。」他說，聲音越來越淡，「我也答應過。」他的身影散成一縷光，鑽進碑的裂縫裡——你這才明白，當年藏起你的那一縷，就是這樣藏進去的。你坐下來，看著下一個名字被刻上去。很久很久以後，會有一個年輕人走到這裡，你會告訴他：「到了。」' },
+  { id: 'liuxia', name: '留下', hint: () => '某位重要人物走到最好的結局，之後又在某一世想起他（前世羈絆）', ok: m => stayWho(m).length > 0,
+    text: s => { const n = ARCS[s.stayWith] ? ARCS[s.stayWith].name : '那個人'; return `你看了碑很久，最後轉過身。「我不走了。」守碑人沒有攔你。超脫的路一直在那裡，不會跑掉；可${n}只有一個。你走下天門，走回${n}在的地方。後來的日子很普通，一起看日出，一起慢慢變老。碑上，你們兩個的名字刻在同一行，誰也沒有被劃掉。`; } },
+];
+XIAN_STORY.push(
+  { id: 'n13', title: '選擇', cond: () => false,   // 不會自己出現：道祖按「超脫」才來
+    text: '再往上沒有路了，只剩那塊碑。它比你記得的任何時候都大，碑面上密密麻麻全是名字，刻上去的、劃掉的，一層疊著一層。守碑人坐在碑腳下，像是一直在等你。「到了。」他說，「接下來，你自己選。」',
+    get choices() {
+      const m = S.meta, list = [];
+      for (const e of ENDINGS) {
+        if (e.id === 'liuxia') { for (const id of stayWho(m)) list.push({ t: `留下（為了${ARCS[id].name}）`, run(s) { s.stayWith = id; return chaotuo('liuxia', s); } }); continue; }
+        if (!e.ok || e.ok(m)) list.push({ t: e.name, run(s) { return chaotuo(e.id, s); } });
+      }
+      list.push({ t: '還不是時候', run() { return '你在碑前坐了很久，最後還是轉身回去了。守碑人沒有說話。碑不會跑掉，想好了再來（按「超脫」）。'; } });
+      return list;
+    },
+    locked: () => ENDINGS.filter(e => e.ok && !e.ok(S.meta)).map(e => `${e.name}：${e.hint(S.meta)}`) },
+);
