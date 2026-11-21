@@ -1,7 +1,6 @@
 // 長生閒記：遊戲邏輯
 const SAVE_KEY = 'changsheng_v1';
-const OFFLINE_AGE = 1 / 3;   // 離線變老的速度（線上的三分之一）
-const YEAR_SEC = 60;        // 線上 60 秒 = 1 年（離線也會老，但只有三分之一）
+const YEAR_SEC = 60;        // 線上 60 秒 = 1 年（離線不會變老）
 const OFFLINE_RATE = 0.5;   // 離線修煉效率
 
 let S = null;               // { meta, life, t }
@@ -2116,11 +2115,7 @@ function applyOffline(sec) {
   if (s.broken > 0) { s.broken = Math.max(0, s.broken - off); s.injury = Math.max(s.injury, s.broken); if (!s.broken) log('閉關期間，根基的裂痕癒合了。'); }
   tickBuffs(off, s);   // 離線期間藥效照樣過
   brewTick(off, s); forgeTick(off, s); arrayTick(off * offRate(), s);   // 爐子離線也照煉，藥園礦脈照離線效率長
-  // 離線也會變老，但比較慢；最多老到壽元剩一成，不會在離線時坐化
-  const ageCap = Math.max(s.age, lifespan() * .9), age1 = s.age + off * OFFLINE_AGE / yearSec(s);
-  if (s.sect) s.sect.duty += Math.min(age1, ageCap) - s.age;   // 離線不算偷懶：宗門任務的期限跟著往後延
-  s.age = Math.min(age1, ageCap);
-  if (age1 > ageCap) log(`壽元將盡，${how}中你強撐著一口氣，沒有再老下去。`);
+  // 離線不會變老（年齡、壽元不動）
   s.tox = Math.max(0, s.tox - off / 6 * (1 + .5 * tl('jiedu')));
   const stones = s.mode === 'travel' ? withStoneMul(TRAVEL_STONE, () => addStone(off / 16 * .6 * stoneUnit() * .5 * (1 + eff('stone')))) : 0;
   if (s.mode === 'travel') { const n = Math.floor(off / 16 * .6 * .25); if (n) addMat(matGrade(), Math.random() < .5 ? 'herb' : 'ore', n); }
@@ -2975,7 +2970,7 @@ function renderDeath() {
 
 // ---------- 開始介面 ----------
 const HELP = [
-  ['放置修煉', '開著網頁，修為就會自己增長。線上 60 秒是遊戲裡的 1 年。關掉網頁後修為照樣累積（效率較低），也會變老，但只有線上的三分之一。點了「水到渠成」，離線時也會自動突破小境界；沒點的話修為滿了就停下，多的化為根基。'],
+  ['放置修煉', '開著網頁，修為就會自己增長。線上 60 秒是遊戲裡的 1 年。關掉網頁後修為照樣累積（效率較低），但不會變老。點了「水到渠成」，離線時也會自動突破小境界；沒點的話修為滿了就停下，多的化為根基。'],
   ['閉關與遊歷', '閉關修為較穩，多出來的修為會變成根基，提高突破成功率，偶爾還會頓悟。遊歷會遇到事件、戰鬥和寶物，但可能受傷。'],
   ['凡人篇', '每一世都從凡人開始（飛升過以後，也可以選擇從仙人開始）：先抽出身，做些凡人的事累積底子，等仙緣上門後選一條路，測出靈根、感氣入體，才算踏入練氣。'],
   ['突破', '修為滿了就能突破。小境界容易，失敗只會散去一些修為。大境界有機率失敗，失敗會經脈受創、折損壽元，還可能跌回上一個小境界，境界越高越兇險。服用對應境界的突破丹可以提高成功率。大境界成功時會決定品質（下品到極品，例如無瑕道基、九竅金丹），這一世永久提升修煉和戰力；選「全力一搏」成功率較低，但更容易出好品質。想要極品，還得有對應境界的天材地寶（例如突破築基要玄黃地乳），可以從稀有事件、戰鬥掉落、坊市、拍賣得到。'],
