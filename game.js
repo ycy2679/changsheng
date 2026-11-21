@@ -1140,6 +1140,7 @@ function enterSecret(id) {
       log(`【${x.name}】${f === 2 ? '頭目' : `第 ${f + 1} 層的`}${names[f]}太強，你${res.fled ? '遁走' : '重傷'}退出了秘境（${res.rounds} 回合）。`);
       save(); render(); return;
     }
+    s.wins++; S.meta.wins++;
     log(`【${x.name}】擊敗${names[f]}（${res.rounds} 回合，剩氣血 ${Math.round(res.hp * 100)}%）。`);
   }
   // 頭目獎勵：天材地寶、高階寶物、靈石丹藥，第一次通關必掉專屬，之後四分之一
@@ -1688,6 +1689,9 @@ function buy(kind, id, n = 1) {   // n：靈草、礦材一次買幾份
   else s.cave++;
   save(); render();
 }
+// 修為丹一顆補這一重所需的比例（未算丹毒、低階打折）：仙丹入骨；藥力精純（合併了丹心通明）
+const xiuPillPct = (it, s = L()) => (it.major >= XIAN_MJ ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) * (isTian(s) ? tianRateK() : 1) : .25) * (1 + .04 * tl('yaoli')) * (1 + eff('pillEff'));
+const pctTxt = p => (p * 100).toFixed(p < .1 ? 1 : 0) + '%';
 function usePill(id) {
   const s = L(), it = ITEMS[id], need = stg().need;
   if (!count(id)) return;
@@ -1699,7 +1703,7 @@ function usePill(id) {
     const diff = stg().major - it.major;
     const low = Math.pow(.25, diff);
     const xp = it.major >= XIAN_MJ;   // 仙丹：每顆只補一成，丹毒也重
-    let amt = (xp ? XIAN_PILL[it.major] * (1 + .15 * tl('xiandan')) * (isTian(s) ? tianRateK() : 1) : .25) * (1 + .04 * tl('yaoli')) * pe * tf * (diff > 0 ? low : 1);   // 仙丹入骨；藥力精純（合併了丹心通明）
+    let amt = xiuPillPct(it, s) * tf * (diff > 0 ? low : 1);
     if (diff < 0) { amt = .5 * tf; injure(150); }
     const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 17.5 : 10);   // 修為丹丹毒（原本 35／20，減半讓遊歷賺的錢能換成修為）
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
@@ -2403,7 +2407,7 @@ function renderGong() {
   const multi = slotTys.length && ordTys.includes(mainTy);
   return `${multi ? '' : `<h3>主修</h3>${mainHtml}`}
     ${(multi ? ordTys : slotTys).map(ty => { if (ty === mainTy && multi) return `<h3>${PATHS[MAIN_PATH[ty]].name}主修（${ty}）</h3>${mainHtml}`; const nm = PATHS[MAIN_PATH[ty]].name, id = pathMains(s).find(x => TECHS[x].type === ty); return `<h3>${nm}主修（${ty}）</h3>` + (id ? techCard(id, `<span class="small same">兼修路線，效果、修煉跟其他主修相加後 ÷${mainN(s)}，精進五折</span><button class="mini on" onclick="setPathMain('${id}')">卸下</button>`) : `<p class="muted small">空著。走了${nm}，可以再修一部${ty}功法當這條路的主修：效果、修煉速度跟其他主修相加後，裝兩部 ÷1.5、三部 ÷2（空著不算），精進五折。</p>`); }).join('')}
-    ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（小成的效果是體系仙階下品功法圓滿的 1.5 倍，大成是中品的 1.5 倍，圓滿是上品的 1.5 倍）。</p>` : ''}
+    ${xpOn(s) ? `<p class="muted small">仙界的根本功法，不能再換。學到自己體系（${xpTypes(s).join('、')}）的${isTian(s) ? '道階功法會自動化入：下品收齊通玄、中品收齊合道、上品收齊無極（通玄的效果是體系道階下品功法圓滿的 1.5 倍，合道是中品的 1.5 倍，無極是上品的 1.5 倍）' : '仙階功法會自動化入：下品收齊小成、中品收齊大成、上品收齊圓滿（小成的效果是體系仙階下品功法圓滿的 1.5 倍，大成是中品的 1.5 倍，圓滿是上品的 1.5 倍）'}。</p>` : ''}
     ${tl('liangyi') && !xpOn(s) ? `<h3>副主修</h3>${s.tech2 ? techCard(s.tech2, `<span class="small same">${dualFactor(s.tech2) === .5 ? '五行相生' : '同修'}，效果 ${dualFactor(s.tech2) * 100}%</span><button class="mini on" onclick="setDual('${s.tech2}')">卸下</button>`)
       : '<p class="muted small">空著。可以再修一部主修類功法：跟主修五行相生的效果五成，其他三成，相剋的不能同修。換副主修要散功。</p>'}
 ` : ''}
@@ -2414,7 +2418,7 @@ function renderGong() {
     ${renderBatch('tech')}
     ${all.length ? `<nav class="wrap">${['全部', ...types].map(ty => `<button class="${techTab === ty ? 'on' : ''}" onclick="setTechView('tab', '${ty}')">${ty}</button>`).join('')}</nav>` : ''}
     ${list.map(id => techCard(id, extra(id), techHint(id), true)).join('') || '<p class="muted">沒有符合的功法。坊市、遊歷、奇遇都可能得到。</p>'}
-    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（主修七成，兼修路線的主修、副主修、輔修平分三成；主修圓滿就全給它們），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。鎖定的不會被批量處理。</p>`;
+    <p class="muted small">換功法不會損失層數。用不到的功法可以「參悟」化為精進（${isXian() ? '根本功法不吃精進，全部由輔修平分' : '主修七成，兼修路線的主修、副主修、輔修平分三成；主修圓滿就全給它們'}），或賣給坊市，練得越深賣得越貴。戰鬥時普通攻擊帶主修功法的屬性；屬性相剋時傷害 ×1.3，被剋 ×0.75。鎖定的不會被批量處理。</p>`;
 }
 // ---------- 術法分頁：屬性分頁、攻防輔篩選、排序 ----------
 let skillTab = '全部', skillKind = '全部', skillSort = 'grade';
@@ -2639,12 +2643,12 @@ function renderShop() {
       const top = matGrade(), chosen = (s.matG || {})[k] || 0, g = Math.min(chosen || top, top), p = herbPrice(g), max = Math.max(1, Math.floor(s.stone / p)), q = getQty('mat:' + k, max);
       const sel = `<select class="mini" onchange="setMatG('${k}', this.value)"><option value="0" ${!chosen ? 'selected' : ''}>最高（${GRADES[top]}・${ITEMS[M[top]].name}）</option>${[1, 2, 3, 4, 6, 7, 8, 9, 10, 11].filter(x => x <= top && M[x]).map(x => `<option value="${x}" ${chosen === x ? 'selected' : ''}>${GRADES[x]}・${ITEMS[M[x]].name}</option>`).join('')}</select>`;
       return `<div class="item"><div class="row"><b>${name}</b></div><div class="small">${desc}選擇：${sel}</div><div class="btnrow">${max > 1 ? qtyPicker('mat:' + k, max) : ''}${btn(p * q, `buy('${k}', ${g}, ${q})`).replace('</button>', `${q > 1 ? ` ×${q}` : ''} 買</button>`)}</div></div>`; }).join('')}
-    <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
+    <div class="item"><div class="row"><b>${xp.name}</b></div><div class="small">${xp.desc}服用後修為增加這一重所需的約 ${pctTxt(xiuPillPct(xp))}（丹毒高時打折）。</div><div class="btnrow">${btn(xiuPillPrice(), "buy('xiu')")}</div></div>
     <div class="item"><div class="row"><b>洞府 ${s.cave} 級</b></div><div class="small muted">閉關修煉 +15%／級，離線可撐 ${Math.round(offlineCap() / 3600)} 小時</div>${caveMats(s).length ? `<div class="small">這一級要${caveMats(s).map(([id, n]) => `${ITEMS[id].name} ×${n}（有 ${count(id)}）`).join('、')}</div>` : ''}<div class="btnrow">${s.cave >= caveMax() ? '<span class="same">已滿級</span>' : btn(cavePrice(), "buy('cave')", caveMats(s).every(([id, n]) => count(id) >= n))}</div></div>
 ` : `
     <div class="row restock"><span></span><span>下次進貨 <span id="shopT"></span> ${btn(refreshPrice(), 'manualRefresh()').replace('靈石</button>', '靈石 立刻換貨</button>')}</span></div>
     ${shelf(s.shop.slots, slot)}
-    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的${isXian() ? '功法' : '功法、術法'}比較常上架。</p>`);
+    <p class="muted small">貨架每 ${shopRefresh() / 60} 分鐘換一批，關掉網頁也照算。${isTian() ? '功法、法寶都是道階，金仙起會出現中品、太乙金仙起出現上品；' : isXian() ? '功法、法寶每類的第一格保證是仙階，地仙起會出現中品、真仙起出現上品；' : '功法、術法、法寶每類的第一格保證是玄階以上（練氣五層起），境界越高越容易出現高階貨；'}跟主修同五行、跟修行路線對得上的${isXian() ? '功法' : '功法、術法'}比較常上架。</p>`);
 }
 // ---------- 百藝・煉丹：丹方（跨世保留）、開爐、出爐 ----------
 const matGrade = (s = L()) => majorGrade(stg(s).major);
@@ -2874,7 +2878,7 @@ function renderCraft() {
     <p class="small">${isXian(s) ? '仙草' : '靈草'}：${herbs}</p>
     <h3${gx()}>丹方（${known.length}/${total}）</h3>
     ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))((isXian(s) ? [6, 7, 8, 9, 10, 11] : [1, 2, 3, 4]).filter(g => known.some(id => RECIPES[id].g === g)))}
-    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4${isXian(s) ? "（仙階中品修為仙丹 ×2、上品 ×4）" : ""}。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種（仙界的修為仙丹，更低仙境的也能煉），突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
+    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4${isXian(s) ? "（仙階中品修為仙丹 ×2、上品 ×4）" : ""}。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種${isXian(s) ? '（仙界的修為仙丹，更低仙境的也能煉）' : ''}，突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
