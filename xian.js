@@ -163,7 +163,7 @@ const XIANJI = {
 const XJ_TASKS = [
   { id: 'men', name: '巡守天門', desc: '天門外常有妖物想趁隙上來，要打一場。', run(s, g) { return battle('天門外的妖物', placeLv() + 1, 1.1) ? g * 1.5 : 0; } },
   { id: 'dang', name: '整理仙籍', desc: '幫接引仙官整理仙籍舊檔，不用打架，仙功少一點。', run(s, g) { return g * .7; } },
-  { id: 'ya', name: '押送仙材', desc: '把一批仙材送去萬藥仙谷，路上可能遇到劫道的散仙；自己能分到兩份材料。', run(s, g) { if (Math.random() < .5 || battle('劫道的散仙', placeLv(), 1)) { addMat(matGrade(s), Math.random() < .5 ? 'herb' : 'ore', 2); return g; } return 0; } },
+  { id: 'ya', name: '押送仙材', desc: '把一批仙材送去別處的仙府，路上可能遇到劫道的散仙；自己能分到兩份材料。', run(s, g) { if (Math.random() < .5 || battle('劫道的散仙', placeLv(), 1)) { addMat(matGrade(s), Math.random() < .5 ? 'herb' : 'ore', 2); return g; } return 0; } },
 ];
 const XJ_TASK_CD = 100;   // 差事冷卻（仙界的年，線上約 10 分鐘）
 const XJ_TECH_COST = { 6: 150, 7: 400, 8: 1000 };

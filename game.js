@@ -1715,7 +1715,7 @@ function usePill(id) {
 // 丹藥現在吃不了的原因（給行囊顯示，也擋住白白浪費）；能吃回空字串
 function danBlock(id, s = L()) {
   const it = ITEMS[id];
-  if (it.kind === 'tech') return techLayer(s.tech, s) >= 9 && !s.subs.some(x => techLayer(x, s) < 9) ? '功法都圓滿了' : '';
+  if (it.kind === 'tech') return techLayer(s.tech, s) >= 9 && !s.subs.some(x => techLayer(x, s) < 9) ? noStudyMsg(s) : '';
   if (it.kind === 'xlife') return !isXian(s) ? '凡人的身子受不住' : (s.xlifeN || 0) >= 3 ? '這一世已經吃了 3 顆' : '';
   if (it.kind !== 'dan') return '';
   switch (it.fx) {
@@ -1961,7 +1961,7 @@ function xianJie() {
   s.press = 0;
   const up = stg(s).major === 12, before = up ? evolveNames(s) : null;
   s.stage++; s.xiu = 0; s.peak = Math.max(s.peak, s.stage); S.meta.best = Math.max(S.meta.best, s.stage);
-  if (up) { S.meta.dengtian = (S.meta.dengtian || 0) + 1; xpathForm(s); if (xpOn(s)) { s.xpGot = s.xpGot || {}; for (const g of [6, 7, 8]) for (const id of xpPool(g, s)) s.xpGot[id] = 1; } }   // 登天時仙階的收集一併圓滿
+  if (up) { S.meta.dengtian = (S.meta.dengtian || 0) + 1; xpathForm(s); if (xpOn(s)) { s.xpGot = s.xpGot || {}; for (const g of [6, 7, 8]) for (const id of xpPool(g, s)) s.xpGot[id] = 1; } if (s.xj) xjRestock(s); }   // 登天時仙階的收集一併圓滿；仙籍兌換換成道階
   if (s.wsLog) { s.wsLog = 0; log('壽元一下子寬了，天人五衰的徵兆退去。'); }
   log(`${name}散去，你晉入${stg(s).name}！壽元增至 ${Math.floor(lifespan())} 年。`);
   if (up) { const after = evolveNames(s), ch = before.map((x, i) => x && x !== after[i] ? `${x}化為${after[i]}` : '').filter(Boolean); log(`你登上了天門，從此是天仙界的仙人。${ch.length ? ch.join('，') + '。' : ''}${S.meta.dengtian === 1 ? '往後轉世從仙人開始，地仙界的路會走得快得多（修煉 ×3）；天仙界的歲月流得快，壽元不一定撐得到頂，但每多登天一次，天仙界的修煉就快一截。' : `碑上的真靈記得這條路，這一世天仙界修煉 +${Math.round(50 * Math.min(3, S.meta.dengtian - 1))}%。`}`); }
@@ -1987,7 +1987,7 @@ function xjRestock(s = L()) {
   s.xj.shop = list;
 }
 function xjList(s = L()) {
-  const rc = unknownRecipes().filter(id => RECIPES[id].g >= 6 && RECIPES[id].g <= matGrade(s)).sort()[0];
+  const rc = unknownRecipes().filter(id => RECIPES[id].g >= (isTian(s) ? 9 : 6) && RECIPES[id].g <= matGrade(s)).sort()[0];
   s.xj.shop = (s.xj.shop || []).filter(o => !(o.id in s.techs) && !(s.xpGot || {})[o.id]);   // 已經從別處學會的仙法就拿掉
   if (!s.xj.shop.length) xjRestock(s);
   return [{ k: 'item', id: 'dujiedan', cost: 60 }, { k: 'item', id: 'xianshou', cost: 80 }, { k: 'item', id: XIU_PILLS[stg(s).major], cost: 25 }, ...(rc ? [{ k: 'recipe', id: rc, cost: 40 * RECIPES[rc].g }] : []), ...(s.xj.shop || [])];
@@ -2337,7 +2337,7 @@ function renderGen() {
     <div class="item"><div class="row"><b class="g${PHYSIQUES[s.phys].r}">${physName(s)}</b><span class="small muted">${PHYS_RANK[PHYSIQUES[s.phys].r]}</span></div>
       <div class="small">${physDesc(s.phys)}</div></div>
     <h3>境界品質</h3>${Object.keys(s.qual || {}).length ? `<div class="item">${Object.entries(s.qual).map(([mj, q]) => `<div class="row small"><span>${MAJORS[mj].name}：<b class="g${q + 1}">${qualName(+mj, q)}</b></span><span class="muted">${QUAL_RANK[q]}${q ? ` · +${QUAL_BONUS[q] * 100}%` : ''}</span></div>`).join('')}
-      <div class="small same">修煉、氣血、攻擊、防禦合計 +${Math.round(qualBonus() * 100)}%</div></div>` : '<p class="muted small">還沒突破過大境界。大境界突破成功時會決定品質：根基越厚、靈根越好、突破丹越多，品質越好；選「全力一搏」更容易出好品質，但成功率較低、失敗更慘。想要極品，還得有對應境界的天材地寶。</p>'}
+      <div class="small same">修煉、氣血、攻擊、防禦合計 +${Math.round(qualBonus() * 100)}%</div></div>` : isXian(s) ? '<p class="muted small">仙界的大境界突破不分品質。</p>' : '<p class="muted small">還沒突破過大境界。大境界突破成功時會決定品質：根基越厚、靈根越好、突破丹越多，品質越好；選「全力一搏」更容易出好品質，但成功率較低、失敗更慘。想要極品，還得有對應境界的天材地寶。</p>'}
     <h3>身體</h3>
     <div class="stats"><span>氣血 ${fmt(st.hp)}</span><span>法力 ${fmt(st.mp)}</span><span>攻擊 ${fmt(st.atk)}</span><span>防禦 ${fmt(st.def)}</span><span>身法 ${st.spd}</span>
       <span>暴擊 ${Math.round(st.crit * 100)}%</span><span>暴傷 ${Math.round(st.critDmg * 100)}%</span><span>閃避 ${Math.round(st.dodge * 100)}%</span><span>屬性 ${TECHS[s.tech].elem}</span></div>`;
@@ -2475,12 +2475,14 @@ function toggleLock(kind, id) {
   if (s[LOCK_KEY[kind]][id]) delete s[LOCK_KEY[kind]][id]; else s[LOCK_KEY[kind]][id] = 1;
   save(); render();
 }
+// 仙界根本仙法不吃精進，沒裝輔修時參悟沒地方分
+const noStudyMsg = (s = L()) => isXian(s) && !s.subs.length ? '沒有輔修可以精進' : '功法都圓滿了';
 const lockBtn = (kind, id) => `<button class="lockico ${isLocked(kind, id) ? 'on' : ''}" title="${isLocked(kind, id) ? '已鎖定，點一下解鎖' : '點一下鎖定'}" onclick="toggleLock('${kind}','${id}')">📌</button>`;
 function dropBtns(kind, id) {
   const price = kind === 'tech' ? techSellPrice(id) : skillSellPrice(id);
   if (isLocked(kind, id)) return '<span class="muted small">已鎖定，不會被參悟或賣出</span>';
   const a = armed === `study:${kind}:${id}`, b = armed === `sellx:${kind}:${id}`;
-  return (kind === 'tech' && !studySplit(id) ? '<span class="muted small">功法都圓滿了</span>' : `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`)
+  return (kind === 'tech' && !studySplit(id) ? `<span class="muted small">${noStudyMsg()}</span>` : `<button class="mini ${a ? 'danger' : ''}" onclick="studyIt('${kind}','${id}')">${a ? '確定參悟？' : '參悟'}</button>`)
     + `<button class="mini ${b ? 'danger' : ''}" onclick="sellIt('${kind}','${id}')">${b ? '確定賣出？' : `賣 ${fmt(price)}`}</button>`;
 }
 // canDrop 同時當作「能不能賣／參悟」的資格判斷：裝備中、鎖定中的都不行
