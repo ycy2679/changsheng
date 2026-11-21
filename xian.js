@@ -589,3 +589,32 @@ XIAN_STORY.push(
     },
     locked: () => ENDINGS.filter(e => e.ok && !e.ok(S.meta)).map(e => `${e.name}：${e.hint(S.meta)}`) },
 );
+
+// ---------- 道階丹：登天以後只煉得了道階的丹，仙版雜丹各有一個道階版本（限時藥效是仙版的兩倍），另有道階渡劫丹、延壽丹 ----------
+// [仙丹, 道階丹 id, 名字, 品階, 說明, 額外欄位]
+const TIAN_DAN = [
+  ['x_julingdan', 'td_julingdan', '歸元道丹', 9, '接下來 10 分鐘修煉速度 +200%。'],
+  ['x_qizhidan', 'td_qizhidan', '明心道丹', 9, '接下來 10 分鐘功法精進 ×5。'],
+  ['x_kuangxue', 'td_kuangxue', '戮仙道丹', 9, '接下來 10 分鐘攻擊 +120%，但防禦 -10%。'],
+  ['x_jingangdan', 'td_jingangdan', '金身道丹', 9, '接下來 10 分鐘防禦 +160%。'],
+  ['x_ningshendan', 'td_ningshendan', '太清道丹', 9, '接下來 10 分鐘法力上限 +200%。'],
+  ['x_huichundan', 'td_huichundan', '九轉還元丹', 9, '立刻回滿氣血和法力。'],
+  ['x_qingxindan', 'td_qingxindan', '無垢道丹', 9, '丹毒清空，本身沒有丹毒。', { amt: 100 }],
+  ['x_wudao', 'td_wudao', '證道丹', 9, '主修功法立刻精進 90 分鐘的進度（主修圓滿了就平分給輔修）。', { amt: 5400 }],
+  ['x_yinyuan', 'td_yinyuan', '天緣道丹', 10, '接下來 10 分鐘奇遇頻率 ×5。'],
+  ['x_xunbaodan', 'td_xunbaodan', '尋珍道丹', 10, '接下來 10 分鐘掉落機率 ×5。'],
+  ['x_xisui', 'td_xisui', '換骨道丹', 10, '這一世氣血、攻擊、防禦永久 +12%，有丹毒。', { amt: .12 }],
+  ['x_pozhang', 'td_pozhang', '通關道丹', 10, '下一次小境界突破必定成功。'],
+  ['x_xingshen', 'td_xingshen', '神遊道丹', 11, '下一場戰鬥，每門神通可以發動兩次。'],
+  ['x_zhuyan', 'td_zhuyan', '返璞道丹', 11, '年齡 -400 歲。', { amt: 400 }],
+  ['x_tianjidan', 'td_tianjidan', '天衍道丹', 11, '下一次坊市換貨，功法、法寶的第一格都保證中品以上。'],
+  ['dujiedan', 'td_dujie', '渡厄道丹', 9, '下一次渡天仙界劫的成功率 +25%（服下後一直有效，直到渡劫）。', { fx: 'tjiedan' }],
+  ['xianshou', 'td_shou', '萬壽道丹', 10, '道階的延壽丹：壽元 +800 年。每一世最多吃 3 顆（跟延壽仙丹分開算）。', { amt: 800 }],
+];
+for (const [src, id, name, g, desc, ex] of TIAN_DAN) {
+  ITEMS[id] = { ...ITEMS[src], name, desc, xian: 1, tian: 1, ...(ex || {}) };
+  RECIPES[id] = { g, n: RECIPES[src].n + 1 };
+  ITEMS[id].base = RECIPES[id].n * MAT_PRICE[g] * XIAN_DAN_K;
+}
+const T_DAN_COMMON = TIAN_DAN.filter(x => x[0].startsWith('x_') && !ITEMS[x[1]].rare).map(x => x[1]);
+const T_DAN_RARE = TIAN_DAN.filter(x => x[0].startsWith('x_') && ITEMS[x[1]].rare).map(x => x[1]);

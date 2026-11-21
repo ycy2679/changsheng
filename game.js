@@ -725,7 +725,7 @@ function eff(key, s = L()) {
 }
 // ---------- 限時藥效（s.buffs：丹藥 id → 剩幾秒） ----------
 const buffOn = (id, s = L()) => !!(s.buffs && s.buffs[id] > 0);
-const bm = (id, s, x = 2) => buffOn('x_' + id, s) ? x : buffOn(id, s) ? 1 : 0;   // 仙版雜丹效果加倍（奇遇、掉落、精進是三倍）
+const bm = (id, s, x = 2) => buffOn('td_' + id, s) ? x * 2 : buffOn('x_' + id, s) ? x : buffOn(id, s) ? 1 : 0;   // 仙版雜丹效果加倍（奇遇、掉落、精進是三倍）；道階版再加倍
 function buffEff(key, s = L()) {
   if (!s.buffs) return 0;
   switch (key) {
@@ -1707,7 +1707,7 @@ function usePill(id) {
     if (diff < 0) { amt = .5 * tf; injure(150); }
     const g = Math.min(need - s.xiu, Math.round(need * amt)); s.xiu += g; addTox(xp ? 17.5 : 10);   // 修為丹丹毒（原本 35／20，減半讓遊歷賺的錢能換成修為）
     msg = `服下${it.name}，修為 +${fmt(g)}${diff > 0 ? '（丹藥品級太低，效果甚微）' : diff < 0 ? '。藥力太猛，經脈受損' : ''}${tf < .9 ? '，丹毒積累，藥效打了折扣' : ''}。`;
-  } else if (it.kind === 'xlife') { if (danBlock(id, s)) return; const n = Math.round(300 * pe * tf); s.lifeBonus += n; s.xlifeN = (s.xlifeN || 0) + 1; addTox(30); msg = `服下延壽仙丹，壽元 +${n}。`; }
+  } else if (it.kind === 'xlife') { if (danBlock(id, s)) return; const n = Math.round((it.amt || 300) * pe * tf), k = it.tian ? 'tlifeN' : 'xlifeN'; s.lifeBonus += n; s[k] = (s[k] || 0) + 1; addTox(30); msg = `服下${it.name}，壽元 +${n}。`; }
   else if (it.kind === 'life') { const n = Math.round(15 * pe * tf); s.lifeBonus += n; addTox(30); msg = `服下延壽丹，壽元 +${n}。`; }
   else if (it.kind === 'body') { s.body += (it.amt || .03) * tf * (tl('xisuiwudu') ? 1.5 : 1); if (!tl('xisuiwudu')) addTox(30); msg = `服下${it.name}，`; msg += '筋骨一陣劇痛，氣血、攻擊、防禦永久提升。'; }
   else if (it.kind === 'dan') { msg = useDan(id, it, addTox); if (!msg) return; }
@@ -1720,15 +1720,16 @@ function usePill(id) {
 function danBlock(id, s = L()) {
   const it = ITEMS[id];
   if (it.kind === 'tech') return techLayer(s.tech, s) >= 9 && !s.subs.some(x => techLayer(x, s) < 9) ? noStudyMsg(s) : '';
-  if (it.kind === 'xlife') return !isXian(s) ? '凡人的身子受不住' : (s.xlifeN || 0) >= 3 ? '這一世已經吃了 3 顆' : '';
+  if (it.kind === 'xlife') return !isXian(s) ? '凡人的身子受不住' : it.tian && !isTian(s) ? '要登天以後才受得住' : (s[it.tian ? 'tlifeN' : 'xlifeN'] || 0) >= 3 ? '這一世已經吃了 3 顆' : '';
   if (it.kind !== 'dan') return '';
   switch (it.fx) {
     case 'jiedan': return !isXian(s) ? '要成仙之後才用得上' : (s.flags.jiedan || 0) >= 1 + tl('sidan') ? '效果還在' : '';
+    case 'tjiedan': return !isTian(s) ? '要登天以後才用得上' : (s.flags.tjiedan || 0) >= 1 + tl('sidan') ? '效果還在' : '';
     case 'guben': return (s.found || 0) >= .3 ? '根基已滿' : '';
     case 'huichun': return (s.hpNow ?? 1) >= 1 && (s.mpNow ?? 1) >= 1 ? '氣血法力都滿' : '';
     case 'qingxin': return s.tox < 1 ? '沒有丹毒' : '';
     case 'zhuyan': return s.age < 26 ? '未滿 26 歲' : '';
-    case 'tianji': if (it.xian && s.stage < GRADE_MIN_STAGE[7]) return '地仙起才有中品'; return s.flags[it.fx] ? '效果還在' : '';
+    case 'tianji': if (it.tian ? s.stage < GRADE_MIN_STAGE[10] : it.xian && s.stage < GRADE_MIN_STAGE[7]) return it.tian ? '金仙起才有中品' : '地仙起才有中品'; return s.flags[it.fx] ? '效果還在' : '';
     case 'pozhang': case 'humai': case 'xingshen': return s.flags[it.fx] ? '效果還在' : '';
   }
   return '';
@@ -1741,6 +1742,7 @@ function useDan(id, it, addTox) {
     case 'huichun': if ((s.hpNow ?? 1) >= 1 && (s.mpNow ?? 1) >= 1) return ''; s.hpNow = s.mpNow = s.snNow = 1; return `服下${it.name}，氣血、法力都回滿了。`;
     case 'qingxin': if (s.tox < 1) return ''; s.tox = Math.max(0, s.tox - (it.amt || 30)); return `服下${it.name}，體內的丹毒散去不少。`;
     case 'pozhang': if (s.flags.pozhang) return ''; s.flags.pozhang = 1; return `服下${it.name}，下一次小境界突破必定成功。`;
+    case 'tjiedan': if (danBlock(id, s)) return ''; s.flags.tjiedan = (s.flags.tjiedan || 0) + 1; return `服下${it.name}，藥力沉在丹田，等著劫雷落下${s.flags.tjiedan > 1 ? `（共 ${s.flags.tjiedan} 顆）` : ''}。`;
     case 'jiedan': if (danBlock(id, s)) return ''; s.flags.jiedan = (s.flags.jiedan || 0) + 1; return `服下渡劫仙丹，藥力沉在丹田，等著劫雷落下${s.flags.jiedan > 1 ? `（共 ${s.flags.jiedan} 顆）` : ''}。`;
     case 'humai': if (s.flags.humai) return ''; s.flags.humai = 1; return `服下${it.name}，經脈被一層藥力護住。`;
     case 'zhuyan': if (s.age < 26) return ''; s.age -= it.amt || 10; ageShift(s, -(it.amt || 10)); addTox(it.tox); return `服下${it.name}，鬢角的白髮轉黑，年齡 -${it.amt || 10} 歲。`;
@@ -1780,8 +1782,8 @@ function restock() {
   // 丹藥：延壽、洗髓、悟道固定有，另有一格珍品（突破丹、天材地寶，沒抽到就不擺）；櫃台有賣的不上貨架
   const m = stg().major;
   // 珍品格：突破丹、天材地寶、五行之精，都沒抽到就擺一顆珍品雜丹；其他格從常見丹藥裡輪替
-  const rare = isXian(s) ? pick(['dujiedan', 'xianshou', 'dujiedan', ...X_DAN_RARE]) : BRK_PILLS[m] && pct(.3) ? BRK_PILLS[m] : tcNext() && pct(.12) ? tcNext() : essenceNext() && pct(.1) ? essenceNext() : pick(DAN_RARE);
-  const common = [...(isXian(s) ? X_DAN_COMMON : DAN_COMMON)].sort(() => Math.random() - .5);
+  const rare = isTian(s) ? pick(['td_dujie', 'td_shou', 'td_dujie', ...T_DAN_RARE]) : isXian(s) ? pick(['dujiedan', 'xianshou', 'dujiedan', ...X_DAN_RARE]) : BRK_PILLS[m] && pct(.3) ? BRK_PILLS[m] : tcNext() && pct(.12) ? tcNext() : essenceNext() && pct(.1) ? essenceNext() : pick(DAN_RARE);
+  const common = [...(isTian(s) ? T_DAN_COMMON : isXian(s) ? X_DAN_COMMON : DAN_COMMON)].sort(() => Math.random() - .5);
   for (const id of [rare, ...common].slice(0, per)) slots.push({ k: 'item', id, price: itemPrice(id) });
   for (const slot of slots) if (pct(.12 * (1 + tl('qihuo')))) { slot.deal = 1; slot.price = Math.round(slot.price * .6); }
   s.shop = { next: Date.now() + shopRefresh() * 1000, slots };
@@ -1929,7 +1931,7 @@ const jieDrop = mj => mj === 12 ? '跌回玄仙一重' : '跌一重';
 const PRESS_CAP = .3;   // 劫前淬鍊上限
 // 仙劫成功率：基本 ＋ 劫前淬鍊 ＋ 渡劫仙丹 15%，天人五衰每個 -5%、負傷減半（不擲戰鬥，免得某些流派怎麼準備都過不了）
 function jieChance(s = L()) {
-  const p = (JIE_BASE[stg(s).major] || 0) + (s.press || 0) + .15 * (s.flags.jiedan || 0) + .025 * tl('pojing') - .05 * wuShuai(s) + (xpOn(s) ? effOf(s.tech, 'brk', s) : 0);   // 根本仙法的突破率也算進仙劫   // 破境如竹在仙界減半；海量可以吃兩顆渡劫仙丹
+  const p = (JIE_BASE[stg(s).major] || 0) + (s.press || 0) + .15 * (s.flags.jiedan || 0) + .25 * (s.flags.tjiedan || 0) +.025 * tl('pojing') - .05 * wuShuai(s) + (xpOn(s) ? effOf(s.tech, 'brk', s) : 0);   // 根本仙法的突破率也算進仙劫   // 破境如竹在仙界減半；海量可以吃兩顆渡劫仙丹
   return Math.max(.01, Math.min(.9, p * (s.injury > 0 ? .5 : 1)));   // 上限 90%：準備再足也有一成風險
 }
 // 停在大圓滿時繼續修煉：修為化為劫前淬鍊，閉關、遊歷都約一個半小時到上限
@@ -1950,7 +1952,7 @@ function xianJie() {
   if (armed !== 'xjie') { armed = 'xjie'; render(); return; }
   armed = ''; const name = JIE_NAME[stg(s).major];
   log(`你引動了${name}。劫雲從四面八方湧來——仙界的天，也會降劫。`);
-  const r = runJie(s); s.flags.jiedan = 0;
+  const r = runJie(s); s.flags.jiedan = 0; s.flags.tjiedan = 0;
   if (!r.ok) {
     const mj = stg(s).major; s.press = 0;
     if (tl('wenxin') && pct(.3)) {   // 道心穩固：三成機率境界保住，只散去這一重的修為、受傷（療傷丹治得好），不會根基破裂
@@ -1994,7 +1996,7 @@ function xjList(s = L()) {
   const rc = unknownRecipes().filter(id => RECIPES[id].g >= (isTian(s) ? 9 : 6) && RECIPES[id].g <= matGrade(s)).sort()[0];
   s.xj.shop = (s.xj.shop || []).filter(o => !(o.id in s.techs) && !(s.xpGot || {})[o.id]);   // 已經從別處學會的仙法就拿掉
   if (!s.xj.shop.length) xjRestock(s);
-  return [{ k: 'item', id: 'dujiedan', cost: 60 }, { k: 'item', id: 'xianshou', cost: 80 }, { k: 'item', id: XIU_PILLS[stg(s).major], cost: 25 }, ...(rc ? [{ k: 'recipe', id: rc, cost: 40 * RECIPES[rc].g }] : []), ...(s.xj.shop || [])];
+  return [{ k: 'item', id: isTian(s) ? 'td_dujie' : 'dujiedan', cost: 60 }, { k: 'item', id: isTian(s) ? 'td_shou' : 'xianshou', cost: 80 },{ k: 'item', id: XIU_PILLS[stg(s).major], cost: 25 }, ...(rc ? [{ k: 'recipe', id: rc, cost: 40 * RECIPES[rc].g }] : []), ...(s.xj.shop || [])];
 }
 function xjBuy(i) {
   const s = L(), o = xjList(s)[i]; if (!o || s.xj.gong < o.cost) return;
@@ -2272,7 +2274,7 @@ function updateDyn() {
   { const atTop = s.stage === MORTAL_TOP, w = atTop ? ascendWhy(s) : [], bt = buffText(s), noDao = !isXian(s) && stg().major >= 7 && S.meta.dao < ASCEND_DAO;
     const xj = isXian(s) && jieNext(s), ws = wuShuai(s);
     const tip = atTop ? (w.length ? '飛升還差：' + w.join('、') + (noDao ? '（道心在坐化或兵解時才會增加，這一世多半飛升不了）' : '') : '九道天雷之後就能飛升，但失敗就會身死。') : noDao ? `道心 ${S.meta.dao}/${ASCEND_DAO}，這一世多半飛升不了`
-      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗${jieDrop(stg().major)}、根基破裂 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= pressCap() - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ` · 渡劫仙丹 +${15 * s.flags.jiedan}%` : ''}`
+      : xj ? `${JIE_NAME[stg().major]} ${JIE_N[stg().major]} 道，失敗${jieDrop(stg().major)}、根基破裂 · 劫前淬鍊 +${Math.round((s.press || 0) * 100)}%${s.press >= pressCap() - 1e-9 ? '（已滿）' : '（停在大圓滿繼續修煉會慢慢增加）'}${s.flags.jiedan ? ` · 渡劫仙丹 +${15 * s.flags.jiedan}%` : ''}${s.flags.tjiedan ? ` · 渡厄道丹 +${25 * s.flags.tjiedan}%` : ''}`
       : s.stage >= STAGES.length - 1 ? '道祖。按「超脫」，到碑前做出選擇。' : '';
     $('buffs').textContent = cur(bt + (tip ? (bt ? '　' : '') + tip : '') + (ws ? `　天人五衰 ${ws}/5（修煉、氣血、攻擊 -${5 * ws}%）` : '')); } $('realm').textContent = realmName(s);
   $('res').innerHTML = `${cur('靈石')} ${fmt(s.stone)}${s.found >= .01 ? ` · <span class="same">根基 +${Math.round(s.found * 100)}%</span>` : ''}${s.tox >= 1 ? ` · <span class="${s.tox > 50 ? 'hurt' : ''}">丹毒 ${Math.ceil(s.tox)}%</span>` : ''}`;
@@ -2681,7 +2683,10 @@ const brewSec = (g, s = L()) => BREW_SEC[g] * (1 - arrSpeed(arrEff('danshi', s))
 const brewMax = (id, s = L()) => s.furnace || !brewOk(id, s) ? 0 : Math.min(Math.floor(count(brewNeed(id).id) / brewNeed(id).n) || 0, Math.floor(s.stone / brewFee(id)) || 0);
 // 修為丹只能煉目前大境界的那一種（仙界的修為仙丹，目前和更低仙境的都能煉）；突破丹目前和更低境界的都能煉
 const brewMajor = id => ITEMS[id].kind === 'xiu' ? XIU_PILLS.indexOf(id) : ITEMS[id].kind === 'brk' ? BRK_PILLS.indexOf(id) : -1;
-const brewOk = (id, s = L()) => { const m = brewMajor(id), mj = stg(s).major; return m < 0 || (ITEMS[id].kind === 'brk' || (isXian(s) && m >= XIAN_MJ) ? m <= mj : m === mj); };
+// 凡界、地仙界、天仙界各只煉得了自己那一界的丹（凡界黃～天階、地仙界仙階、天仙界道階）
+const danRealm = g => g >= 9 ? 2 : g >= 6 ? 1 : 0;
+const myRealm = (s = L()) => isTian(s) ? 2 : isXian(s) ? 1 : 0;
+const brewOk = (id, s = L()) => { const m = brewMajor(id), mj = stg(s).major; if (danRealm(RECIPES[id].g) !== myRealm(s)) return false; return m < 0 ||(ITEMS[id].kind === 'brk' || (isXian(s) && m >= XIAN_MJ) ? m <= mj : m === mj); };
 function tryBrew(id, qty = 1, s = L()) {
   const r = RECIPES[id], nd = brewNeed(id);
   if (s.furnace || !r || !knowRecipe(id) || !brewOk(id, s) || qty < 1 || count(nd.id) < nd.n * qty || s.stone < brewFee(id) * qty) return false;
@@ -2859,9 +2864,9 @@ function setCraftTab(k) { craftTab = k; render(); }
 const craftNav = () => `<nav>${(isXian() ? [['dan', '仙丹'], ['qi', '靈器'], ['zhen', '仙陣']] : [['dan', '煉丹'], ['qi', '煉器'], ['zhen', '陣法']]).map(([k, n]) => `<button class="${craftTab === k ? 'on' : ''}" onclick="setCraftTab('${k}')">${n}</button>`).join('')}</nav>`;
 function renderCraft() {
   const s = L(), lv = alchLv(), xp = s.alch || 0, f = s.furnace;
-  const here = Object.keys(RECIPES).filter(id => (RECIPES[id].g >= 6) === isXian(s));   // 凡界、仙界的丹方分開算
+  const here = Object.keys(RECIPES).filter(id => danRealm(RECIPES[id].g) === myRealm(s));   // 凡界、地仙界、天仙界的丹方分開算
   const known = here.filter(knowRecipe), total = here.length;
-  const herbs = (isXian(s) ? MAT_HERB.slice(6) : MAT_HERB.slice(1, 5)).filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
+  const herbs = (isTian(s) ? MAT_HERB.slice(9) : isXian(s) ? MAT_HERB.slice(6, 9) : MAT_HERB.slice(1, 5)).filter(Boolean).map(id => `${ITEMS[id].name} ${count(id)}`).join('　');
   const row = id => {
     const r = RECIPES[id], nd = brewNeed(id), max = brewMax(id, s), key = 'dan:' + id, q = getQty(key, Math.max(max, 1)), ok = max >= 1;
     return `<div class="item"><div class="row"><b>${ITEMS[id].name}</b> ${gradeTag(r.g)}</div>
@@ -2878,7 +2883,7 @@ function renderCraft() {
     <p class="small">${isXian(s) ? '仙草' : '靈草'}：${herbs}</p>
     <h3${gx()}>丹方（${known.length}/${total}）</h3>
     ${(gs => gradeNav('dan', gs) + known.filter(id => RECIPES[id].g === craftG('dan', gs)).map(row).join(''))((isXian(s) ? [6, 7, 8, 9, 10, 11] : [1, 2, 3, 4]).filter(g => known.some(id => RECIPES[id].g === g)))}
-    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4${isXian(s) ? "（仙階中品修為仙丹 ×2、上品 ×4）" : ""}。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種${isXian(s) ? '（仙界的修為仙丹，更低仙境的也能煉）' : ''}，突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
+    <p class="muted small">品質決定顆數：下品 1 顆、中品 2、上品 3、極品 4${isXian(s) ? "（仙階中品修為仙丹 ×2、上品 ×4）" : ""}。開爐要付坊市價三成的${isXian(s) ? '仙元石' : '靈石'}當爐費；修為丹只能煉目前大境界用的那一種${isXian(s) ? '（仙界的修為仙丹，更低仙境的也能煉）' : ''}，突破丹目前和更低境界的都能煉。失敗${isXian(s) ? '仙草' : '靈草'}會燒掉，${isXian(s) ? '仙丹' : '地階以上的丹'}還可能炸爐受傷。${isTian(s) ? '登天以後只煉得了道階的丹：道階丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。道階仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : isXian(s) ? '成仙以後只煉得了仙丹：仙丹方從遊歷、秘境、仙籍兌換得到，學過的丹方轉世後還記得。仙草從遊歷打怪、仙籍差事、秘境、坊市櫃台、仙藥園取得；丹道功法和仙丹室都能提高成功率。' : '黃階丹方生來就會，其他丹方從遊歷、秘境、百草丹宗得到，學過的丹方轉世後還記得。靈草從遊歷打怪、宗門採藥、秘境、坊市櫃台取得；丹道功法和百草丹宗身分都能提高成功率。'}</p>`;
 }
 // ---------- 新手引導：依進度跳出的提示卡（每張一次，跨世記錄在 meta.tips） ----------
 const TIPS = [
