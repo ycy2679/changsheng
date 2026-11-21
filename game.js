@@ -2716,8 +2716,9 @@ function brewDone(f, s) {
     log(`丹成！${QUAL_RANK[q]}${nm} ${n} 顆出爐。`, true);
   } else {
     s.alch = (s.alch || 0) + Math.ceil(BREW_XP[g] / 2);
-    if (g >= 3 && pct(.3)) { injure(60 * g); log(`煉${nm}時丹爐炸了，你受了點傷，靈草全毀。`, true); }
-    else log(`煉${nm}失敗，靈草化成了一爐藥渣。`, true);
+    const herb = isXian(s) ? '仙草' : '靈草';
+    if (g >= 3 && pct(.3)) { injure(60 * g); log(`煉${nm}時丹爐炸了，你受了點傷，${herb}全毀。`, true); }
+    else log(`煉${nm}失敗，${herb}化成了一爐藥渣。`, true);
   }
   dirty = true;
 }
