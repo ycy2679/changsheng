@@ -1404,7 +1404,7 @@ function autoActs() {
 function autoLife() {
   if (!autoOn('a_rebirth')) return;
   const s = L();
-  if (s.dead) { rebirth(); return; }
+  if (s.dead) { if (!s.chaotuo) rebirth(); return; }   // 超脫的結局要讓玩家自己看完、自己按轉世
   const m = s.mortal;   // 凡人篇：挑最稀有的出身、第一個仙緣
   // 飛升過以後：照上一次的選擇（從凡人／從仙人開始）；還沒選過就停下來等你
   if (m && m.phase === 'birth' && S.meta.ascends > 0 && S.meta.lastStart !== 'mortal') { if (S.meta.lastStart === 'xian') chooseXianStart(); return; }
